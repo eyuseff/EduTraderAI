@@ -1,6 +1,8 @@
 import yfinance as yf
 import pandas as pd
 
+from indicators import calculate_indicators
+
 WATCHLIST = [
     "AAPL",
     "MSFT",
@@ -12,31 +14,36 @@ WATCHLIST = [
 
 
 def get_stock_data(symbol):
-    stock = yf.Ticker(symbol)
-    hist = stock.history(period="5d")
 
-    if hist.empty:
+    stock = yf.Ticker(symbol)
+
+    df = stock.history(period="1y")
+
+    if df.empty:
         return None
 
-    current = hist["Close"].iloc[-1]
-    previous = hist["Close"].iloc[-2]
+    df = calculate_indicators(df)
 
-    change = ((current - previous) / previous) * 100
+    latest = df.iloc[-1]
 
     return {
         "Symbol": symbol,
-        "Price": current,
-        "Change": change
+        "Price": latest["Close"],
+        "RSI": latest["RSI"],
+        "EMA20": latest["EMA20"],
+        "EMA50": latest["EMA50"],
+        "SMA200": latest["SMA200"],
+        "MACD": latest["MACD"],
+        "Signal": latest["MACD_SIGNAL"],
     }
 
 
 def scan_market():
-    print("\n🚀 EduTrader AI")
-    print("=" * 60)
-    print(f'{"Symbol":<10}{"Price":>12}{"Change":>12}')
-    print("-" * 60)
 
-    results = []
+    print("\n🚀 EduTrader AI")
+    print("=" * 70)
+    print(f'{"Symbol":<10}{"Price":>12}{"RSI":>10}')
+    print("-" * 70)
 
     for symbol in WATCHLIST:
 
@@ -44,15 +51,11 @@ def scan_market():
 
         if data:
 
-            results.append(data)
-
             print(
                 f'{data["Symbol"]:<10}'
                 f'${data["Price"]:>10.2f}'
-                f'{data["Change"]:>11.2f}%'
+                f'{data["RSI"]:>10.1f}'
             )
-
-    return pd.DataFrame(results)
 
 
 if __name__ == "__main__":
