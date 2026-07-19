@@ -15,16 +15,18 @@ class Order:
     symbol: str
     side: TradeSide
     quantity: int
-
-    price: float | None = None
+    price: float
 
     status: OrderStatus = OrderStatus.PENDING
     broker_order_id: str | None = None
+    rejection_reason: str | None = None
+
     id: int | None = None
 
     created_at: datetime = field(
         default_factory=lambda: datetime.now(UTC)
     )
+    filled_at: datetime | None = None
 
     def __post_init__(self) -> None:
         self.symbol = self.symbol.strip().upper()
@@ -32,11 +34,20 @@ class Order:
         if not self.symbol:
             raise ValueError("Order symbol cannot be empty.")
 
+        if not isinstance(self.side, TradeSide):
+            raise TypeError("Order side must be a TradeSide value.")
+
         if self.quantity <= 0:
             raise ValueError("Order quantity must be positive.")
 
-        if self.price is not None and self.price <= 0:
+        if self.price <= 0:
             raise ValueError("Order price must be greater than zero.")
+
+    @property
+    def notional_value(self) -> float:
+        """Return the total monetary value of the order."""
+
+        return self.quantity * self.price
 
     @property
     def is_pending(self) -> bool:
