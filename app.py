@@ -10,6 +10,8 @@ from broker.alpaca_paper import AlpacaPaperBroker
 from broker.simulated import SimulatedPaperBroker
 from trading.execution import PaperExecutionEngine
 from trading.risk_manager import RiskLimits, RiskManager, TradeProposal
+from engine.brain import EduTraderBrain
+from scanner_engine.universe import CORE_UNIVERSE, normalize_universe
 
 
 st.set_page_config(
@@ -31,11 +33,11 @@ def money(value: float) -> str:
 
 with st.sidebar:
     st.title("🛡️ EduTrader AI")
-    st.caption("v3.1 · Paper-Trading Foundation")
+    st.caption("v3.2 · Automated Scanner")
     st.success("PAPER MODE ONLY")
     page = st.radio(
         "Navigation",
-        ["Safety Dashboard", "Paper Order", "Orders & Positions", "Legacy Dashboard"],
+        ["Safety Dashboard", "Automated Scanner", "Paper Order", "Orders & Positions", "Legacy Dashboard"],
     )
     st.divider()
     broker_choice = st.selectbox("Paper broker", ["Local Simulator", "Alpaca Paper"])
@@ -118,6 +120,70 @@ if page == "Safety Dashboard":
         "Paper trading is a simulation. It does not reproduce every effect of live execution, "
         "including all slippage, queue position, partial fills, outages, or price gaps."
     )
+
+
+elif page == "Automated Scanner":
+    st.title("Automated Scanner + Paper Execution")
+    st.caption("Run a market-regime-gated scan. Preview is the default; execution remains paper-only.")
+
+    c1, c2, c3 = st.columns(3)
+    min_score = c1.slider("Minimum score", 70, 100, 80)
+    max_new = c2.number_input("Maximum new paper trades", 1, 3, 3)
+    universe_text = c3.text_input("Optional tickers", value="")
+    custom = [x.strip().upper() for x in universe_text.split(",") if x.strip()]
+    symbols = normalize_universe(custom or list(CORE_UNIVERSE))
+
+    execute = st.checkbox("Submit approved paper orders automatically after this scan", value=False)
+    confirmation = st.text_input(
+        'To enable paper submission, type exactly: AUTO PAPER',
+        disabled=not execute,
+    )
+    run_disabled = execute and confirmation != "AUTO PAPER"
+
+    if st.button("Run Automated Scan", type="primary", disabled=run_disabled):
+        try:
+            brain = EduTraderBrain(engine)
+            with st.spinner(f"Scanning {len(symbols)} liquid instruments..."):
+                cycle = brain.run_cycle(
+                    symbols,
+                    min_score=min_score,
+                    max_new_trades=int(max_new),
+                    submit_orders=execute,
+                )
+            regime = cycle.scan.regime
+            if regime.tradeable:
+                st.success(f"Market regime: {regime.label} ({regime.score}/100) — trading gate open")
+            else:
+                st.error(f"Market regime: {regime.label} ({regime.score}/100) — new trades blocked")
+            for reason in regime.reasons:
+                st.write(f"• {reason}")
+
+            st.subheader("Qualified Candidates")
+            rows = [{
+                "Symbol": x.symbol, "Score": x.score, "Entry": x.entry_price,
+                "Stop": x.stop_price, "Target": x.target_price,
+                "Daily Change %": round(x.daily_change_pct, 2),
+                "Average Volume": int(x.average_volume),
+            } for x in cycle.scan.qualified]
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            else:
+                st.info("No candidates passed every scanner filter.")
+
+            st.subheader("Paper Orders / Previews")
+            if cycle.submitted:
+                st.dataframe(pd.DataFrame(cycle.submitted), use_container_width=True, hide_index=True)
+            else:
+                st.info("No paper orders or previews were produced.")
+
+            with st.expander("Rejected candidates and reasons"):
+                rejected = cycle.scan.rejected + cycle.rejected_by_risk
+                if rejected:
+                    st.dataframe(pd.DataFrame(rejected), use_container_width=True, hide_index=True)
+                else:
+                    st.write("No rejected candidates.")
+        except Exception as exc:
+            st.error(f"Automated scan failed safely: {exc}")
 
 elif page == "Paper Order":
     st.title("Create a Paper Trade")
@@ -209,5 +275,5 @@ else:
 st.divider()
 st.caption(
     "Educational software under development. Paper results do not guarantee live results. "
-    "EduTrader AI v3.1 cannot connect to a live trading endpoint."
+    "EduTrader AI v3.2 cannot connect to a live trading endpoint."
 )

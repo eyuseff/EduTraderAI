@@ -1,6 +1,79 @@
 {
   "cash": 100000.0,
   "daily_pnl": 0.0,
-  "orders": [],
+  "orders": [
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "179a3221-7853-4100-badc-46031f9cda16",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 50,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 95.72,
+      "submitted_price": 100.68,
+      "symbol": "ABT",
+      "target_price": 111.59
+    },
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "c6905973-2178-4d2c-a7b1-dc7aca8ffd4e",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 25,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 244.63,
+      "submitted_price": 254.49,
+      "symbol": "ABBV",
+      "target_price": 276.18
+    },
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "35b4923a-f4dc-4c06-a080-7f22722bffb3",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 4,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 1121.41,
+      "submitted_price": 1179.11,
+      "symbol": "LLY",
+      "target_price": 1306.05
+    },
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "d6206440-d337-482f-8e16-ca66519388c0",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 13,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 406.95,
+      "submitted_price": 426.09,
+      "symbol": "UNH",
+      "target_price": 468.2
+    },
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "037f972d-bc93-44c6-95df-f75b0dcef021",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 5,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 600.02,
+      "submitted_price": 646.01,
+      "symbol": "META",
+      "target_price": 747.19
+    },
+    {
+      "message": "Recorded by the local simulator; no real order was sent.",
+      "order_id": "7f3c9dd6-455e-4b63-9928-16e47f6ae949",
+      "order_type": "bracket-limit-simulation",
+      "quantity": 21,
+      "side": "buy",
+      "status": "accepted",
+      "stop_price": 329.44,
+      "submitted_price": 341.1,
+      "symbol": "JPM",
+      "target_price": 366.75
+    }
+  ],
   "positions": []
 }
