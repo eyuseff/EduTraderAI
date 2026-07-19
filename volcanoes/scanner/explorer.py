@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from volcanoes.database.models import Candidate
+from volcanoes.domain import Candidate
 from volcanoes.indicators.engine import IndicatorEngine
 from volcanoes.market.sentinel import Sentinel
 
@@ -55,3 +55,18 @@ class Explorer:
             entry_price=price,
             explanation=" ".join(reasons),
         )
+
+    def scan_symbols(self, symbols: list[str]) -> list[Candidate]:
+        """Scan multiple symbols and return candidates sorted by score."""
+
+        candidates: list[Candidate] = []
+
+        for symbol in symbols:
+            try:
+                candidates.append(self.evaluate_symbol(symbol))
+            except Exception as exc:
+                print(f"Skipping {symbol}: {exc}")
+
+        candidates.sort(key=lambda candidate: candidate.score, reverse=True)
+
+        return candidates
