@@ -1,88 +1,164 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
+
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
+import yfinance as yf
+
+from config import APP_NAME, WATCHLIST
+from position_sizing import PositionSizingEngine
+from risk import RiskEngine
+from scanner import MarketScanner
+from strategy import StrategyEngine
 
 
 st.set_page_config(
-    page_title="EduTrader AI",
+    page_title=f"{APP_NAME} 3.1",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-
-# -----------------------------
-# Demo data
-# -----------------------------
-RANKING_DATA = [
-    {"Rank": 1, "Ticker": "META", "Score": 95, "Signal": "STRONG BUY", "Price": 515.40, "RSI": 61.2, "Risk": "Medium"},
-    {"Rank": 2, "Ticker": "NVDA", "Score": 95, "Signal": "STRONG BUY", "Price": 141.25, "RSI": 64.7, "Risk": "High"},
-    {"Rank": 3, "Ticker": "AAPL", "Score": 85, "Signal": "BUY", "Price": 224.10, "RSI": 57.4, "Risk": "Low"},
-    {"Rank": 4, "Ticker": "AMZN", "Score": 70, "Signal": "BUY", "Price": 218.70, "RSI": 55.1, "Risk": "Medium"},
-    {"Rank": 5, "Ticker": "GOOGL", "Score": 50, "Signal": "HOLD", "Price": 192.35, "RSI": 49.8, "Risk": "Low"},
-    {"Rank": 6, "Ticker": "MSFT", "Score": 40, "Signal": "SELL", "Price": 452.80, "RSI": 43.6, "Risk": "Medium"},
-]
-
-PRICE_HISTORY = pd.DataFrame(
-    {
-        "Day": pd.date_range(end=datetime.now(), periods=30, freq="D"),
-        "Price": [
-            490, 494, 492, 497, 501, 499, 503, 506, 508, 505,
-            509, 512, 510, 514, 516, 518, 515, 519, 522, 521,
-            524, 526, 523, 527, 529, 531, 528, 532, 534, 535,
-        ],
-    }
-).set_index("Day")
+TRADEABLE = {"BUY", "STRONG BUY"}
 
 
-def signal_label(signal: str) -> str:
+def signal_icon(signal: str) -> str:
     icons = {
         "STRONG BUY": "🟢",
         "BUY": "🟩",
         "HOLD": "🟡",
-        "SELL": "🔴",
+        "SELL": "🟥",
+        "STRONG SELL": "🔴",
     }
     return f"{icons.get(signal, '⚪')} {signal}"
 
 
-def recommendation_text(row: pd.Series) -> str:
-    signal = row["Signal"]
-    ticker = row["Ticker"]
-    score = row["Score"]
-    rsi = row["RSI"]
-    risk = row["Risk"]
+def risk_level(atr: float, price: float) -> str:
+    if price <= 0:
+        return "Unknown"
+    atr_pct = atr / price * 100
+    if atr_pct < 2.5:
+        return "Low"
+    if atr_pct < 5.0:
+        return "Medium"
+    return "High"
 
-    if signal == "STRONG BUY":
-        return (
-            f"{ticker} is currently rated STRONG BUY with an AI score of {score}/100. "
-            f"Momentum remains positive, while RSI at {rsi:.1f} is elevated but not yet extreme. "
-            f"Risk is classified as {risk.lower()}, so position sizing and stop-loss discipline remain important."
+
+@st.cache_data(ttl=900, show_spinner=False)
+def run_live_scan() -> pd.DataFrame:
+    scanner = MarketScanner()
+    strategy = StrategyEngine()
+    risk_engine = RiskEngine()
+
+    rows: list[dict[str, Any]] = []
+    for stock in scanner.scan():
+        result = strategy.evaluate(stock)
+        risk = risk_engine.calculate(stock)
+        rows.append(
+            {
+                "Ticker": stock["Symbol"],
+                "Price": stock["Price"],
+                "Score": result.score,
+                "Signal": result.recommendation,
+                "RSI": stock["RSI"],
+                "EMA20": stock["EMA20"],
+                "EMA50": stock["EMA50"],
+                "SMA200": stock["SMA200"],
+                "MACD": stock["MACD"],
+                "ATR": stock["ATR"],
+                "Risk": risk_level(stock["ATR"], stock["Price"]),
+                "Entry": risk.entry,
+                "Stop Loss": risk.stop_loss,
+                "Target": risk.target,
+                "Risk/Reward": risk.risk_reward,
+                "Reasons": result.reasons,
+            }
         )
-    if signal == "BUY":
-        return (
-            f"{ticker} is rated BUY with a score of {score}/100. "
-            f"The setup is constructive, with RSI at {rsi:.1f}. "
-            f"Consider entering only if the trade fits your portfolio risk limits."
+
+    if not rows:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame(rows).sort_values(
+        ["Score", "Ticker"], ascending=[False, True]
+    )
+    frame.insert(0, "Rank", range(1, len(frame) + 1))
+    return frame.reset_index(drop=True)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_history(symbol: str, period: str = "6mo") -> pd.DataFrame:
+    data = yf.download(
+        symbol,
+        period=period,
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=False,
+    )
+    if data.empty:
+        return data
+
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+    return data.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def candlestick_chart(history: pd.DataFrame, symbol: str) -> go.Figure:
+    figure = go.Figure()
+    figure.add_trace(
+        go.Candlestick(
+            x=history.index,
+            open=history["Open"],
+            high=history["High"],
+            low=history["Low"],
+            close=history["Close"],
+            name=symbol,
         )
-    if signal == "HOLD":
-        return (
-            f"{ticker} is rated HOLD with a score of {score}/100. "
-            "The model does not currently identify a strong enough edge for a new position."
+    )
+
+    close = history["Close"]
+    figure.add_trace(
+        go.Scatter(
+            x=history.index,
+            y=close.rolling(20).mean(),
+            mode="lines",
+            name="SMA 20",
         )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=history.index,
+            y=close.rolling(50).mean(),
+            mode="lines",
+            name="SMA 50",
+        )
+    )
+    figure.update_layout(
+        title=f"{symbol} price history",
+        height=520,
+        margin=dict(l=10, r=10, t=55, b=10),
+        xaxis_rangeslider_visible=False,
+        legend_orientation="h",
+    )
+    return figure
+
+
+def explanation(row: pd.Series) -> str:
+    reasons = row.get("Reasons", [])
+    reason_text = " ".join(f"• {reason}" for reason in reasons)
     return (
-        f"{ticker} is rated SELL with a score of {score}/100. "
-        "The current setup is weak, so the model recommends avoiding a new long position."
+        f"{row['Ticker']} is rated {row['Signal']} with a score of "
+        f"{int(row['Score'])}/100. {reason_text}"
     )
 
 
-# -----------------------------
-# Sidebar
-# -----------------------------
 with st.sidebar:
     st.title("📈 EduTrader AI")
-    st.caption("Professional Trading Dashboard")
+    st.caption("Live Market Intelligence")
     st.divider()
 
     page = st.radio(
@@ -106,176 +182,168 @@ with st.sidebar:
         format="%.2f%%",
     )
 
-    st.caption("EduTrader AI v3.0 Preview")
+    if st.button("🔄 Refresh live data", width="stretch"):
+        run_live_scan.clear()
+        load_history.clear()
+        st.rerun()
+
+    st.caption("EduTrader AI v3.1")
 
 
-ranking_df = pd.DataFrame(RANKING_DATA)
-ranking_df["Signal Display"] = ranking_df["Signal"].map(signal_label)
+with st.spinner("Downloading market data and running the strategy engine..."):
+    scan_df = run_live_scan()
+
+if scan_df.empty:
+    st.error(
+        "No market data was returned. Check your internet connection and try Refresh live data."
+    )
+    st.stop()
+
+scan_df["Signal Display"] = scan_df["Signal"].map(signal_icon)
 
 
-# -----------------------------
-# Dashboard
-# -----------------------------
 if page == "Dashboard":
     st.title("EduTrader AI Professional")
-    st.caption(f"Market intelligence dashboard · {datetime.now():%A, %B %d, %Y}")
+    st.caption(f"Live dashboard · {datetime.now():%A, %B %d, %Y at %H:%M}")
     st.divider()
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Top AI Score", "95 / 100", "+5")
-    col2.metric("Trade Candidates", "4", "+1")
-    col3.metric("Portfolio Value", f"${account_value:,.0f}")
-    col4.metric("Risk per Trade", f"{risk_per_trade:.2f}%")
+    top_score = int(scan_df["Score"].max())
+    candidates = int(scan_df["Signal"].isin(TRADEABLE).sum())
+    leader = str(scan_df.iloc[0]["Ticker"])
 
-    st.subheader("🏆 Top Opportunities")
-    display_df = ranking_df[["Rank", "Ticker", "Score", "Signal Display", "Price", "RSI", "Risk"]].copy()
-    display_df.columns = ["Rank", "Ticker", "AI Score", "Signal", "Price", "RSI", "Risk"]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Top AI Score", f"{top_score} / 100")
+    c2.metric("Trade Candidates", str(candidates))
+    c3.metric("Current Leader", leader)
+    c4.metric("Portfolio Value", f"${account_value:,.0f}")
 
-    left, right = st.columns([1.5, 1])
+    st.subheader("🏆 Live Ranking")
+    table = scan_df[
+        ["Rank", "Ticker", "Score", "Signal Display", "Price", "RSI", "Risk"]
+    ].copy()
+    table.columns = ["Rank", "Ticker", "AI Score", "Signal", "Price", "RSI", "Risk"]
+    st.dataframe(table, width="stretch", hide_index=True)
 
+    selected = st.selectbox("Analyze stock", scan_df["Ticker"].tolist())
+    row = scan_df.loc[scan_df["Ticker"] == selected].iloc[0]
+    history = load_history(selected)
+
+    left, right = st.columns([1.65, 1])
     with left:
-        st.subheader("📊 Market Trend")
-        st.line_chart(PRICE_HISTORY, use_container_width=True)
+        st.subheader("📊 Interactive Chart")
+        if history.empty:
+            st.warning("Price history is temporarily unavailable.")
+        else:
+            st.plotly_chart(candlestick_chart(history, selected), width="stretch")
 
     with right:
-        st.subheader("🤖 AI Recommendation")
-        selected = st.selectbox("Select stock", ranking_df["Ticker"].tolist())
-        selected_row = ranking_df.loc[ranking_df["Ticker"] == selected].iloc[0]
+        st.subheader("🤖 Strategy Analysis")
+        m1, m2 = st.columns(2)
+        m1.metric("Signal", signal_icon(str(row["Signal"])))
+        m2.metric("AI Score", f"{int(row['Score'])}/100")
+        st.metric("Live Price", f"${float(row['Price']):,.2f}")
+        st.info(explanation(row))
 
-        st.metric("Current Signal", signal_label(selected_row["Signal"]))
-        st.metric("AI Score", f"{selected_row['Score']} / 100")
-        st.metric("Current Price", f"${selected_row['Price']:,.2f}")
-        st.info(recommendation_text(selected_row))
+        st.subheader("Risk Plan")
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Entry", f"${float(row['Entry']):,.2f}")
+        r2.metric("Stop", f"${float(row['Stop Loss']):,.2f}")
+        r3.metric("Target", f"${float(row['Target']):,.2f}")
 
-        if selected_row["Signal"] in {"BUY", "STRONG BUY"}:
-            max_risk_dollars = account_value * (risk_per_trade / 100)
-            example_stop_distance = selected_row["Price"] * 0.05
-            shares = int(max_risk_dollars / example_stop_distance) if example_stop_distance else 0
+        if row["Signal"] in TRADEABLE:
+            sizing = PositionSizingEngine(
+                account_balance=account_value,
+                risk_percentage=risk_per_trade,
+            ).calculate(
+                entry_price=float(row["Entry"]),
+                stop_loss=float(row["Stop Loss"]),
+                target_price=float(row["Target"]),
+            )
             st.success(
-                f"Illustrative position size: {shares} shares, assuming a 5% stop distance."
+                f"Trade eligible: {sizing.shares} shares · "
+                f"Capital required ${sizing.capital_required:,.2f} · "
+                f"Maximum modeled loss ${sizing.actual_loss:,.2f}"
             )
         else:
-            st.warning("No new trade is recommended for this stock.")
+            st.warning("NO TRADE: the strategy does not recommend a new long position.")
 
-    st.caption(
-        "Educational prototype only. This application does not provide personalized financial advice."
-    )
-
-
-# -----------------------------
-# Market Scanner
-# -----------------------------
 elif page == "Market Scanner":
-    st.title("Market Scanner")
-    st.caption("Rank securities by AI score, technical momentum, and risk.")
+    st.title("Live Market Scanner")
+    st.caption("Yahoo Finance data evaluated by your existing EduTrader strategy engine.")
 
-    minimum_score = st.slider("Minimum AI score", 0, 100, 50, 5)
-    signals = st.multiselect(
+    minimum_score = st.slider("Minimum score", 0, 100, 0, 5)
+    selected_signals = st.multiselect(
         "Signals",
-        ["STRONG BUY", "BUY", "HOLD", "SELL"],
-        default=["STRONG BUY", "BUY", "HOLD", "SELL"],
+        ["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"],
+        default=["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"],
     )
-
-    filtered = ranking_df[
-        (ranking_df["Score"] >= minimum_score)
-        & (ranking_df["Signal"].isin(signals))
+    filtered = scan_df[
+        (scan_df["Score"] >= minimum_score)
+        & (scan_df["Signal"].isin(selected_signals))
     ]
 
     st.dataframe(
-        filtered[["Rank", "Ticker", "Score", "Signal Display", "Price", "RSI", "Risk"]],
-        use_container_width=True,
+        filtered[
+            [
+                "Rank", "Ticker", "Score", "Signal Display", "Price", "RSI",
+                "EMA20", "EMA50", "SMA200", "MACD", "ATR", "Risk",
+            ]
+        ],
+        width="stretch",
         hide_index=True,
     )
-
     st.download_button(
         "Download scanner results",
-        data=filtered.to_csv(index=False).encode("utf-8"),
-        file_name="edutrader_scanner_results.csv",
+        data=filtered.drop(columns=["Reasons", "Signal Display"]).to_csv(index=False),
+        file_name="edutrader_live_scan.csv",
         mime="text/csv",
     )
 
-
-# -----------------------------
-# Portfolio
-# -----------------------------
 elif page == "Portfolio":
-    st.title("Portfolio")
-    st.caption("Preview of portfolio monitoring and position sizing.")
+    st.title("Portfolio & Position Sizing")
+    st.caption("Risk-controlled position plans for current trade candidates.")
 
-    cash = account_value * 0.35
-    invested = account_value - cash
-    daily_change = account_value * 0.0064
+    plans: list[dict[str, Any]] = []
+    for _, row in scan_df.iterrows():
+        if row["Signal"] not in TRADEABLE:
+            continue
+        sizing = PositionSizingEngine(account_value, risk_per_trade).calculate(
+            float(row["Entry"]), float(row["Stop Loss"]), float(row["Target"])
+        )
+        plans.append(
+            {
+                "Ticker": row["Ticker"],
+                "Signal": row["Signal"],
+                "Shares": sizing.shares,
+                "Entry": row["Entry"],
+                "Stop Loss": row["Stop Loss"],
+                "Target": row["Target"],
+                "Capital Required": sizing.capital_required,
+                "Maximum Loss": sizing.actual_loss,
+                "Estimated Profit": sizing.estimated_profit,
+            }
+        )
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Value", f"${account_value:,.2f}", f"${daily_change:,.2f}")
-    c2.metric("Invested", f"${invested:,.2f}")
-    c3.metric("Cash", f"${cash:,.2f}")
+    if plans:
+        st.dataframe(pd.DataFrame(plans), width="stretch", hide_index=True)
+    else:
+        st.info("There are no trade-eligible stocks in the current scan.")
 
-    positions = pd.DataFrame(
-        [
-            {"Ticker": "META", "Shares": 35, "Average Cost": 498.20, "Current Price": 515.40},
-            {"Ticker": "NVDA", "Shares": 80, "Average Cost": 132.10, "Current Price": 141.25},
-            {"Ticker": "AAPL", "Shares": 45, "Average Cost": 216.50, "Current Price": 224.10},
-        ]
-    )
-    positions["Market Value"] = positions["Shares"] * positions["Current Price"]
-    positions["P/L"] = (
-        positions["Current Price"] - positions["Average Cost"]
-    ) * positions["Shares"]
-
-    st.dataframe(positions, use_container_width=True, hide_index=True)
-
-
-# -----------------------------
-# Backtesting
-# -----------------------------
 elif page == "Backtesting":
     st.title("Backtesting")
-    st.caption("The backtesting engine will be connected in EduTrader AI v3.1.")
+    st.info(
+        "The live dashboard is complete. The historical execution engine and equity curve "
+        "will be connected in EduTrader AI v3.2."
+    )
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Return", "18.4%")
-    c2.metric("Win Rate", "62.5%")
-    c3.metric("Max Drawdown", "-7.8%")
-    c4.metric("Sharpe Ratio", "1.41")
-
-    equity_curve = pd.DataFrame(
-        {
-            "Date": pd.date_range(end=datetime.now(), periods=60, freq="D"),
-            "Portfolio Value": [
-                100000 + (i * 290) + ((i % 7) - 3) * 140 for i in range(60)
-            ],
-        }
-    ).set_index("Date")
-
-    st.subheader("Equity Curve")
-    st.line_chart(equity_curve, use_container_width=True)
-    st.info("This page currently uses demonstration data.")
-
-
-# -----------------------------
-# Settings
-# -----------------------------
 else:
     st.title("Settings")
-    st.caption("Configure portfolio and risk-management preferences.")
+    st.write("Current watchlist:", ", ".join(WATCHLIST))
+    st.write(f"Portfolio value: ${account_value:,.2f}")
+    st.write(f"Risk per trade: {risk_per_trade:.2f}%")
+    st.caption("Edit WATCHLIST in config.py to add or remove symbols.")
 
-    st.number_input(
-        "Default account value",
-        min_value=1_000.0,
-        value=account_value,
-        step=1_000.0,
-    )
-    st.slider(
-        "Default risk per trade",
-        min_value=0.25,
-        max_value=3.0,
-        value=risk_per_trade,
-        step=0.25,
-    )
-    st.checkbox("Enable trade alerts", value=False)
-    st.checkbox("Enable paper-trading mode", value=True)
-
-    if st.button("Save settings"):
-        st.success("Settings saved for this session.")
+st.divider()
+st.caption(
+    "Educational software only. Market data may be delayed. This is not personalized financial advice."
+)
