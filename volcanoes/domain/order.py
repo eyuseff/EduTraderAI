@@ -1,0 +1,51 @@
+"""Order domain model for Volcanes."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+from volcanoes.domain.enums import OrderStatus, TradeSide
+
+
+@dataclass
+class Order:
+    """Represents an order submitted to a broker."""
+
+    symbol: str
+    side: TradeSide
+    quantity: int
+
+    price: float | None = None
+
+    status: OrderStatus = OrderStatus.PENDING
+    broker_order_id: str | None = None
+    id: int | None = None
+
+    created_at: datetime = field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+
+    def __post_init__(self) -> None:
+        self.symbol = self.symbol.strip().upper()
+
+        if not self.symbol:
+            raise ValueError("Order symbol cannot be empty.")
+
+        if self.quantity <= 0:
+            raise ValueError("Order quantity must be positive.")
+
+        if self.price is not None and self.price <= 0:
+            raise ValueError("Order price must be greater than zero.")
+
+    @property
+    def is_pending(self) -> bool:
+        return self.status == OrderStatus.PENDING
+
+    @property
+    def is_filled(self) -> bool:
+        return self.status == OrderStatus.FILLED
+
+    @property
+    def is_rejected(self) -> bool:
+        return self.status == OrderStatus.REJECTED
