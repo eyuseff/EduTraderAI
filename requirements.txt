@@ -55,3 +55,4 @@ urllib3==2.7.0
 uvicorn==0.51.0
 websockets==16.1
 yfinance==1.5.1
+alpaca-py>=0.42.0,<1.0.0
