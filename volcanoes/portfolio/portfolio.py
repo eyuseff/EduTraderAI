@@ -68,6 +68,12 @@ class Portfolio:
 
         return self.cash
 
+    @property
+    def open_positions(self) -> int:
+        """Return the number of currently open positions."""
+
+        return len(self.positions)
+
     def has_position(self, symbol: str) -> bool:
         """Return whether the portfolio holds a symbol."""
 

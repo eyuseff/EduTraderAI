@@ -13,6 +13,7 @@ from volcanoes.domain.ledger_entry import LedgerEntry
 from volcanoes.domain.order import Order
 from volcanoes.domain.position import Position
 from volcanoes.domain.trade import Trade
+from volcanoes.domain.trade_intent import TradeIntent
 from volcanoes.domain.trade_request import TradeRequest
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "OrderStatus",
     "Position",
     "Trade",
+    "TradeIntent",
     "TradeRequest",
     "TradeSide",
     "TradeStatus",
