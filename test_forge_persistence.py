@@ -1,9 +1,15 @@
-from volcanoes.database.models import Trade, TradeSide, TradeStatus
+"""Integration test for Forge trade persistence."""
+
+from decimal import Decimal
+
+from volcanoes.database.models import Trade
 from volcanoes.database.repository import SQLiteRepository
 from volcanoes.database.schema import initialize_database
+from volcanoes.domain import TradeSide, TradeStatus
 from volcanoes.execution.forge import Forge
 from volcanoes.execution.paper_broker import PaperBroker
 from volcanoes.guardian.guardian import Guardian
+from volcanoes.portfolio import Portfolio
 from volcanoes.scanner.explorer import Explorer
 
 
@@ -12,8 +18,18 @@ def main() -> None:
 
     explorer = Explorer()
     guardian = Guardian(minimum_score=80)
-    broker = PaperBroker(initial_cash=100_000)
-    forge = Forge(broker=broker, allocation_fraction=0.10)
+
+    portfolio = Portfolio(
+        starting_cash=Decimal("100000.00")
+    )
+
+    broker = PaperBroker(portfolio=portfolio)
+
+    forge = Forge(
+        broker=broker,
+        allocation_fraction=0.10,
+    )
+
     repository = SQLiteRepository()
 
     candidate = explorer.evaluate_symbol("MSFT")
@@ -25,7 +41,10 @@ def main() -> None:
         return
 
     if result.order.status.value != "FILLED":
-        print("Order was not filled:", result.order.status.value)
+        print(
+            "Order was not filled:",
+            result.order.status.value,
+        )
         return
 
     trade = Trade(
@@ -48,7 +67,10 @@ def main() -> None:
     print("Quantity:", trade.quantity)
     print("Entry price:", trade.entry_price)
     print("Status:", trade.status.value)
-    print("Trades in database:", repository.count_rows("trades"))
+    print(
+        "Trades in database:",
+        repository.count_rows("trades"),
+    )
 
 
 if __name__ == "__main__":
