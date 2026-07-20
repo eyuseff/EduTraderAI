@@ -3,6 +3,17 @@
 from enum import Enum
 
 
+class LedgerEntryType(str, Enum):
+    """Supported financial ledger entry types."""
+
+    BUY = "BUY"
+    SELL = "SELL"
+    COMMISSION = "COMMISSION"
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    DIVIDEND = "DIVIDEND"
+
+
 class TradeSide(str, Enum):
     """Supported trading directions."""
 
