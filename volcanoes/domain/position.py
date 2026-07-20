@@ -3,26 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-
-from volcanoes.domain.enums import TradeSide
+from decimal import Decimal
 
 
 @dataclass
 class Position:
-    """Represents the current holdings for a symbol."""
+    """Represents an open portfolio position."""
 
     symbol: str
     quantity: int
-    average_price: float
-    side: TradeSide = TradeSide.BUY
+    average_price: Decimal
 
-    current_price: float | None = None
-    id: int | None = None
-
-    updated_at: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    id: int |None = None
 
     def __post_init__(self) -> None:
         self.symbol = self.symbol.strip().upper()
@@ -33,39 +25,32 @@ class Position:
         if self.quantity < 0:
             raise ValueError("Position quantity cannot be negative.")
 
-        if self.average_price <= 0:
-            raise ValueError("Average price must be greater than zero.")
-
-        if self.current_price is not None and self.current_price <= 0:
-            raise ValueError("Current price must be greater than zero.")
+        if self.average_price < Decimal("0"):
+            raise ValueError("Average price cannot be negative.")
 
     @property
-    def market_value(self) -> float | None:
-        """Return the current market value."""
+    def market_value(self) -> Decimal:
+        """Current position cost basis."""
 
-        if self.current_price is None:
-            return None
+        return Decimal(self.quantity) * self.average_price
 
-        return self.current_price * self.quantity
+    def update_average_price(
+        self,
+        purchase_quantity: int,
+        purchase_price: Decimal,
+    ) -> None:
+        """Update weighted average price after a purchase."""
 
-    @property
-    def unrealized_pnl(self) -> float | None:
-        """Return the unrealized profit or loss."""
+        if purchase_quantity <= 0:
+            raise ValueError("Purchase quantity must be positive.")
 
-        if self.current_price is None:
-            return None
+        if purchase_price <= Decimal("0"):
+            raise ValueError("Purchase price must be positive.")
 
-        if self.side == TradeSide.BUY:
-            return (
-                self.current_price - self.average_price
-            ) * self.quantity
+        total_cost = (
+            self.market_value
+            + Decimal(purchase_quantity) * purchase_price
+        )
 
-        return (
-            self.average_price - self.current_price
-        ) * self.quantity
-
-    @property
-    def cost_basis(self) -> float:
-        """Return the original cost basis."""
-
-        return self.average_price * self.quantity
+        self.quantity += purchase_quantity
+        self.average_price = total_cost / Decimal(self.quantity)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from volcanoes.domain.enums import OrderStatus, TradeSide
 
@@ -15,7 +16,7 @@ class Order:
     symbol: str
     side: TradeSide
     quantity: int
-    price: float
+    price: Decimal
 
     status: OrderStatus = OrderStatus.PENDING
     broker_order_id: str | None = None
@@ -40,14 +41,14 @@ class Order:
         if self.quantity <= 0:
             raise ValueError("Order quantity must be positive.")
 
-        if self.price <= 0:
+        if self.price <= Decimal("0"):
             raise ValueError("Order price must be greater than zero.")
 
     @property
-    def notional_value(self) -> float:
+    def notional_value(self) -> Decimal:
         """Return the total monetary value of the order."""
 
-        return self.quantity * self.price
+        return Decimal(self.quantity) * self.price
 
     @property
     def is_pending(self) -> bool:

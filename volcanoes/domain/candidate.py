@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from volcanoes.domain.enums import CandidateStatus
 
@@ -16,14 +17,15 @@ class Candidate:
     strategy_name: str
     score: int
 
-    entry_price: float | None = None
-    stop_price: float | None = None
-    target_price: float | None = None
+    entry_price: Decimal | None = None
+    stop_price: Decimal | None = None
+    target_price: Decimal | None = None
     explanation: str = ""
 
     status: CandidateStatus = CandidateStatus.NEW
     scanner_run_id: int | None = None
     id: int | None = None
+
     created_at: datetime = field(
         default_factory=lambda: datetime.now(UTC)
     )
@@ -41,10 +43,27 @@ class Candidate:
         if not 0 <= self.score <= 100:
             raise ValueError("Candidate score must be between 0 and 100.")
 
-        for name, value in (
-            ("entry_price", self.entry_price),
-            ("stop_price", self.stop_price),
-            ("target_price", self.target_price),
-        ):
-            if value is not None and value <= 0:
-                raise ValueError(f"{name} must be greater than zero.")
+        self.entry_price = self._normalize_price(self.entry_price)
+        self.stop_price = self._normalize_price(self.stop_price)
+        self.target_price = self._normalize_price(self.target_price)
+
+    @staticmethod
+    def _normalize_price(
+        value: Decimal | float | int | str | None,
+    ) -> Decimal | None:
+        """Convert incoming market prices to Decimal with cent precision."""
+
+        if value is None:
+            return None
+
+        try:
+            decimal_value = Decimal(str(value))
+        except Exception as exc:
+            raise ValueError(f"Invalid price value: {value}") from exc
+
+        decimal_value = decimal_value.quantize(Decimal("0.01"))
+
+        if decimal_value <= Decimal("0"):
+            raise ValueError("Price values must be greater than zero.")
+
+        return decimal_value

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from volcanoes.domain.enums import TradeSide, TradeStatus
 
@@ -15,14 +16,15 @@ class Trade:
     symbol: str
     side: TradeSide
     quantity: int
-    entry_price: float
+    entry_price: Decimal
 
-    exit_price: float | None = None
+    id: int | None = None
+
+    exit_price: Decimal | None = None
 
     status: TradeStatus = TradeStatus.OPEN
 
-    order_id: int | None = None
-    id: int | None = None
+    commission: Decimal = field(default_factory=lambda: Decimal("0"))
 
     opened_at: datetime = field(
         default_factory=lambda: datetime.now(UTC)
@@ -35,13 +37,16 @@ class Trade:
         if not self.symbol:
             raise ValueError("Trade symbol cannot be empty.")
 
+        if not isinstance(self.side, TradeSide):
+            raise TypeError("Trade side must be a TradeSide value.")
+
         if self.quantity <= 0:
             raise ValueError("Trade quantity must be positive.")
 
-        if self.entry_price <= 0:
+        if self.entry_price <= Decimal("0"):
             raise ValueError("Entry price must be greater than zero.")
 
-        if self.exit_price is not None and self.exit_price <= 0:
+        if self.exit_price is not None and self.exit_price <= Decimal("0"):
             raise ValueError("Exit price must be greater than zero.")
 
     @property
@@ -53,13 +58,30 @@ class Trade:
         return self.status == TradeStatus.CLOSED
 
     @property
-    def realized_pnl(self) -> float | None:
-        """Return realized P&L once the trade is closed."""
+    def entry_value(self) -> Decimal:
+        """Total value at trade entry."""
+
+        return Decimal(self.quantity) * self.entry_price
+
+    @property
+    def exit_value(self) -> Decimal | None:
+        """Total value at trade exit."""
 
         if self.exit_price is None:
             return None
 
-        if self.side == TradeSide.BUY:
-            return (self.exit_price - self.entry_price) * self.quantity
+        return Decimal(self.quantity) * self.exit_price
 
-        return (self.entry_price - self.exit_price) * self.quantity
+    @property
+    def realized_pnl(self) -> Decimal | None:
+        """Realized profit/loss after commissions."""
+
+        if self.exit_price is None:
+            return None
+
+        gross = (self.exit_price - self.entry_price) * Decimal(self.quantity)
+
+        if self.side == TradeSide.SELL:
+            gross = -gross
+
+        return gross - self.commission
