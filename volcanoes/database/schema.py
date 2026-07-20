@@ -118,21 +118,18 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS positions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT NOT NULL UNIQUE,
-    quantity REAL NOT NULL,
-    average_entry_price REAL NOT NULL,
-    market_price REAL,
-    unrealized_pnl REAL,
-    portfolio_heat REAL,
+    quantity INTEGER NOT NULL,
+    average_price TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cash REAL NOT NULL,
-    equity REAL NOT NULL,
-    buying_power REAL,
-    total_exposure REAL NOT NULL DEFAULT 0,
-    portfolio_heat REAL NOT NULL DEFAULT 0,
+    starting_cash TEXT NOT NULL,
+    cash TEXT NOT NULL,
+    equity TEXT NOT NULL,
+    buying_power TEXT NOT NULL,
+    realized_pnl TEXT NOT NULL,
     recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
