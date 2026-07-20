@@ -2,6 +2,8 @@
 
 import json
 import sqlite3
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 from volcanoes.config import config
@@ -12,6 +14,7 @@ from volcanoes.database.models import (
     Trade,
     TradeStatus,
 )
+from volcanoes.domain import LedgerEntry, LedgerEntryType
 
 
 class SQLiteRepository:
@@ -193,6 +196,76 @@ class SQLiteRepository:
 
         return event.id
 
+    def save_ledger_entry(self, entry: LedgerEntry) -> int:
+        """Persist an immutable ledger entry."""
+
+        if not isinstance(entry, LedgerEntry):
+            raise TypeError("entry must be a LedgerEntry instance.")
+
+        query = """
+        INSERT INTO ledger_entries (
+            entry_id,
+            entry_type,
+            amount,
+            description,
+            symbol,
+            quantity,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+
+        values = (
+            entry.id,
+            entry.entry_type.value,
+            str(entry.amount),
+            entry.description,
+            entry.symbol,
+            entry.quantity,
+            entry.created_at.isoformat(),
+        )
+
+        with database_session(self.database_path) as connection:
+            cursor = connection.execute(query, values)
+            database_id = cursor.lastrowid
+
+        if database_id is None:
+            raise RuntimeError("Ledger entry could not be saved.")
+
+        return int(database_id)
+
+    def get_ledger_entries(self) -> list[LedgerEntry]:
+        """Return all ledger entries in chronological order."""
+
+        query = """
+        SELECT
+            entry_id,
+            entry_type,
+            amount,
+            description,
+            symbol,
+            quantity,
+            created_at
+        FROM ledger_entries
+        ORDER BY created_at ASC, id ASC
+        """
+
+        with database_session(self.database_path) as connection:
+            rows = connection.execute(query).fetchall()
+
+        return [
+            LedgerEntry(
+                id=row["entry_id"],
+                entry_type=LedgerEntryType(row["entry_type"]),
+                amount=Decimal(row["amount"]),
+                description=row["description"],
+                symbol=row["symbol"],
+                quantity=row["quantity"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in rows
+        ]
+
     def count_rows(self, table_name: str) -> int:
         """Return the number of rows in an approved table."""
 
@@ -202,6 +275,7 @@ class SQLiteRepository:
             "orders",
             "positions",
             "system_events",
+            "ledger_entries",
         }
 
         if table_name not in allowed_tables:

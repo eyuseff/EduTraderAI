@@ -11,6 +11,8 @@ Author: Eduardo Yuseff
 =========================================================
 """
 
+from pathlib import Path
+
 from volcanoes.database.connection import database_session
 
 
@@ -23,6 +25,17 @@ CREATE TABLE IF NOT EXISTS system_events (
     message TEXT NOT NULL,
     metadata_json TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ledger_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id TEXT NOT NULL UNIQUE,
+    entry_type TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    description TEXT NOT NULL,
+    symbol TEXT,
+    quantity INTEGER,
+    created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS market_regimes (
@@ -174,13 +187,21 @@ CREATE INDEX IF NOT EXISTS idx_system_events_component
 
 CREATE INDEX IF NOT EXISTS idx_system_events_created_at
     ON system_events(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_created_at
+    ON ledger_entries(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_symbol
+    ON ledger_entries(symbol);
 """
 
 
-def initialize_database() -> None:
+def initialize_database(
+    database_path: Path | None = None,
+) -> None:
     """Create all Volcanes database tables and indexes."""
 
-    with database_session() as connection:
+    with database_session(database_path) as connection:
         connection.executescript(SCHEMA)
 
 
