@@ -1,0 +1,16 @@
+[run]
+branch = True
+source =
+    volcanoes
+    adapters
+    engine
+omit =
+    engine/__init__.py
+    engine/brain.py
+    engine/cycle_report.py
+
+[report]
+fail_under = 79.0
+precision = 1
+show_missing = True
+skip_empty = True

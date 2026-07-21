@@ -30,9 +30,9 @@ class PositionSizer:
 
         risk_per_share = request.trade_intent.risk_per_share
 
-        quantity_decimal = (
-            request.allowed_risk / risk_per_share
-        ).to_integral_value(rounding=ROUND_FLOOR)
+        quantity_decimal = (request.allowed_risk / risk_per_share).to_integral_value(
+            rounding=ROUND_FLOOR
+        )
 
         quantity = int(quantity_decimal)
 
@@ -43,15 +43,9 @@ class PositionSizer:
                 position_value=request.allowed_risk * 0,
             )
 
-        dollar_risk = (
-            risk_per_share
-            * quantity
-        )
+        dollar_risk = risk_per_share * quantity
 
-        position_value = (
-            request.trade_intent.entry_price
-            * quantity
-        )
+        position_value = request.trade_intent.entry_price * quantity
 
         return PositionSizingResult(
             quantity=quantity,

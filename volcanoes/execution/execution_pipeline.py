@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from volcanoes.domain import (
     Order,
@@ -11,11 +12,11 @@ from volcanoes.domain import (
 )
 from volcanoes.execution.broker import Broker
 from volcanoes.execution.order_builder import OrderBuilder
+from volcanoes.execution.trade_planner import TradePlan, TradePlanner
 from volcanoes.portfolio import Portfolio
-from volcanoes.risk import RiskManager
+from volcanoes.risk import RiskManager, RiskViolation
 from volcanoes.sizing import (
     PositionSizer,
-    PositionSizingRequest,
     PositionSizingResult,
 )
 
@@ -45,21 +46,24 @@ class ExecutionPipeline:
         position_sizer: PositionSizer | None = None,
         order_builder: OrderBuilder | None = None,
         risk_manager: RiskManager | None = None,
+        planner: TradePlanner | None = None,
     ) -> None:
         if not isinstance(broker, Broker):
-            raise TypeError(
-                "ExecutionPipeline requires a Broker instance."
-            )
+            raise TypeError("ExecutionPipeline requires a Broker instance.")
 
         self._broker = broker
-        self._position_sizer = (
-            position_sizer or PositionSizer()
-        )
-        self._order_builder = (
-            order_builder or OrderBuilder()
-        )
-        self._risk_manager = (
-            risk_manager or RiskManager()
+        if planner is not None and any(
+            component is not None
+            for component in (position_sizer, order_builder, risk_manager)
+        ):
+            raise ValueError(
+                "planner cannot be combined with sizing, order, or risk components."
+            )
+
+        self._planner = planner or TradePlanner(
+            position_sizer=position_sizer,
+            order_builder=order_builder,
+            risk_manager=risk_manager,
         )
 
     def execute(
@@ -75,67 +79,72 @@ class ExecutionPipeline:
         """
 
         if not isinstance(portfolio, Portfolio):
-            raise TypeError(
-                "portfolio must be a Portfolio instance."
-            )
+            raise TypeError("portfolio must be a Portfolio instance.")
 
         if not isinstance(trade_intent, TradeIntent):
-            raise TypeError(
-                "trade_intent must be a TradeIntent instance."
-            )
+            raise TypeError("trade_intent must be a TradeIntent instance.")
 
-        sizing_request = PositionSizingRequest(
-            portfolio_equity=portfolio.equity,
-            trade_intent=trade_intent,
-            maximum_risk=(
-                self._risk_manager.config.max_risk_per_trade
-            ),
+        plan = self._planner.plan(
+            portfolio,
+            trade_intent,
         )
 
-        sizing_result = (
-            self._position_sizer.size_position(
-                sizing_request
-            )
-        )
+        return self.submit_plan(trade_intent, plan)
 
-        if sizing_result.quantity == 0:
+    def submit_plan(
+        self,
+        trade_intent: TradeIntent,
+        plan: TradePlan,
+        *,
+        target_price: Decimal | None = None,
+    ) -> ExecutionPipelineResult:
+        """Submit an immutable plan without repeating sizing or risk rules."""
+
+        if not isinstance(trade_intent, TradeIntent):
+            raise TypeError("trade_intent must be a TradeIntent instance.")
+
+        if not isinstance(plan, TradePlan):
+            raise TypeError("plan must be a TradePlan instance.")
+
+        if not plan.approved:
+            if plan.risk_code is not None:
+                raise RiskViolation(
+                    code=plan.risk_code,
+                    message=plan.reason,
+                )
+
             return ExecutionPipelineResult(
                 submitted=False,
-                reason=(
-                    "Risk allowance is insufficient "
-                    "to trade one share."
-                ),
-                sizing_result=sizing_result,
+                reason=plan.reason,
+                sizing_result=plan.sizing_result,
             )
 
-        trade_request = self._order_builder.build(
-            trade_intent,
-            sizing_result,
-        )
+        trade_request = plan.trade_request
 
-        self._risk_manager.validate_trade(
-            portfolio,
-            trade_request,
-        )
+        if trade_request is None:
+            raise RuntimeError("Approved trade plan has no trade request.")
+
+        if (
+            trade_request.symbol != trade_intent.symbol
+            or trade_request.price != trade_intent.entry_price
+        ):
+            raise ValueError("Trade plan does not match the supplied trade intent.")
 
         order = Order(
             symbol=trade_request.symbol,
             side=trade_intent.side,
             quantity=trade_request.quantity,
             price=trade_request.price,
+            stop_price=(trade_intent.stop_price if target_price is not None else None),
+            target_price=target_price,
         )
 
-        completed_order = self._broker.submit_order(
-            order
-        )
+        completed_order = self._broker.submit_order(order)
 
         return ExecutionPipelineResult(
             submitted=True,
-            reason=(
-                "Order completed with status "
-                f"{completed_order.status.value}."
-            ),
-            sizing_result=sizing_result,
+            reason=("Order completed with status " f"{completed_order.status.value}."),
+            sizing_result=plan.sizing_result,
             trade_request=trade_request,
             order=completed_order,
         )
@@ -150,4 +159,10 @@ class ExecutionPipeline:
     def risk_manager(self) -> RiskManager:
         """Return the pipeline risk manager."""
 
-        return self._risk_manager
+        return self._planner.risk_manager
+
+    @property
+    def planner(self) -> TradePlanner:
+        """Return the pure planner shared with preview use cases."""
+
+        return self._planner

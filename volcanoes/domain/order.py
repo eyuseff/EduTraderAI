@@ -17,16 +17,18 @@ class Order:
     side: TradeSide
     quantity: int
     price: Decimal
+    stop_price: Decimal | None = field(default=None, kw_only=True)
+    target_price: Decimal | None = field(default=None, kw_only=True)
 
     status: OrderStatus = OrderStatus.PENDING
     broker_order_id: str | None = None
+    broker_status: str | None = field(default=None, kw_only=True)
+    broker_message: str = field(default="", kw_only=True)
     rejection_reason: str | None = None
 
     id: int | None = None
 
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     filled_at: datetime | None = None
 
     def __post_init__(self) -> None:
@@ -43,6 +45,12 @@ class Order:
 
         if self.price <= Decimal("0"):
             raise ValueError("Order price must be greater than zero.")
+
+        if self.stop_price is not None and self.stop_price <= Decimal("0"):
+            raise ValueError("Order stop price must be greater than zero.")
+
+        if self.target_price is not None and self.target_price <= Decimal("0"):
+            raise ValueError("Order target price must be greater than zero.")
 
     @property
     def notional_value(self) -> Decimal:

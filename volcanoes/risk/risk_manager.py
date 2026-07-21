@@ -3,8 +3,8 @@
 from decimal import Decimal
 
 from volcanoes.domain import TradeRequest
-from volcanoes.portfolio import Portfolio
 from volcanoes.risk.exceptions import RiskViolation
+from volcanoes.risk.portfolio_view import RiskPortfolioView
 from volcanoes.risk.risk_config import RiskConfig
 
 
@@ -16,7 +16,7 @@ class RiskManager:
 
     def validate_trade(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
         trade: TradeRequest,
     ) -> bool:
         """
@@ -39,7 +39,7 @@ class RiskManager:
 
     def _validate_daily_loss(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
     ) -> None:
         """
         Reject new trades after the session loss limit is reached.
@@ -49,22 +49,17 @@ class RiskManager:
         this with an explicit start-of-day equity snapshot.
         """
 
-        maximum_loss = (
-            portfolio.starting_cash
-            * self.config.max_daily_loss
-        )
+        maximum_loss = portfolio.starting_cash * self.config.max_daily_loss
 
         if portfolio.realized_pnl <= -maximum_loss:
             raise RiskViolation(
                 code="MAX_DAILY_LOSS",
-                message=(
-                    "Maximum daily loss limit has been reached."
-                ),
+                message=("Maximum daily loss limit has been reached."),
             )
 
     def _validate_buying_power(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
         trade: TradeRequest,
     ) -> None:
         """Reject trades whose cost exceeds available buying power."""
@@ -77,32 +72,21 @@ class RiskManager:
 
     def _validate_position_size(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
         trade: TradeRequest,
     ) -> None:
         """Reject trades that create an oversized position."""
 
-        maximum_position_value = (
-            portfolio.equity
-            * self.config.max_position_size
-        )
+        maximum_position_value = portfolio.equity * self.config.max_position_size
 
-        existing_position = portfolio.get_position(
-            trade.symbol
-        )
+        existing_position = portfolio.get_position(trade.symbol)
 
         existing_position_value = Decimal("0.00")
 
         if existing_position is not None:
-            existing_position_value = (
-                Decimal(existing_position.quantity)
-                * trade.price
-            )
+            existing_position_value = Decimal(existing_position.quantity) * trade.price
 
-        projected_position_value = (
-            existing_position_value
-            + trade.cost
-        )
+        projected_position_value = existing_position_value + trade.cost
 
         if projected_position_value > maximum_position_value:
             raise RiskViolation(
@@ -112,7 +96,7 @@ class RiskManager:
 
     def _validate_open_positions(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
         trade: TradeRequest,
     ) -> None:
         """
@@ -124,38 +108,25 @@ class RiskManager:
         if portfolio.has_position(trade.symbol):
             return
 
-        if (
-            portfolio.open_positions
-            >= self.config.max_open_positions
-        ):
+        if portfolio.open_positions >= self.config.max_open_positions:
             raise RiskViolation(
                 code="MAX_OPEN_POSITIONS",
-                message=(
-                    "Maximum number of open positions exceeded."
-                ),
+                message=("Maximum number of open positions exceeded."),
             )
 
     def _validate_portfolio_exposure(
         self,
-        portfolio: Portfolio,
+        portfolio: RiskPortfolioView,
         trade: TradeRequest,
     ) -> None:
         """Reject trades that exceed maximum portfolio exposure."""
 
-        maximum_exposure_value = (
-            portfolio.equity
-            * self.config.max_portfolio_exposure
-        )
+        maximum_exposure_value = portfolio.equity * self.config.max_portfolio_exposure
 
-        projected_exposure = (
-            portfolio.invested_value
-            + trade.cost
-        )
+        projected_exposure = portfolio.invested_value + trade.cost
 
         if projected_exposure > maximum_exposure_value:
             raise RiskViolation(
                 code="MAX_PORTFOLIO_EXPOSURE",
-                message=(
-                    "Trade exceeds maximum portfolio exposure."
-                ),
+                message=("Trade exceeds maximum portfolio exposure."),
             )

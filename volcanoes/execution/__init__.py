@@ -11,6 +11,7 @@ from volcanoes.execution.forge import (
 )
 from volcanoes.execution.order_builder import OrderBuilder
 from volcanoes.execution.paper_broker import PaperBroker
+from volcanoes.execution.trade_planner import TradePlan, TradePlanner
 
 __all__ = [
     "Broker",
@@ -20,4 +21,6 @@ __all__ = [
     "ForgeResult",
     "OrderBuilder",
     "PaperBroker",
+    "TradePlan",
+    "TradePlanner",
 ]

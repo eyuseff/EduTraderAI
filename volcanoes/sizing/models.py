@@ -23,19 +23,13 @@ class PositionSizingRequest:
         """Validate the position-sizing inputs."""
 
         if self.portfolio_equity <= Decimal("0"):
-            raise ValueError(
-                "Portfolio equity must be greater than zero."
-            )
+            raise ValueError("Portfolio equity must be greater than zero.")
 
         if self.maximum_risk <= Decimal("0"):
-            raise ValueError(
-                "Maximum risk must be greater than zero."
-            )
+            raise ValueError("Maximum risk must be greater than zero.")
 
         if self.maximum_risk > Decimal("1"):
-            raise ValueError(
-                "Maximum risk cannot exceed one."
-            )
+            raise ValueError("Maximum risk cannot exceed one.")
 
     @property
     def allowed_risk(self) -> Decimal:
@@ -62,48 +56,30 @@ class PositionSizingResult:
         """Validate the position-sizing result."""
 
         if isinstance(self.quantity, bool):
-            raise ValueError(
-                "Quantity must be a whole number."
-            )
+            raise ValueError("Quantity must be a whole number.")
 
         if not isinstance(self.quantity, int):
-            raise ValueError(
-                "Quantity must be a whole number."
-            )
+            raise ValueError("Quantity must be a whole number.")
 
         if self.quantity < 0:
-            raise ValueError(
-                "Quantity cannot be negative."
-            )
+            raise ValueError("Quantity cannot be negative.")
 
         if self.dollar_risk < Decimal("0"):
-            raise ValueError(
-                "Dollar risk cannot be negative."
-            )
+            raise ValueError("Dollar risk cannot be negative.")
 
         if self.position_value < Decimal("0"):
-            raise ValueError(
-                "Position value cannot be negative."
-            )
+            raise ValueError("Position value cannot be negative.")
 
         if self.quantity == 0:
             if self.dollar_risk != Decimal("0"):
-                raise ValueError(
-                    "Zero quantity must have zero dollar risk."
-                )
+                raise ValueError("Zero quantity must have zero dollar risk.")
 
             if self.position_value != Decimal("0"):
-                raise ValueError(
-                    "Zero quantity must have zero position value."
-                )
+                raise ValueError("Zero quantity must have zero position value.")
 
         if self.quantity > 0:
             if self.dollar_risk <= Decimal("0"):
-                raise ValueError(
-                    "Positive quantity requires positive dollar risk."
-                )
+                raise ValueError("Positive quantity requires positive dollar risk.")
 
             if self.position_value <= Decimal("0"):
-                raise ValueError(
-                    "Positive quantity requires positive position value."
-                )
+                raise ValueError("Positive quantity requires positive position value.")
