@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from adapters.paper_order_preview import preview_paper_order
+from adapters.paper_order_presentation import approved_quantity_display
 from adapters.paper_order_submission import submit_paper_order
 from adapters.scanner_execution import (
     ScannerExecutionRuntime,
@@ -473,7 +474,7 @@ elif page == "Paper Order":
 
     with right:
         st.subheader("Risk Preview")
-        st.metric("Approved quantity", decision.quantity)
+        st.metric("Approved quantity", approved_quantity_display(decision))
         st.metric("Capital required", money(decision.capital_required))
         st.metric("Maximum planned loss", money(decision.maximum_loss))
         st.metric("Reward / Risk", f"{decision.reward_risk:.2f}")

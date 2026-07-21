@@ -14,6 +14,10 @@ from adapters.paper_order_preview import (
     compare_preview_decisions,
     preview_paper_order,
 )
+from adapters.paper_order_presentation import (
+    REJECTED_APPROVED_QUANTITY,
+    approved_quantity_display,
+)
 from broker.base import (
     AccountSnapshot,
     BrokerOrder,
@@ -492,6 +496,34 @@ def test_preview_never_submits_or_mutates_broker() -> None:
     assert "close_all_positions" not in broker.calls
 
 
+def test_rejected_plan_never_displays_a_nonzero_approved_quantity() -> None:
+    rejected = RiskDecision(
+        approved=False,
+        quantity=250,
+        maximum_loss=250.0,
+        capital_required=2_250.0,
+        reward_risk=2.0,
+        reasons=["Price is below the $10.00 minimum."],
+    )
+
+    rendered = approved_quantity_display(rejected)
+
+    assert rendered == REJECTED_APPROVED_QUANTITY
+    assert rendered not in (250, "250")
+
+
+def test_approved_plan_displays_its_existing_quantity_unchanged() -> None:
+    approved = RiskDecision(
+        approved=True,
+        quantity=100,
+        maximum_loss=250.0,
+        capital_required=10_000.0,
+        reward_risk=2.0,
+    )
+
+    assert approved_quantity_display(approved) == approved.quantity
+
+
 def test_app_feature_flag_defaults_to_deterministic_preview() -> None:
     tree = ast.parse((PROJECT_ROOT / "app.py").read_text(encoding="utf-8"))
     assignments = {
@@ -530,6 +562,31 @@ def test_app_wires_paper_order_preview_through_feature_flag() -> None:
     assert keywords["legacy_preview"].attr == "preview"
     assert isinstance(keywords["use_deterministic_preview"], ast.Name)
     assert keywords["use_deterministic_preview"].id == "USE_DETERMINISTIC_PREVIEW"
+
+
+def test_app_uses_rejection_aware_approved_quantity_presentation() -> None:
+    tree = ast.parse((PROJECT_ROOT / "app.py").read_text(encoding="utf-8"))
+    metric_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "st"
+        and node.func.attr == "metric"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "Approved quantity"
+    ]
+
+    assert len(metric_calls) == 1
+    rendered_value = metric_calls[0].args[1]
+    assert isinstance(rendered_value, ast.Call)
+    assert isinstance(rendered_value.func, ast.Name)
+    assert rendered_value.func.id == "approved_quantity_display"
+    assert len(rendered_value.args) == 1
+    assert isinstance(rendered_value.args[0], ast.Name)
+    assert rendered_value.args[0].id == "decision"
 
 
 def test_app_submission_retains_legacy_execution_engine_as_rollback() -> None:
