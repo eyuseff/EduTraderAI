@@ -79,3 +79,7 @@ Live trading, production mobile approval, cloud deployment, and EMERS Score impl
 ## 20. Recommended first prototype
 
 First prototype should cover Home dashboard, Opportunity detail, Trade-plan builder, Risk review, Paper approval, Broker status, Orders, Position detail, and failure or unresolved order state.
+
+## Polaris Phase 1 reference
+
+Polaris Phase 1 creates the first static clickable EMERS Trade prototype for review. It is isolated from production systems, uses simulated data only, and does not authorize frontend architecture, production implementation, broker integration, mobile order submission, or EMERS Score implementation.

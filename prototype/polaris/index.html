@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMERS Trade Polaris Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#screen-title">Skip to prototype content</a>
+  <div class="prototype-frame">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand-lockup">
+        <div class="mark" aria-hidden="true">E</div>
+        <div>
+          <p class="eyebrow">EMERS Trade</p>
+          <p class="tagline">Intelligent trading. Disciplined risk.</p>
+        </div>
+      </div>
+      <nav id="main-nav"></nav>
+      <button class="emergency-entry" id="emergency-entry" type="button">Emergency Stop</button>
+      <p class="prototype-note">Static simulated prototype. No broker connection.</p>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar" aria-label="Global status">
+        <div>
+          <strong>EMERS Trade</strong>
+          <span class="subtle">Powered by EduTraderAI Engine</span>
+        </div>
+        <div class="status-pills" aria-live="polite">
+          <span class="pill paper">PAPER ENVIRONMENT</span>
+          <span class="pill" id="data-status">DATA STATUS: CURRENT - SIMULATED</span>
+          <span class="pill" id="broker-status">BROKER: SIMULATED CONNECTED</span>
+          <span class="pill" id="health-status">SYSTEM: HEALTHY</span>
+          <span class="pill" id="sim-time">SIM TIME --:--</span>
+        </div>
+        <button class="ghost" id="evidence-toggle" type="button">Evidence</button>
+      </header>
+
+      <section id="degraded-panel" class="banner hidden" aria-live="assertive"></section>
+      <section id="emergency-panel" class="banner danger hidden" aria-live="assertive"></section>
+
+      <section class="screen" id="app-screen" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <aside class="drawer" id="evidence-drawer" aria-label="Evidence drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">Evidence and audit</p>
+        <h2>Prototype audit trail</h2>
+      </div>
+      <button class="ghost" id="drawer-close" type="button">Close</button>
+    </div>
+    <div id="audit-list" class="audit-list"></div>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

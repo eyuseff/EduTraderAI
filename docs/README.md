@@ -13,7 +13,15 @@ Artificial Intelligence is an enhancement to the platform—not its decision mak
 
 
 
+
 ---
+
+# Project Polaris
+
+Project Polaris Phase 1 is a static clickable EMERS Trade prototype for review only. It uses simulated data, makes no broker connection, imports no production modules, and does not authorize frontend implementation.
+
+- `prototype/polaris/index.html`
+- `prototype/polaris/README.md`
 
 # Project Horizon
 
