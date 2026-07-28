@@ -10,7 +10,21 @@ The project is being developed with one primary objective:
 
 Artificial Intelligence is an enhancement to the platform—not its decision maker.
 
+
 ---
+
+# EMERS Vision Documents
+
+The v4.1 development line introduces EMERS as the working user-facing brand
+architecture while EduTraderAI remains the technical engine. These documents are
+working product and company-vision materials pending legal, trademark, domain,
+and regulatory review:
+
+- `docs/vision/EMERS_CONSTITUTION.md`
+- `docs/vision/EMERS_PRODUCT_VISION.md`
+- `docs/vision/EMERS_BRAND_ARCHITECTURE.md`
+- `docs/vision/EMERS_PRODUCT_PRINCIPLES.md`
+- `docs/vision/EMERS_FIVE_YEAR_VISION.md`
 
 # Project Status
 

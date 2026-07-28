@@ -28,6 +28,10 @@ limitations.
 
 ## 3. v4.1 objectives
 
+EMERS Trade is the emerging user-facing product identity for this line, while
+EduTraderAI remains the existing technical engine. Public commercialization is
+outside the immediate v4.1 implementation scope unless separately approved.
+
 v4.1 is an incremental safety and release-operations release over v4.0.0. Its
 primary objectives are:
 
