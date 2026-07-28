@@ -43,6 +43,11 @@ primary objectives are:
 
 ## 4. Scope
 
+Project Atlas now provides a directional ecosystem blueprint for future EMERS
+Trade product, technology, security, data, broker, commercialization, and
+delivery decisions. Atlas does not change the approved v4.1 priorities or
+authorize implementation beyond separately approved backlog items.
+
 In scope:
 
 - Paper-only qualification workflow design and implementation.

@@ -11,7 +11,25 @@ The project is being developed with one primary objective:
 Artificial Intelligence is an enhancement to the platform—not its decision maker.
 
 
+
 ---
+
+# Project Atlas
+
+Project Atlas is the strategic blueprint for the future EMERS Trade ecosystem.
+It is directional documentation only: it does not authorize implementation,
+commercial launch, cloud deployment, live trading, or broker expansion.
+
+- `docs/atlas/PROJECT_ATLAS_OVERVIEW.md`
+- `docs/atlas/EMERS_EXPERIENCE_BLUEPRINT.md`
+- `docs/atlas/EMERS_PRODUCT_ARCHITECTURE.md`
+- `docs/atlas/EMERS_TECHNOLOGY_BLUEPRINT.md`
+- `docs/atlas/EMERS_SECURITY_AND_TRUST_MODEL.md`
+- `docs/atlas/EMERS_DATA_AND_INTELLIGENCE_STRATEGY.md`
+- `docs/atlas/EMERS_BROKER_INTEGRATION_STRATEGY.md`
+- `docs/atlas/EMERS_COMMERCIALIZATION_PATH.md`
+- `docs/atlas/EMERS_DELIVERY_PHASES.md`
+- `docs/atlas/EMERS_ATLAS_DECISION_REGISTER.md`
 
 # EMERS Vision Documents
 
