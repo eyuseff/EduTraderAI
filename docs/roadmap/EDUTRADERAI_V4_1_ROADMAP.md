@@ -139,6 +139,13 @@ Design references:
 - `docs/engineering/V41_PQ_001_TRANSITION_TABLE.md`
 - `docs/engineering/V41_PQ_001_TEST_STRATEGY.md`
 
+Implementation status:
+
+- V41-PQ-001A — CORE DOMAIN MODEL AND PURE TRANSITION ENGINE: IMPLEMENTED.
+- V41-PQ-001 overall status: IN PROGRESS.
+- Broker execution, runtime integration, persistence, and cross-process coordination remain pending and are not part of V41-PQ-001A.
+- Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
+
 
 ### Workstream B - Cross-process Coordination
 

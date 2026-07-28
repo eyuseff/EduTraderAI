@@ -396,6 +396,18 @@ Before production integration, rollback is simply not enabling the feature. Once
 - How should Alpaca client order IDs encode qualification-run identity without leaking sensitive data?
 
 
+
+## V41-PQ-001A implementation mapping
+
+The first implementation slice maps the design to these files:
+
+- `volcanoes/application/qualification/contracts.py` contains immutable state, result, event, context, decision, side-effect intent, evidence intent, guard, and transition-spec contracts.
+- `volcanoes/application/qualification/errors.py` contains typed transition errors with stable reason codes and safe messages.
+- `volcanoes/application/qualification/state_machine.py` contains the deterministic transition registry and pure transition-evaluation function.
+- `tests/test_paper_qualification_state_machine.py` contains the focused unit and invariant test suite for V41-PQ-001A.
+
+This mapping does not change the accepted architecture and does not implement broker execution, persistence, event publication, runtime composition, UI, CLI, or cross-process coordination.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
