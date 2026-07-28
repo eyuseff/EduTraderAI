@@ -43,6 +43,12 @@ primary objectives are:
 
 ## 4. Scope
 
+Project Horizon defines the future EMERS product experience and design-system
+blueprint. Horizon does not authorize implementation, select a frontend
+framework, implement EMERS Score, authorize mobile order submission, or alter
+the approved v4.1 engineering sequence. V41-PQ-001 remains the next approved
+implementation item.
+
 Project Atlas now provides a directional ecosystem blueprint for future EMERS
 Trade product, technology, security, data, broker, commercialization, and
 delivery decisions. Atlas does not change the approved v4.1 priorities or

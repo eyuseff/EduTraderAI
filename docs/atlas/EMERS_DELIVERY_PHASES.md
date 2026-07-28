@@ -24,6 +24,7 @@ Project Atlas must not displace this approved engineering work.
 
 ## 5. Phase 2 - Product identity and usability
 
+Project Horizon may inform Phase 2 product identity and usability work, but prototypes and frontend implementation require separate approval.
 Possible focus: EMERS Trade presentation, calmer dashboard, clearer approval language, accessibility, and user-facing evidence review.
 
 ## 6. Phase 3 - Secure web foundation

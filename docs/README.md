@@ -12,7 +12,28 @@ Artificial Intelligence is an enhancement to the platform—not its decision mak
 
 
 
+
 ---
+
+# Project Horizon
+
+Project Horizon defines the future EMERS Trade product experience, information
+architecture, design-system foundation, risk communication, approval experience,
+broker-state presentation, mobile posture, accessibility direction, metrics, and
+prototype plan. It is documentation only and does not authorize frontend
+implementation.
+
+- `docs/horizon/PROJECT_HORIZON_OVERVIEW.md`
+- `docs/horizon/EMERS_INFORMATION_ARCHITECTURE.md`
+- `docs/horizon/EMERS_DESIGN_PHILOSOPHY.md`
+- `docs/horizon/EMERS_DESIGN_SYSTEM_FOUNDATION.md`
+- `docs/horizon/EMERS_DASHBOARD_BLUEPRINT.md`
+- `docs/horizon/EMERS_SCREEN_CATALOG.md`
+- `docs/horizon/EMERS_CORE_USER_FLOWS.md`
+- `docs/horizon/EMERS_RISK_COMMUNICATION_STANDARD.md`
+- `docs/horizon/EMERS_TRADE_APPROVAL_EXPERIENCE.md`
+- `docs/horizon/EMERS_BROKER_STATUS_EXPERIENCE.md`
+- `docs/horizon/EMERS_HORIZON_DECISION_REGISTER.md`
 
 # Project Atlas
 
