@@ -16,6 +16,16 @@ Artificial Intelligence is an enhancement to the platform—not its decision mak
 
 ---
 
+
+# Engineering Phase I — Paper Qualification State Machine
+
+V41-PQ-001 design artifacts propose the Paper qualification state machine for review. ADR-004 remains Proposed; implementation has not started.
+
+- `docs/adr/ADR-004-PAPER-QUALIFICATION-STATE-MACHINE.md`
+- `docs/engineering/V41_PQ_001_DESIGN.md`
+- `docs/engineering/V41_PQ_001_TRANSITION_TABLE.md`
+- `docs/engineering/V41_PQ_001_TEST_STRATEGY.md`
+
 # Project Polaris
 
 Project Polaris Phase 1 is a static clickable EMERS Trade prototype for review only. It uses simulated data, makes no broker connection, imports no production modules, and does not authorize frontend implementation.

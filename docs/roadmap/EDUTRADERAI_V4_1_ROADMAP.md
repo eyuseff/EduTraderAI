@@ -129,6 +129,17 @@ Required evidence: redacted JSON qualification artifact, manifest row, hash
 verification output, broker status summary, cancellation confirmation, and no
 open-order/no-position confirmation.
 
+
+Design status: DESIGN PROPOSED — IMPLEMENTATION NOT STARTED. ADR-004 and the V41-PQ-001 engineering design documents define the proposed state machine, transition table, and test strategy for review. They do not mark V41-PQ-001 complete, do not authorize production implementation, and keep V41-PQ-002 persistence and V41-CP-001 coordination separate.
+
+Design references:
+
+- `docs/adr/ADR-004-PAPER-QUALIFICATION-STATE-MACHINE.md`
+- `docs/engineering/V41_PQ_001_DESIGN.md`
+- `docs/engineering/V41_PQ_001_TRANSITION_TABLE.md`
+- `docs/engineering/V41_PQ_001_TEST_STRATEGY.md`
+
+
 ### Workstream B - Cross-process Coordination
 
 | Field | Value |
