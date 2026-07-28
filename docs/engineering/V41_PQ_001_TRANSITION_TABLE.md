@@ -71,6 +71,26 @@ Terminal workflow states are `QUALIFIED`, `DISQUALIFIED`, and `ABORTED`. Order l
 | PQ-TRN-034 | Any non-terminal | `ABORT_REQUESTED` | Actor authorized to abort; no unsafe broker side effect in progress or reconciliation path recorded | `ABORTED` | Block future commands for this run | `QualificationAborted` | Replay returns aborted result | Non-retryable in same run | Reject and preserve state | Qualification was aborted. No further action will occur in this run. | `ABORTED` | If broker state is unknown, first move unresolved/reconcile. |
 | PQ-TRN-035 | Any persisted active state | `PROCESS_RESTARTED` | Durable state/evidence loaded and hash verified | Same logical state or `RECONCILIATION_REQUIRED` | Resume or require reconciliation | `QualificationRecovered` | Repeat restart is safe | Safe recovery/read retry | Reject if evidence corrupt | Qualification state was recovered from evidence. | Existing result or `INCONCLUSIVE` | V41-PQ-002 implementation requirement. |
 
+
+## Sentinel correction: narrowed general transitions
+
+Rows that use broad source wording are templates, not permission for arbitrary mutation:
+
+- PQ-TRN-033 applies only to non-terminal states after scenario criteria can be evaluated from complete evidence. It may not bypass `RECONCILIATION_REQUIRED` when broker state is unknown.
+- PQ-TRN-034 applies only when aborting will not hide an uncertain broker side effect. If a broker request may have crossed the external boundary, the run must first enter `UNRESOLVED` or `RECONCILIATION_REQUIRED`.
+- PQ-TRN-035 is a recovery template for persisted active states. It is not implemented as restart durability until V41-PQ-002 exists.
+
+## Sentinel correction: explicit failure destinations
+
+| Transition group | Failure before external effect | Failure after possible external effect | Evidence failure |
+|---|---|---|---|
+| Precheck and approval | Preserve source or move to `PRECHECK_FAILED` / `REJECTED` as specified | Not applicable | Preserve source and report evidence unavailable |
+| Submission preparation | Preserve source if broker request provably not sent | `UNRESOLVED` | `UNRESOLVED` if send status is uncertain |
+| Broker request sent | Not applicable | `UNRESOLVED` or `RECONCILIATION_REQUIRED` | `UNRESOLVED` and block duplicate submission |
+| Broker lifecycle observation | Preserve source for invalid event; reconcile for plausible conflicting broker event | `RECONCILIATION_REQUIRED` | Preserve source or require reconciliation if evidence loss affects broker truth |
+| Cancellation | Preserve source if cancellation provably not sent | `UNRESOLVED` or `RECONCILIATION_REQUIRED` | `UNRESOLVED` if cancellation side effect is uncertain |
+| Finalization | Preserve source and keep result pending/inconclusive | Not applicable | Block `QUALIFIED` / `DISQUALIFIED` until evidence exists |
+
 ## 4. Invalid-transition examples
 
 Invalid transitions must be rejected deterministically, preserve the current state, produce diagnostic evidence where possible, perform no transition side effects, return a typed error, and avoid leaking credentials or sensitive broker payloads.

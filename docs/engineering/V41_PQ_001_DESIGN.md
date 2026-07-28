@@ -395,6 +395,26 @@ Before production integration, rollback is simply not enabling the feature. Once
 - Should the first implementation include an admin CLI, Streamlit admin panel, or release-script entry point?
 - How should Alpaca client order IDs encode qualification-run identity without leaking sensitive data?
 
+
+## Sentinel correction: side-effect boundary contract
+
+The implementation must split command processing into these explicit records:
+
+1. Command validation result.
+2. Idempotency lookup or reservation.
+3. Transition decision.
+4. Pre-effect evidence intent.
+5. External side-effect attempt, only when authorized.
+6. Post-effect broker observation or unresolved marker.
+7. State commitment.
+8. Evidence commitment.
+
+V41-PQ-001 may implement this with in-memory fakes for tests, but it must not claim restart durability. If the process cannot prove whether an external request crossed the broker boundary, the runner must reconstruct through read-only reconciliation rather than replaying the external command.
+
+## Sentinel correction: mandatory scenario selection
+
+The initial implementation should target PQ-SCN-005 as the mandatory positive Paper-qualification scenario: one-share, Paper-only, deliberately non-marketable order, explicit approval, one broker submission, broker acknowledgment/status capture, zero-fill observation, cancellation request, broker cancellation confirmation, no-open-order check, no-position check, redacted evidence, and final `QUALIFIED` only after all scenario criteria are present.
+
 ## 27. Approval gate
 
 Implementation may begin only after ADR-004 is reviewed and accepted. Approval must confirm that the design preserves Paper-only scope, explicit operator approval, broker truth, evidence requirements, idempotency, reconciliation, and the deferred boundaries for persistence and cross-process coordination.

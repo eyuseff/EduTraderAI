@@ -269,6 +269,19 @@ Deferred to broker smoke procedure:
 
 - Credentialed Alpaca Paper smoke using real credentials.
 
+
+## Sentinel correction: transition coverage map
+
+Every transition ID PQ-TRN-001 through PQ-TRN-035 requires at least one positive transition test, one invalid-source test, one guard-failure test, one evidence-intent assertion, one state-revision assertion, and one side-effect-intent assertion. Duplicate/replay tests are mandatory for PQ-TRN-001, PQ-TRN-005 through PQ-TRN-017, PQ-TRN-024 through PQ-TRN-035, and any broker lifecycle event carrying an external event identity.
+
+Additional targeted coverage:
+
+- PQ-TRN-010, PQ-TRN-015, and PQ-TRN-016 must prove an external side effect is not repeated on replay.
+- PQ-TRN-022 and PQ-TRN-023 must prove timeout after possible submission blocks blind retry.
+- PQ-TRN-025 through PQ-TRN-027 must prove reconciliation is read-only.
+- PQ-TRN-029 through PQ-TRN-032 must prove scenario-specific criteria and complete evidence are required before `QUALIFIED`.
+- PQ-TRN-033 through PQ-TRN-035 must prove broad-source templates cannot bypass reconciliation or terminal-state rules.
+
 ## 22. Implementation test sequence
 
 1. Enum and contract validation tests.

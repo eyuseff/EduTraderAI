@@ -6,9 +6,9 @@ Paper Qualification State Machine for EMERS Trade v4.1.
 
 ## 2. Status
 
-Proposed.
+Accepted.
 
-This ADR is intentionally not Accepted. It is a review artifact for V41-PQ-001 and does not authorize implementation.
+Accepted after Project Sentinel engineering review on 2026-07-28. Acceptance authorizes V41-PQ-001 implementation design only. It does not authorize live trading, persistence implementation, cross-process coordination, infrastructure selection, broker expansion, production behavior changes, or automatic qualification execution.
 
 ## 3. Date
 
@@ -226,9 +226,30 @@ The qualification workflow may reference order lifecycle state, but `SUBMITTED`,
 | `DISQUALIFIED` | Terminal failure | Scenario criteria failed with evidence. |
 | `ABORTED` | Terminal failure | Operator or system aborted before qualification criteria were met. |
 
+
+### Sentinel correction: state ownership table
+
+| Concern | Owner | Stored as | May directly finalize qualification? | Notes |
+|---|---|---|---|---|
+| Qualification workflow | Paper qualification state machine | `QualificationState` | Yes, only through scenario criteria | Owns allowed transitions and operator-visible status. |
+| Qualification result | Paper qualification state machine | `QualificationResult` | N/A | `PENDING`, `PASSED`, `FAILED`, `ABORTED`, or `INCONCLUSIVE`; separate from workflow state. |
+| Approval state | Approval boundary / qualification runner | Approval evidence and scoped approval ID | No | Approval permits a later command; it is not broker truth. |
+| Order lifecycle | Broker boundary plus qualification observation | Broker lifecycle observation | No | Broker lifecycle can satisfy scenario criteria but does not itself equal qualification. |
+| Broker-reported state | Broker adapter/read model | Redacted broker observation | No | Broker truth is authoritative for external order state. |
+| Reconciliation state | Qualification state machine and reconciliation runner | Reconciliation requirement and reconciliation ID | No | Required when external state is uncertain or conflicting. |
+| Evidence state | Evidence boundary | Evidence IDs, hashes, and schema versions | No | Evidence availability gates finalization but is not business state. |
+| Emergency-stop state | Platform/operator safety boundary | Guard input | No | Emergency stop is a guard that blocks commands; it is not an order lifecycle state. |
+
 ### Separation of concerns
 
 The model should be implemented as a qualification state machine referencing order lifecycle observations, not as a broker order state machine alone. Broker lifecycle states are facts reported by the broker; qualification states are system-governance states that decide whether the Paper path has satisfied an approved scenario.
+
+
+### Sentinel correction: default mandatory qualification scenario
+
+For v4.1 Paper qualification, the default mandatory success scenario is PQ-SCN-005: one explicitly approved Paper-only, one-share, deliberately non-marketable order that is acknowledged, observed as unfilled, cancelled, confirmed cancelled, and reconciled to no open order and no position. Other scenarios remain required negative or supplemental validation scenarios, but they do not replace PQ-SCN-005 unless a later accepted ADR changes the qualification definition.
+
+A run may pass on rejection, precheck failure, duplicate prevention, or operator rejection only when the selected scenario is explicitly a negative validation scenario and all expected evidence exists. Those outcomes do not qualify the broker adapter for the default positive Paper path.
 
 ## 13. Transition model
 
@@ -237,6 +258,11 @@ Transitions are listed formally in `docs/engineering/V41_PQ_001_TRANSITION_TABLE
 Every transition must define source state, event or command, guard, destination state, side-effect intent, evidence event, idempotency behavior, retry classification, invalid-state behavior, operator-visible message, and qualification-result impact.
 
 Arbitrary direct state assignment is prohibited.
+
+
+### Sentinel correction: failure-destination rule
+
+Every transition has the following default failure destination unless its row states a stricter destination: guard failure preserves the source state, emits diagnostic evidence when evidence is available, and performs no consequential side effect. If a failure occurs after a broker request may have crossed the external boundary, the destination is `UNRESOLVED` or `RECONCILIATION_REQUIRED`, not the source state. If evidence required for finalization is unavailable, finalization is blocked and the result remains `INCONCLUSIVE` until evidence is recovered or the run is disqualified by explicit criteria.
 
 ## 14. Guard conditions
 
@@ -502,6 +528,19 @@ ADR-004 may be accepted only when:
 - No live-trading behavior is authorized.
 - No implementation has occurred.
 - Reviewers approve the design.
+
+
+## Sentinel acceptance record
+
+- Sentinel review reference: `docs/reviews/SENTINEL_ADR_004_REVIEW.md`.
+- Acceptance date: 2026-07-28.
+- Accepted scope: deterministic Paper-qualification state-machine design for V41-PQ-001.
+- Unresolved critical findings: 0.
+- Unresolved major findings: 0.
+- Unresolved minor findings: 1, non-blocking wording consistency follow-up.
+- Deferred observations: persistence implementation, cross-process coordination, event-publisher durability, exact timeout constants, and UI entry-point choice.
+- Implementation prerequisites: implement the state machine through one authoritative transition function; preserve existing trading behavior until separately approved; use fake brokers and redacted evidence in automated tests; keep persistence and coordination behind their own approved items.
+- Non-authorization statement: this acceptance does not authorize live trading, durable persistence, distributed locks, infrastructure selection, additional brokers, mobile submission, or cloud deployment.
 
 ## 30. References
 

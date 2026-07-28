@@ -130,7 +130,7 @@ verification output, broker status summary, cancellation confirmation, and no
 open-order/no-position confirmation.
 
 
-Design status: DESIGN PROPOSED — IMPLEMENTATION NOT STARTED. ADR-004 and the V41-PQ-001 engineering design documents define the proposed state machine, transition table, and test strategy for review. They do not mark V41-PQ-001 complete, do not authorize production implementation, and keep V41-PQ-002 persistence and V41-CP-001 coordination separate.
+Design status: ADR-004 — ACCEPTED AFTER SENTINEL REVIEW. V41-PQ-001 — READY FOR IMPLEMENTATION after separate implementation authorization. The design documents define the accepted state machine, transition table, and test strategy. They do not mark V41-PQ-001 implemented, do not change production behavior, and keep V41-PQ-002 persistence and V41-CP-001 coordination separate.
 
 Design references:
 
