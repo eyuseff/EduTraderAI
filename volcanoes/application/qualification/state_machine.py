@@ -63,15 +63,15 @@ def transition(
 ) -> TransitionDecision:
     """Evaluate exactly one accepted ADR-004 transition without side effects."""
 
+    replay = _idempotent_replay(current_run, event, context)
+    if replay is not None:
+        return replay
+
     if current_run.state_revision != context.expected_revision:
         raise StaleRevisionError(
             reason_code="STALE_REVISION",
             safe_message="State changed before this command; refresh required.",
         )
-
-    replay = _idempotent_replay(current_run, event, context)
-    if replay is not None:
-        return replay
 
     if is_terminal_workflow_state(current_run.state):
         raise QualificationTerminalError(

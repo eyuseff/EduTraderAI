@@ -336,7 +336,7 @@ def test_idempotent_replay_returns_recorded_result_without_side_effects() -> Non
         applied,
         original_event,
         context(
-            11,
+            10,
             prior=PriorCommandRecord(
                 idempotency_key=original_event.idempotency_key,
                 payload_fingerprint=original_event.payload_fingerprint,

@@ -408,6 +408,17 @@ The first implementation slice maps the design to these files:
 
 This mapping does not change the accepted architecture and does not implement broker execution, persistence, event publication, runtime composition, UI, CLI, or cross-process coordination.
 
+## V41-PQ-001B implementation mapping
+
+The second implementation slice maps the application orchestration design to these files:
+
+- `volcanoes/application/qualification/ports.py` contains abstract repository and evidence-recorder ports plus safe result/reference types.
+- `volcanoes/application/qualification/service.py` contains typed application commands, descriptive execution plans, application results, application-layer errors, and `PaperQualificationService`.
+- `tests/test_paper_qualification_service.py` contains fake-port orchestration tests for the service boundary.
+- `tests/test_architecture_dependencies.py` contains qualification-boundary fitness checks.
+
+This mapping does not change the accepted transition semantics. The service invokes the pure transition engine and turns side-effect intents into descriptive plans only. It does not call brokers, mutate simulator state, persist to a production store, publish events, read credentials, expose a runtime entry point, or implement cross-process coordination.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

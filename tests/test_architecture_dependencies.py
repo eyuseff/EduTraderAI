@@ -87,6 +87,25 @@ FORBIDDEN_SUPERVISOR_PREFIXES = (
     "volcanoes.risk.risk_manager",
 )
 
+FORBIDDEN_QUALIFICATION_PREFIXES = (
+    "streamlit",
+    "adapters",
+    "volcanoes.adapters",
+    "broker",
+    "scanner_engine",
+    "database",
+    "persistence",
+    "volcanoes.database",
+    "volcanoes.persistence",
+    "engine",
+    "trading",
+    "requests",
+    "http",
+    "urllib",
+    "socket",
+    "subprocess",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -373,6 +392,78 @@ def test_execution_supervisor_has_no_outward_or_trading_logic_dependencies() -> 
     )
 
     assert violations == (), "\n".join(violations)
+
+
+def test_qualification_package_has_no_external_or_infrastructure_dependencies() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/qualification"),
+        FORBIDDEN_QUALIFICATION_PREFIXES,
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_service_depends_only_on_domain_and_ports() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/service.py"
+    allowed_project_prefixes = (
+        "volcanoes.application.qualification.contracts",
+        "volcanoes.application.qualification.errors",
+        "volcanoes.application.qualification.ports",
+        "volcanoes.application.qualification.state_machine",
+    )
+    project_roots = (
+        "adapters",
+        "broker",
+        "database",
+        "engine",
+        "persistence",
+        "scanner_engine",
+        "streamlit",
+        "trading",
+        "volcanoes",
+    )
+    violations = {
+        reference.module
+        for reference in _imports_for_file(path)
+        if any(_matches_prefix(reference.module, root) for root in project_roots)
+        and not any(
+            _matches_prefix(reference.module, allowed)
+            for allowed in allowed_project_prefixes
+        )
+    }
+
+    assert violations == set()
+
+
+def test_qualification_state_machine_does_not_import_service_layer() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py"
+    violations = _violations(
+        (path,),
+        ("volcanoes.application.qualification.service",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_package_has_no_runtime_side_effect_tokens() -> None:
+    prohibited_tokens = (
+        "os.environ",
+        "TradingClient",
+        "WebSocket",
+        "simulated_broker",
+        "BrokerAdapter",
+        "subprocess",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/qualification"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
 
 
 def test_scanner_signal_production_has_no_execution_dependencies() -> None:
