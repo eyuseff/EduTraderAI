@@ -466,6 +466,107 @@ def test_qualification_package_has_no_runtime_side_effect_tokens() -> None:
     assert offenders == []
 
 
+def test_qualification_scenario_harness_has_no_external_dependencies() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/qualification"),
+        (
+            "streamlit",
+            "adapters",
+            "volcanoes.adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "requests",
+            "http",
+            "urllib",
+            "socket",
+            "subprocess",
+            "os",
+            "random",
+            "uuid",
+            "datetime",
+            "pathlib",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_scenario_modules_do_not_touch_runtime_state_or_network() -> None:
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "Alpaca",
+        "WebSocket",
+        "requests",
+        "socket",
+        "subprocess",
+        "os.environ",
+        "open(",
+        "Path(",
+        "uuid4",
+        "random",
+        "datetime.now",
+        "BrokerAdapter",
+    )
+    scenario_files = (
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_models.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_catalog.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_validation.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_harness.py",
+    )
+    offenders: list[str] = []
+    for path in scenario_files:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_state_machine_and_service_do_not_import_scenario_harness() -> None:
+    violations = _violations(
+        (
+            PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+            PROJECT_ROOT / "volcanoes/application/qualification/service.py",
+        ),
+        (
+            "volcanoes.application.qualification.scenario_harness",
+            "volcanoes.application.qualification.scenario_catalog",
+            "volcanoes.application.qualification.scenario_models",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_scenario_harness_invokes_application_service_not_transition_engine() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/scenario_harness.py"
+    source = path.read_text(encoding="utf-8")
+    imports = {reference.module for reference in _imports_for_file(path)}
+
+    assert "volcanoes.application.qualification.service" in imports
+    assert (
+        "volcanoes.application.qualification.state_machine.apply_transition"
+        not in imports
+    )
+    assert "apply_transition" not in source
+
+
+def test_scenario_specifications_do_not_contain_callables() -> None:
+    source = (
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_catalog.py"
+    ).read_text(encoding="utf-8")
+
+    assert "lambda" not in source
+    assert "Callable" not in source
+
+
 def test_scanner_signal_production_has_no_execution_dependencies() -> None:
     violations = _violations(
         _python_files("scanner_engine"),

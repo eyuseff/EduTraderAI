@@ -419,6 +419,21 @@ The second implementation slice maps the application orchestration design to the
 
 This mapping does not change the accepted transition semantics. The service invokes the pure transition engine and turns side-effect intents into descriptive plans only. It does not call brokers, mutate simulator state, persist to a production store, publish events, read credentials, expose a runtime entry point, or implement cross-process coordination.
 
+## V41-PQ-001C implementation mapping
+
+The third implementation slice maps the approved scenarios to a deterministic executable reference harness:
+
+- `volcanoes/application/qualification/scenario_models.py` contains immutable scenario, step, expectation, context, step-result, and scenario-result contracts.
+- `volcanoes/application/qualification/scenario_validation.py` contains safe scenario specification validation.
+- `volcanoes/application/qualification/scenario_catalog.py` contains the approved in-code scenario catalog and stable lookup by scenario ID/version.
+- `volcanoes/application/qualification/scenario_harness.py` contains `QualificationScenarioHarness`, which invokes `PaperQualificationService` and asserts expected state-machine behavior without calling brokers or mutating runtime state.
+- `volcanoes/application/qualification/in_memory.py` contains deterministic non-durable in-memory ports for harness execution and tests.
+- `tests/test_paper_qualification_scenarios.py` contains scenario-harness tests and the default trace/revision assertions.
+
+The mandatory default catalog scenario is `PQ-SCN-005` version `v1`. Its approved trace is `PQ-TRN-001`, `PQ-TRN-002`, `PQ-TRN-005`, `PQ-TRN-006`, `PQ-TRN-009`, `PQ-TRN-010`, `PQ-TRN-011`, `PQ-TRN-015`, `PQ-TRN-017`, and `PQ-TRN-030`.
+
+This mapping does not add a runtime entry point, broker adapter, simulator mutation, production persistence, durable event publication, UI, CLI, live-trading support, or cross-process coordination. V41-PQ-001 remains in progress after this slice.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
