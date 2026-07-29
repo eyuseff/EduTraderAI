@@ -113,6 +113,7 @@ def transition(
         current_run=current_run,
         event=event,
         destination=destination,
+        next_revision=next_revision,
         result=result,
         environment=context.environment,
         diagnostic=False,
@@ -178,6 +179,8 @@ def diagnostic_rejection(
         safe_message=safe_message,
         object_reference=event.object_reference,
         diagnostic=True,
+        previous_revision=current_run.state_revision,
+        next_revision=current_run.state_revision,
     )
     return TransitionDecision(
         accepted=False,
@@ -314,6 +317,7 @@ def _evidence_intent(
     current_run: PaperQualificationRun,
     event: QualificationEvent,
     destination: QualificationState,
+    next_revision: StateRevision,
     result: QualificationResult,
     environment: str,
     diagnostic: bool,
@@ -335,6 +339,10 @@ def _evidence_intent(
         safe_message=spec.safe_message,
         object_reference=event.object_reference,
         diagnostic=diagnostic,
+        previous_revision=current_run.state_revision,
+        next_revision=next_revision,
+        reconciliation_required=destination
+        is QualificationState.RECONCILIATION_REQUIRED,
     )
 
 

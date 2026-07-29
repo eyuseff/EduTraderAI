@@ -485,7 +485,6 @@ def test_qualification_scenario_harness_has_no_external_dependencies() -> None:
             "os",
             "random",
             "uuid",
-            "datetime",
             "pathlib",
         ),
     )
@@ -540,6 +539,90 @@ def test_state_machine_and_service_do_not_import_scenario_harness() -> None:
             "volcanoes.application.qualification.scenario_catalog",
             "volcanoes.application.qualification.scenario_models",
         ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_evidence_adapter_has_no_outward_or_infrastructure_dependencies() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/evidence.py"
+    violations = _violations(
+        (path,),
+        (
+            "streamlit",
+            "adapters",
+            "volcanoes.adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "requests",
+            "http",
+            "urllib",
+            "socket",
+            "subprocess",
+            "os",
+            "pathlib",
+            "volcanoes.events",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_evidence_adapter_has_no_runtime_effect_tokens() -> None:
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "Alpaca",
+        "WebSocket",
+        "requests",
+        "socket",
+        "subprocess",
+        "os.environ",
+        "getenv",
+        "open(",
+        "Path(",
+        "write_text",
+        "write_bytes",
+        "uuid4",
+        "random",
+        "datetime.now",
+        "time.time",
+        "BrokerAdapter",
+        "EventPublisher",
+        "Kafka",
+        "Rabbit",
+        "Redis",
+    )
+    path = PROJECT_ROOT / "volcanoes/application/qualification/evidence.py"
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+
+    assert offenders == []
+
+
+def test_service_does_not_implement_canonical_evidence_serialization() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/service.py"
+    source = path.read_text(encoding="utf-8")
+
+    assert "serialize_qualification_evidence" not in source
+    assert "QualificationEvidenceRecord(" not in source
+    assert "compute_evidence_digest" not in source
+
+
+def test_state_machine_and_scenario_models_do_not_import_evidence_adapter() -> None:
+    violations = _violations(
+        (
+            PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+            PROJECT_ROOT / "volcanoes/application/qualification/scenario_models.py",
+        ),
+        ("volcanoes.application.qualification.evidence",),
     )
 
     assert violations == (), "\n".join(violations)

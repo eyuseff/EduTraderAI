@@ -434,6 +434,21 @@ The mandatory default catalog scenario is `PQ-SCN-005` version `v1`. Its approve
 
 This mapping does not add a runtime entry point, broker adapter, simulator mutation, production persistence, durable event publication, UI, CLI, live-trading support, or cross-process coordination. V41-PQ-001 remains in progress after this slice.
 
+## V41-PQ-001D implementation mapping
+
+The fourth implementation slice establishes the canonical evidence-adapter contract:
+
+- `volcanoes/application/qualification/evidence.py` contains canonical qualification evidence records, evidence type mapping, schema validation, deterministic JSON serialization, SHA-256 digest helpers, redaction policy, metadata validation, and the port-compatible in-memory canonical recorder.
+- `volcanoes/application/qualification/contracts.py` extends `EvidenceIntent` with optional previous/next revision and replay/reconciliation metadata populated by the transition engine.
+- `tests/test_paper_qualification_evidence.py` contains canonical evidence-adapter tests and default scenario evidence trace assertions.
+- `tests/test_architecture_dependencies.py` contains evidence-adapter boundary checks.
+
+The canonical evidence schema identifier is `qualification-evidence/v1`.
+
+The default `PQ-SCN-005` evidence transition trace is `PQ-TRN-001`, `PQ-TRN-002`, `PQ-TRN-005`, `PQ-TRN-006`, `PQ-TRN-009`, `PQ-TRN-010`, `PQ-TRN-011`, `PQ-TRN-015`, `PQ-TRN-017`, and `PQ-TRN-030`.
+
+Canonical records remain in memory only in this slice. No production persistence, external publisher, broker adapter, simulator mutation, runtime entry point, UI, CLI, live-trading support, or cross-process coordination is added. V41-PQ-001 remains in progress after this slice.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

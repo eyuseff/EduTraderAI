@@ -337,6 +337,10 @@ class EvidenceIntent:
     schema_version: str = "paper-qualification-transition/v1"
     object_reference: str | None = None
     diagnostic: bool = False
+    previous_revision: StateRevision | None = None
+    next_revision: StateRevision | None = None
+    replayed: bool = False
+    reconciliation_required: bool = False
 
     def __post_init__(self) -> None:
         for name in (
@@ -356,6 +360,10 @@ class EvidenceIntent:
                 raise ValueError(f"{name} cannot be empty.")
         if self.object_reference is not None and not self.object_reference.strip():
             raise ValueError("object_reference cannot be blank when supplied.")
+        if self.previous_revision is not None and self.previous_revision < 0:
+            raise ValueError("previous_revision cannot be negative.")
+        if self.next_revision is not None and self.next_revision < 0:
+            raise ValueError("next_revision cannot be negative.")
 
 
 @dataclass(frozen=True, slots=True)

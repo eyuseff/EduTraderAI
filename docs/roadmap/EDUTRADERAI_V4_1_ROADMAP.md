@@ -144,12 +144,15 @@ Implementation status:
 - V41-PQ-001A — CORE DOMAIN MODEL AND PURE TRANSITION ENGINE: IMPLEMENTED.
 - V41-PQ-001B — APPLICATION QUALIFICATION SERVICE: IMPLEMENTED.
 - V41-PQ-001C — QUALIFICATION SCENARIO HARNESS: IMPLEMENTED.
+- V41-PQ-001D — QUALIFICATION EVIDENCE ADAPTER: IMPLEMENTED.
 - V41-PQ-001 overall status: IN PROGRESS.
-- Next: V41-PQ-001D — QUALIFICATION EVIDENCE ADAPTER.
-- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, or V41-PQ-001C.
+- Next: V41-PQ-001E — PAPER QUALIFICATION WORKFLOW INTEGRATION DESIGN.
+- Before production workflow integration, V41-PQ-001E should begin with a bounded integration design and compatibility review.
+- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, or V41-PQ-001D.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001C_IMPLEMENTATION_REPORT.md`.
+- Implementation report: `docs/engineering/V41_PQ_001D_IMPLEMENTATION_REPORT.md`.
 
 
 ### Workstream B - Cross-process Coordination
