@@ -62,6 +62,16 @@ from volcanoes.application.qualification.integration.translation import (
     observation_to_qualification_command,
     runtime_request_to_qualification_command,
 )
+from volcanoes.application.qualification.integration.validation import (
+    ShadowObservationValidationHarness,
+    ShadowValidationClassification,
+    ShadowValidationConflict,
+    ShadowValidationConflictType,
+    ShadowValidationError,
+    ShadowValidationObservation,
+    ShadowValidationRatio,
+    ShadowValidationSummary,
+)
 from volcanoes.application.qualification.integration.facade import (
     PaperQualificationFacade,
     PaperQualificationFacadeResult,
@@ -128,8 +138,16 @@ __all__ = [
     "ShadowComparisonStatus",
     "ShadowIdentityContinuityError",
     "ShadowInputValidationError",
+    "ShadowObservationValidationHarness",
     "ShadowMismatch",
     "ShadowMismatchClassification",
+    "ShadowValidationClassification",
+    "ShadowValidationConflict",
+    "ShadowValidationConflictType",
+    "ShadowValidationError",
+    "ShadowValidationObservation",
+    "ShadowValidationRatio",
+    "ShadowValidationSummary",
     "UnsafeIntegrationMetadataError",
     "UnsupportedLegacyDecisionError",
     "UnsupportedExecutionPlanError",

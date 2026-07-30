@@ -601,6 +601,52 @@ while preserving current Paper behavior:
   persistence, events, metrics, configuration, and environment switches remain
   unwired.
 
+## V41-PQ-001F4C implementation mapping
+
+The shadow observation validation slice adds an in-memory harness for completed
+boundary results only:
+
+- Validation module location:
+  `volcanoes/application/qualification/integration/validation.py`.
+- Public API:
+  `ShadowObservationValidationHarness.record(result)` and
+  `ShadowObservationValidationHarness.summarize()`.
+- Input rule: the harness accepts `QualificationRuntimeBoundaryResult` only.
+  It does not accept runtime requests, legacy decisions, shadow requests,
+  runtime actions, broker responses, simulator state, evidence, or paths.
+- In-memory rule: the harness uses a private in-memory accumulator and returns
+  immutable `ShadowValidationObservation` and `ShadowValidationSummary`
+  values.
+- Deterministic summary rule: observations, conflicts, mismatch counts, ratios,
+  and summary fingerprints are canonical and insertion-independent where
+  appropriate.
+- Duplicate model: exact duplicate observations increment deterministic replay
+  counts and do not create conflicts.
+- Conflict model: the same observation identity with different validation facts
+  creates immutable safe conflict records and increments nondeterministic replay
+  counters.
+- Repeatability model: only repeated equivalent observations can be repeatable;
+  one-time observations are not treated as proof of repeatability.
+- Identity continuity: the harness counts missing or inconsistent boundary,
+  shadow, runtime request, run, command, correlation, and idempotency
+  identities.
+- Revision continuity: the harness counts previous/expected revision
+  mismatches and next-revision regressions.
+- Transition continuity: the harness counts boundary/shadow transition identity
+  mismatches.
+- No-readiness-authorization rule: F4C produces validation facts only and does
+  not define readiness thresholds or deployment decisions.
+- No-runtime-control rule: validation results never authorize, block, replace,
+  or modify legacy Paper behavior.
+- No-persistence rule: F4C adds no file output, evidence recorder, database,
+  durable store, JSON export, or CSV export.
+- No-execution rule: F4C does not execute runtime actions and does not import
+  broker, simulator, scanner, supervisor, UI, API, CLI, event, metrics,
+  platform configuration, or feature-flag modules.
+- Deferred slice: V41-PQ-001F4D should consume immutable F4C summaries and
+  define advisory shadow-readiness assessment criteria without authorizing
+  runtime execution.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

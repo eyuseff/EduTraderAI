@@ -832,6 +832,175 @@ def test_shadow_mode_is_not_wired_into_current_runtime_entry_points() -> None:
     assert offenders == []
 
 
+def test_shadow_validation_harness_imports_only_boundary_contracts() -> None:
+    path = (
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/validation.py"
+    )
+    allowed_project_prefixes = (
+        "volcanoes.application.qualification.integration.boundary",
+        "volcanoes.application.qualification.integration.contracts",
+        "volcanoes.application.qualification.integration.shadow",
+    )
+    forbidden_prefixes = (
+        "streamlit",
+        "app",
+        "adapters",
+        "volcanoes.adapters",
+        "broker",
+        "scanner_engine",
+        "engine",
+        "trading",
+        "requests",
+        "http",
+        "urllib",
+        "socket",
+        "subprocess",
+        "os",
+        "pathlib",
+        "random",
+        "uuid",
+        "datetime",
+        "time",
+        "database",
+        "persistence",
+        "volcanoes.database",
+        "volcanoes.persistence",
+        "volcanoes.events",
+        "volcanoes.application.operations",
+        "volcanoes.application.platform",
+        "volcanoes.application.supervisor",
+        "volcanoes.application.qualification.runtime_observation",
+        "volcanoes.application.qualification.integration.runtime_observation",
+        "volcanoes.application.qualification.integration.facade",
+        "volcanoes.application.qualification.integration.evidence",
+        "volcanoes.application.qualification.integration.service",
+        "volcanoes.application.qualification.integration.state_machine",
+        "volcanoes.application.qualification.integration.ports",
+        "volcanoes.application.qualification.integration.shadow.PaperQualificationShadowRunner",
+        "volcanoes.application.qualification.facade",
+        "volcanoes.application.qualification.service",
+        "volcanoes.application.qualification.state_machine",
+        "volcanoes.application.qualification.evidence",
+        "volcanoes.application.qualification.ports",
+    )
+    project_roots = (
+        "adapters",
+        "broker",
+        "database",
+        "engine",
+        "persistence",
+        "scanner_engine",
+        "streamlit",
+        "trading",
+        "volcanoes",
+    )
+    violations = {
+        reference.module
+        for reference in _imports_for_file(path)
+        if any(
+            _matches_prefix(reference.module, prefix) for prefix in forbidden_prefixes
+        )
+        or (
+            any(_matches_prefix(reference.module, root) for root in project_roots)
+            and not any(
+                _matches_prefix(reference.module, allowed)
+                for allowed in allowed_project_prefixes
+            )
+        )
+    }
+
+    assert violations == set()
+
+
+def test_shadow_validation_harness_has_no_runtime_effect_or_authority_tokens() -> None:
+    path = (
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/validation.py"
+    )
+    prohibited_tokens = (
+        "evaluate_shadow(",
+        "PaperQualificationShadowRunner(",
+        "PaperQualificationFacade(",
+        "PaperQualificationService(",
+        "transition(",
+        "apply_transition",
+        "RuntimeActionRequest(",
+        "TradingClient",
+        "Alpaca",
+        "BrokerAdapter",
+        "simulated_broker",
+        "scanner",
+        "supervisor",
+        "streamlit",
+        "requests",
+        "http",
+        "https",
+        "socket",
+        "WebSocket",
+        "subprocess",
+        "os.environ",
+        "getenv",
+        "open(",
+        "Path(",
+        "read_text",
+        "write_text",
+        "write_bytes",
+        "uuid4",
+        "random",
+        "datetime.now",
+        "time.time",
+        "EventPublisher",
+        "metrics",
+        "logging",
+        "print(",
+        "execute(",
+        "submit",
+        "cancel",
+        "reconcile",
+        "database",
+        "sqlite",
+        "postgres",
+        "redis",
+        "Kafka",
+        "Rabbit",
+        "API_KEY",
+        "SECRET",
+        "TOKEN",
+        "PASSWORD",
+        "authorization",
+        "cookie",
+        "LIVE",
+        "READY",
+    )
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+
+    assert offenders == []
+
+
+def test_no_reverse_dependency_into_shadow_validation_harness() -> None:
+    paths = (
+        PROJECT_ROOT / "volcanoes/application/qualification/service.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/evidence.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/boundary.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/shadow.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/facade.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/translation.py",
+        PROJECT_ROOT
+        / "volcanoes/application/qualification/integration/runtime_observation.py",
+    )
+    violations = _violations(
+        paths,
+        ("volcanoes.application.qualification.integration.validation",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
 def test_controlled_shadow_runtime_observation_has_one_call_site() -> None:
     runtime_paths = (
         PROJECT_ROOT / "app.py",

@@ -151,12 +151,15 @@ Implementation status:
 - V41-PQ-001F3 — SHADOW-MODE PAPER QUALIFICATION INVOCATION: IMPLEMENTED.
 - V41-PQ-001F4A — QUALIFICATION RUNTIME INTEGRATION BOUNDARY: IMPLEMENTED.
 - V41-PQ-001F4B — CONTROLLED SHADOW RUNTIME WIRING: IMPLEMENTED.
+- V41-PQ-001F4C — SHADOW OBSERVATION VALIDATION HARNESS: IMPLEMENTED.
 - V41-PQ-001 overall status: IN PROGRESS.
 - V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
-- Next recommended implementation slice: V41-PQ-001F4C — controlled broker-side qualification executor design, pending separate authorization.
+- Next recommended implementation slice: V41-PQ-001F4D — SHADOW READINESS ASSESSMENT.
 - V41-PQ-001F4B connects exactly one approved Paper runtime observation point, calls only `QualificationRuntimeIntegrationBoundary`, never calls the shadow runner, facade, or service directly, remains disabled by default, uses an explicit typed Paper-only gate, never executes returned actions, never alters legacy decisions, provides instant rollback by disabling or removing one narrow call site, preserves broker, simulator, scanner, supervisor, and UI behavior, and proves zero behavioral impact when disabled and zero consequential impact when enabled.
+- V41-PQ-001F4C adds an in-memory validation harness that consumes completed boundary results only, aggregates immutable validation facts, detects duplicates and conflicts, evaluates repeatability and continuity counters, produces deterministic summaries, remains unwired from production runtime, and does not authorize runtime execution.
+- V41-PQ-001F4D should consume immutable F4C validation summaries, define explicit advisory readiness criteria, distinguish READY, NOT_READY, and INSUFFICIENT_EVIDENCE, require zero identity and authority violations, require zero nondeterministic conflicts, require deterministic replay, define minimum observation counts, define permitted and prohibited mismatch categories, remain advisory only, not authorize runtime execution, not invoke brokers, not persist, not add Live support, and not mark V41-PQ-001 complete.
 - Do not proceed directly to a broker side-effect executor.
-- Broker execution, runtime integration beyond controlled shadow observation, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, V41-PQ-001F2, V41-PQ-001F3, V41-PQ-001F4A, or V41-PQ-001F4B.
+- Broker execution, runtime integration beyond controlled shadow observation, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, V41-PQ-001F2, V41-PQ-001F3, V41-PQ-001F4A, V41-PQ-001F4B, or V41-PQ-001F4C.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001C_IMPLEMENTATION_REPORT.md`.
@@ -168,6 +171,7 @@ Implementation status:
 - Implementation report: `docs/engineering/V41_PQ_001F4A_IMPLEMENTATION_REPORT.md`.
 - Observation-point decision: `docs/engineering/V41_PQ_001F4B_OBSERVATION_POINT_DECISION.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F4B_IMPLEMENTATION_REPORT.md`.
+- Implementation report: `docs/engineering/V41_PQ_001F4C_IMPLEMENTATION_REPORT.md`.
 
 
 ### Workstream B - Cross-process Coordination
