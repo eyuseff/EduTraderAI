@@ -530,6 +530,48 @@ The next slice, V41-PQ-001F4, may introduce one controlled Paper-only runtime
 observation point. F4 must remain disabled by default, never execute returned
 runtime actions, never influence legacy decisions, and include instant rollback.
 
+## V41-PQ-001F4A implementation mapping
+
+The fourth runtime-integration slice adds the intended sole future
+runtime-facing integration seam while keeping it unwired:
+
+- `volcanoes/application/qualification/integration/boundary.py` contains
+  `QualificationRuntimeIntegrationBoundary`,
+  `QualificationRuntimeBoundaryRequest`, `QualificationRuntimeBoundaryResult`,
+  `QualificationRuntimeBoundaryMode`, `QualificationRuntimeBoundaryStatus`,
+  deterministic `qib-` boundary identity derivation, and comparison-status
+  mapping.
+- The boundary public API is
+  `QualificationRuntimeIntegrationBoundary(shadow_runner).evaluate_shadow(request)`.
+- The request model composes `PaperQualificationShadowRequest`, accepts only
+  `QualificationRuntimeBoundaryMode.SHADOW_ONLY`, requires legacy Paper
+  behavior to remain authoritative, rejects execution authorization, and carries
+  only a safe source identifier and safe metadata.
+- The result model preserves boundary ID, mode, status, shadow result,
+  qualification run ID, runtime request ID, command ID, correlation ID,
+  idempotency key, comparison status, mismatch classifications, revision fields,
+  transition ID, described action, and the guarantees `action_executed=False`,
+  `legacy_behavior_authoritative=True`, `legacy_behavior_changed=False`, and
+  `runtime_connected=False`.
+- The dependency direction is future runtime → boundary → shadow runner →
+  facade → service. In F4A the future-runtime arrow remains hypothetical:
+  current runtime modules do not import or invoke the boundary.
+- Identity-continuity rules require matching environment, runtime request ID,
+  qualification run ID, command ID, correlation ID, idempotency key, expected
+  revision, prior revision, transition identity, and shadow invocation identity.
+- The legacy authority rule is encoded explicitly: matches do not authorize
+  execution, mismatches do not block legacy behavior, qualification errors do
+  not alter runtime behavior, and returned runtime actions are never executed.
+- The no-effect boundary excludes brokers, simulator state, runtime entry
+  points, scanner, supervisor, UI, CLI, API, feature flags, configuration
+  readers, persistence, events, metrics, executor hooks, retries, polling, and
+  reconciliation execution.
+
+The next slice, V41-PQ-001F4B, may connect exactly one approved Paper runtime
+observation point to this boundary. F4B must call only the boundary, remain
+disabled by default, never execute returned actions, never alter legacy
+decisions, and prove zero behavioral impact.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

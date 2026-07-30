@@ -95,3 +95,27 @@ class UnsupportedLegacyDecisionError(PaperQualificationShadowError):
 
 class ShadowComparisonError(PaperQualificationShadowError):
     """Raised when shadow comparison cannot be represented safely."""
+
+
+class QualificationRuntimeBoundaryError(QualificationIntegrationError):
+    """Raised when the runtime integration boundary cannot proceed safely."""
+
+
+class BoundaryInputValidationError(QualificationRuntimeBoundaryError):
+    """Raised when a runtime boundary request is invalid."""
+
+
+class BoundaryModeError(QualificationRuntimeBoundaryError):
+    """Raised when a runtime boundary mode is not shadow-only."""
+
+
+class BoundaryIdentityContinuityError(QualificationRuntimeBoundaryError):
+    """Raised when boundary identity continuity fails."""
+
+
+class BoundaryResultValidationError(QualificationRuntimeBoundaryError):
+    """Raised when a shadow result conflicts with the boundary request."""
+
+
+class BoundaryShadowInvocationError(QualificationRuntimeBoundaryError):
+    """Raised when the injected shadow runner fails."""

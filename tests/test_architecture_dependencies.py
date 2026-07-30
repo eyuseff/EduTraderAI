@@ -499,7 +499,8 @@ def test_qualification_scenario_modules_do_not_touch_runtime_state_or_network() 
         "TradingClient",
         "Alpaca",
         "WebSocket",
-        "requests",
+        "import requests",
+        "from requests",
         "socket",
         "subprocess",
         "os.environ",
@@ -577,7 +578,8 @@ def test_evidence_adapter_has_no_runtime_effect_tokens() -> None:
         "TradingClient",
         "Alpaca",
         "WebSocket",
-        "requests",
+        "import requests",
+        "from requests",
         "socket",
         "subprocess",
         "os.environ",
@@ -733,6 +735,69 @@ def test_qualification_shadow_does_not_construct_facade_service_or_call_state_ma
     assert offenders == []
 
 
+def test_qualification_runtime_boundary_imports_only_shadow_boundary_dependencies() -> (
+    None
+):
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/boundary.py"
+    violations = _violations(
+        (path,),
+        (
+            "streamlit",
+            "adapters",
+            "volcanoes.adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "requests",
+            "http",
+            "urllib",
+            "socket",
+            "subprocess",
+            "os",
+            "pathlib",
+            "random",
+            "uuid",
+            "volcanoes.application.qualification.service",
+            "volcanoes.application.qualification.state_machine",
+            "volcanoes.application.qualification.evidence",
+            "volcanoes.application.qualification.ports",
+            "volcanoes.events",
+            "volcanoes.application.operations",
+            "volcanoes.application.platform",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_runtime_boundary_has_no_execution_hooks_or_construction() -> (
+    None
+):
+    prohibited_tokens = (
+        "PaperQualificationShadowRunner(",
+        "PaperQualificationFacade(",
+        "PaperQualificationService(",
+        "transition(",
+        "apply_transition",
+        "diagnostic_rejection",
+        "RuntimeActionRequest(",
+        "execute(",
+        "submit",
+        "cancel",
+        "feature_flag",
+    )
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/boundary.py"
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+
+    assert offenders == []
+
+
 def test_shadow_mode_is_not_wired_into_current_runtime_entry_points() -> None:
     prohibited_tokens = (
         "PaperQualificationShadowRunner",
@@ -746,6 +811,36 @@ def test_shadow_mode_is_not_wired_into_current_runtime_entry_points() -> None:
         PROJECT_ROOT / "adapters/paper_order_preview.py",
         PROJECT_ROOT / "adapters/paper_order_submission.py",
         PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_runtime_boundary_is_not_wired_into_current_runtime_entry_points() -> None:
+    prohibited_tokens = (
+        "QualificationRuntimeIntegrationBoundary",
+        "QualificationRuntimeBoundaryRequest",
+        "QualificationRuntimeBoundaryResult",
+        "QualificationRuntimeBoundaryMode",
+        "qualification.integration.boundary",
+    )
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
         PROJECT_ROOT / "engine/supervised_brain.py",
         PROJECT_ROOT / "engine/brain.py",
     )
@@ -780,6 +875,26 @@ def test_no_reverse_dependency_from_facade_or_core_into_shadow_module() -> None:
     assert violations == (), "\n".join(violations)
 
 
+def test_no_reverse_dependency_from_shadow_facade_or_core_into_boundary_module() -> (
+    None
+):
+    paths = (
+        PROJECT_ROOT / "volcanoes/application/qualification/service.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/evidence.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/shadow.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/facade.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/translation.py",
+    )
+
+    violations = _violations(
+        paths,
+        ("volcanoes.application.qualification.integration.boundary",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
 def test_qualification_integration_has_no_effect_or_runtime_tokens() -> None:
     prohibited_tokens = (
         "state/simulated_broker.json",
@@ -787,7 +902,8 @@ def test_qualification_integration_has_no_effect_or_runtime_tokens() -> None:
         "TradingClient",
         "Alpaca",
         "WebSocket",
-        "requests",
+        "import requests",
+        "from requests",
         "socket",
         "subprocess",
         "os.environ",

@@ -15,6 +15,11 @@ from volcanoes.application.qualification.integration.contracts import (
     require_paper_environment,
 )
 from volcanoes.application.qualification.integration.errors import (
+    BoundaryIdentityContinuityError,
+    BoundaryInputValidationError,
+    BoundaryModeError,
+    BoundaryResultValidationError,
+    BoundaryShadowInvocationError,
     FacadeIdentityContinuityError,
     FacadeResultValidationError,
     FacadeServiceInvocationError,
@@ -24,6 +29,7 @@ from volcanoes.application.qualification.integration.errors import (
     PaperQualificationFacadeError,
     PaperQualificationShadowError,
     QualificationIntegrationError,
+    QualificationRuntimeBoundaryError,
     RuntimeRequestValidationError,
     ShadowComparisonError,
     ShadowIdentityContinuityError,
@@ -33,6 +39,15 @@ from volcanoes.application.qualification.integration.errors import (
     UnsupportedExecutionPlanError,
     UnsupportedRuntimeObservationError,
     UnsupportedRuntimeRequestError,
+)
+from volcanoes.application.qualification.integration.boundary import (
+    QualificationRuntimeBoundaryMode,
+    QualificationRuntimeBoundaryRequest,
+    QualificationRuntimeBoundaryResult,
+    QualificationRuntimeBoundaryStatus,
+    QualificationRuntimeIntegrationBoundary,
+    boundary_status_from_shadow,
+    derive_boundary_invocation_id,
 )
 from volcanoes.application.qualification.integration.translation import (
     derive_integration_identity,
@@ -58,6 +73,11 @@ from volcanoes.application.qualification.integration.shadow import (
 )
 
 __all__ = [
+    "BoundaryIdentityContinuityError",
+    "BoundaryInputValidationError",
+    "BoundaryModeError",
+    "BoundaryResultValidationError",
+    "BoundaryShadowInvocationError",
     "FacadeIdentityContinuityError",
     "FacadeResultValidationError",
     "FacadeServiceInvocationError",
@@ -80,6 +100,12 @@ __all__ = [
     "PaperQualificationShadowResult",
     "PaperQualificationShadowRunner",
     "QualificationIntegrationError",
+    "QualificationRuntimeBoundaryError",
+    "QualificationRuntimeBoundaryMode",
+    "QualificationRuntimeBoundaryRequest",
+    "QualificationRuntimeBoundaryResult",
+    "QualificationRuntimeBoundaryStatus",
+    "QualificationRuntimeIntegrationBoundary",
     "RuntimeActionKind",
     "RuntimeActionRequest",
     "RuntimeObservationType",
@@ -98,6 +124,8 @@ __all__ = [
     "UnsupportedExecutionPlanError",
     "UnsupportedRuntimeObservationError",
     "UnsupportedRuntimeRequestError",
+    "boundary_status_from_shadow",
+    "derive_boundary_invocation_id",
     "derive_shadow_invocation_id",
     "derive_integration_identity",
     "execution_plan_to_runtime_action_request",
