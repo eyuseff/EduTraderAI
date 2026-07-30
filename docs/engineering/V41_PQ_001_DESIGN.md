@@ -449,6 +449,23 @@ The default `PQ-SCN-005` evidence transition trace is `PQ-TRN-001`, `PQ-TRN-002`
 
 Canonical records remain in memory only in this slice. No production persistence, external publisher, broker adapter, simulator mutation, runtime entry point, UI, CLI, live-trading support, or cross-process coordination is added. V41-PQ-001 remains in progress after this slice.
 
+## V41-PQ-001F1 implementation mapping
+
+The first runtime-integration slice establishes pure integration contracts and compatibility translators:
+
+- `volcanoes/application/qualification/integration/contracts.py` contains the Paper environment model, runtime request contract, safe order intent, runtime action-request contract, normalized runtime-observation contract, safe metadata normalization, timestamp normalization, symbol normalization, Paper-only guard, and semantic validation helpers.
+- `volcanoes/application/qualification/integration/errors.py` contains typed safe integration errors with stable reason codes and no raw payload exposure.
+- `volcanoes/application/qualification/integration/translation.py` contains pure translators from `PaperRuntimeRequest` to `QualificationApplicationCommand`, from `QualificationExecutionPlan` to `RuntimeActionRequest`, and from `NormalizedRuntimeObservation` to `QualificationApplicationCommand`.
+- `volcanoes/application/qualification/integration/validation.py` re-exports validation helpers for future integration slices.
+- `tests/test_paper_qualification_integration_contracts.py` contains focused contract, translation, Paper-only, identity, metadata, and no-external-effect tests.
+- `tests/test_architecture_dependencies.py` contains integration-package boundary checks.
+
+Derived runtime action identities use deterministic SHA-256 over sorted canonical JSON values and the `qia-` prefix. Callers must supply qualification run ID, command ID, correlation ID, idempotency key, expected revision, and timestamps explicitly. The integration layer does not generate identifiers with random values, does not read wall-clock time, and does not read environment variables.
+
+The integration package is intentionally non-executing. It does not invoke `PaperQualificationService`, does not call the state machine, does not execute side-effect intents, does not call brokers, does not instantiate broker adapters, does not touch simulator state, does not persist state, does not record evidence, does not publish events, does not add a feature flag, and does not connect any runtime entry point.
+
+The next slice, V41-PQ-001F2, may add a Paper Qualification Facade that uses these contracts to invoke `PaperQualificationService` while remaining non-executing and Paper-only.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

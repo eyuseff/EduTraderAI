@@ -628,6 +628,107 @@ def test_state_machine_and_scenario_models_do_not_import_evidence_adapter() -> N
     assert violations == (), "\n".join(violations)
 
 
+def test_qualification_integration_has_no_runtime_or_infrastructure_imports() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/qualification/integration"),
+        (
+            "streamlit",
+            "adapters",
+            "volcanoes.adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "requests",
+            "http",
+            "urllib",
+            "socket",
+            "subprocess",
+            "os",
+            "pathlib",
+            "random",
+            "uuid",
+            "volcanoes.events",
+            "volcanoes.database",
+            "volcanoes.persistence",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_integration_does_not_call_services_or_state_machine() -> None:
+    prohibited_tokens = (
+        "PaperQualificationService",
+        "transition(",
+        "apply_transition",
+        "diagnostic_rejection",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/qualification/integration"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_qualification_integration_has_no_effect_or_runtime_tokens() -> None:
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "Alpaca",
+        "WebSocket",
+        "requests",
+        "socket",
+        "subprocess",
+        "os.environ",
+        "getenv",
+        "open(",
+        "Path(",
+        "read_text",
+        "write_text",
+        "write_bytes",
+        "uuid4",
+        "random",
+        "datetime.now",
+        "time.time",
+        "BrokerAdapter",
+        "EventPublisher",
+        "Kafka",
+        "Rabbit",
+        "Redis",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/qualification/integration"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_qualification_core_does_not_import_integration_package() -> None:
+    core_files = tuple(
+        path
+        for path in _python_files("volcanoes/application/qualification")
+        if "integration" not in path.relative_to(PROJECT_ROOT).parts
+    )
+    violations = _violations(
+        core_files,
+        ("volcanoes.application.qualification.integration",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
 def test_scenario_harness_invokes_application_service_not_transition_engine() -> None:
     path = PROJECT_ROOT / "volcanoes/application/qualification/scenario_harness.py"
     source = path.read_text(encoding="utf-8")
