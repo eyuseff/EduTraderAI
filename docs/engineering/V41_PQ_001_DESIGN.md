@@ -466,6 +466,21 @@ The integration package is intentionally non-executing. It does not invoke `Pape
 
 The next slice, V41-PQ-001F2, may add a Paper Qualification Facade that uses these contracts to invoke `PaperQualificationService` while remaining non-executing and Paper-only.
 
+## V41-PQ-001F2 implementation mapping
+
+The second runtime-integration slice adds a narrow non-executing facade over the F1 contracts:
+
+- `volcanoes/application/qualification/integration/facade.py` contains `PaperQualificationFacade` and `PaperQualificationFacadeResult`.
+- The facade public API is `PaperQualificationFacade(service).handle(request)`.
+- The facade validates the Paper-only request boundary, translates `PaperRuntimeRequest` into `QualificationApplicationCommand`, invokes the injected `PaperQualificationService` exactly once, validates identity continuity, translates the returned `QualificationExecutionPlan` into `RuntimeActionRequest`, validates the descriptive action, and returns an immutable facade result.
+- `PaperQualificationFacadeResult` preserves run ID, command ID, correlation ID, idempotency key, transition ID, previous revision, next revision, qualification state, qualification result, replay status, the application result reference, and the translated runtime action. It always reports `action_executed=False`.
+- `tests/test_paper_qualification_facade.py` covers facade orchestration, identity continuity, replay behavior, failure behavior, no-external-effect boundaries, and default scenario execution through the facade with in-memory ports.
+- `tests/test_architecture_dependencies.py` contains facade-specific fitness checks.
+
+The facade invokes `PaperQualificationService` but remains non-executing. It does not call the state machine directly, does not access repositories directly, does not serialize evidence, does not call brokers, does not instantiate broker adapters, does not touch simulator state, does not publish events, does not emit metrics, does not add a feature flag, and does not connect any runtime entry point.
+
+The next slice, V41-PQ-001F3, may connect the facade into a read-only or shadow runtime path. F3 must not influence current Paper decisions, execute returned runtime actions, submit or cancel broker orders, or change Paper workflow behavior.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

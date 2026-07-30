@@ -40,8 +40,36 @@ _REQUEST_EVENT_MAP = {
     RuntimeRequestKind.APPROVAL_REQUESTED: QualificationEventType.APPROVAL_REQUESTED,
     RuntimeRequestKind.OPERATOR_APPROVED: QualificationEventType.OPERATOR_APPROVED,
     RuntimeRequestKind.OPERATOR_REJECTED: QualificationEventType.OPERATOR_REJECTED,
+    RuntimeRequestKind.SUBMISSION_STARTED: QualificationEventType.SUBMISSION_STARTED,
+    RuntimeRequestKind.BROKER_REQUEST_SENT: QualificationEventType.BROKER_REQUEST_SENT,
+    RuntimeRequestKind.BROKER_ACKNOWLEDGED: QualificationEventType.BROKER_ACKNOWLEDGED,
+    RuntimeRequestKind.BROKER_PARTIAL_FILL_REPORTED: (
+        QualificationEventType.BROKER_PARTIAL_FILL_REPORTED
+    ),
+    RuntimeRequestKind.BROKER_FILL_REPORTED: (
+        QualificationEventType.BROKER_FILL_REPORTED
+    ),
     RuntimeRequestKind.CANCELLATION_REQUESTED: QualificationEventType.CANCELLATION_REQUESTED,
+    RuntimeRequestKind.BROKER_CANCELLATION_CONFIRMED: (
+        QualificationEventType.BROKER_CANCELLATION_CONFIRMED
+    ),
+    RuntimeRequestKind.BROKER_REJECTED: QualificationEventType.BROKER_REJECTED,
+    RuntimeRequestKind.BROKER_EXPIRED: QualificationEventType.BROKER_EXPIRED,
+    RuntimeRequestKind.TIMEOUT_DETECTED: QualificationEventType.TIMEOUT_DETECTED,
+    RuntimeRequestKind.RECONCILIATION_STARTED: (
+        QualificationEventType.RECONCILIATION_STARTED
+    ),
+    RuntimeRequestKind.RECONCILIATION_RESOLVED: (
+        QualificationEventType.RECONCILIATION_RESOLVED
+    ),
+    RuntimeRequestKind.QUALIFICATION_CRITERIA_MET: (
+        QualificationEventType.QUALIFICATION_CRITERIA_MET
+    ),
+    RuntimeRequestKind.QUALIFICATION_CRITERIA_FAILED: (
+        QualificationEventType.QUALIFICATION_CRITERIA_FAILED
+    ),
     RuntimeRequestKind.ABORT_REQUESTED: QualificationEventType.ABORT_REQUESTED,
+    RuntimeRequestKind.PROCESS_RESTARTED: QualificationEventType.PROCESS_RESTARTED,
 }
 
 _OBSERVATION_EVENT_MAP = {

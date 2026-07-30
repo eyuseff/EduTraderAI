@@ -59,3 +59,19 @@ class IntegrationTranslationError(QualificationIntegrationError):
 
 class UnsafeIntegrationMetadataError(QualificationIntegrationError):
     """Raised when integration metadata cannot be made safe."""
+
+
+class PaperQualificationFacadeError(QualificationIntegrationError):
+    """Raised when facade orchestration cannot complete safely."""
+
+
+class FacadeIdentityContinuityError(PaperQualificationFacadeError):
+    """Raised when service output conflicts with the originating request."""
+
+
+class FacadeResultValidationError(PaperQualificationFacadeError):
+    """Raised when a service result cannot be represented by the facade."""
+
+
+class FacadeServiceInvocationError(PaperQualificationFacadeError):
+    """Raised when the injected application service fails."""

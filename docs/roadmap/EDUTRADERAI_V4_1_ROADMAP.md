@@ -147,17 +147,19 @@ Implementation status:
 - V41-PQ-001D — QUALIFICATION EVIDENCE ADAPTER: IMPLEMENTED.
 - V41-PQ-001E — PAPER WORKFLOW INTEGRATION ARCHITECTURE REVIEW: COMPLETED.
 - V41-PQ-001F1 — INTEGRATION CONTRACTS AND COMPATIBILITY TRANSLATION: IMPLEMENTED.
+- V41-PQ-001F2 — PAPER QUALIFICATION FACADE: IMPLEMENTED.
 - V41-PQ-001 overall status: IN PROGRESS.
 - V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
-- Next recommended implementation slice: V41-PQ-001F2 — Paper Qualification Facade.
-- V41-PQ-001F2 must invoke `PaperQualificationService` through the new integration contracts, remain non-executing, return translated execution plans, preserve Paper-only enforcement, and avoid broker, simulator, persistence, and runtime wiring.
-- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, or V41-PQ-001F1.
+- Next recommended implementation slice: V41-PQ-001F3 — Shadow-mode Paper qualification invocation.
+- V41-PQ-001F3 must integrate the facade into a read-only or shadow runtime path, not influence current Paper decisions, not execute returned runtime actions, not submit or cancel broker orders, compare legacy and qualification outcomes safely, preserve Paper-only isolation, and remain disabled by default unless an accepted design explicitly changes that.
+- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, or V41-PQ-001F2.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001C_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001D_IMPLEMENTATION_REPORT.md`.
 - Architecture review: `docs/engineering/V41_PQ_001E_INTEGRATION_ARCHITECTURE_REVIEW.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F1_IMPLEMENTATION_REPORT.md`.
+- Implementation report: `docs/engineering/V41_PQ_001F2_IMPLEMENTATION_REPORT.md`.
 
 
 ### Workstream B - Cross-process Coordination

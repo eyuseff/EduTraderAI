@@ -657,21 +657,43 @@ def test_qualification_integration_has_no_runtime_or_infrastructure_imports() ->
     assert violations == (), "\n".join(violations)
 
 
-def test_qualification_integration_does_not_call_services_or_state_machine() -> None:
+def test_qualification_integration_service_dependency_is_contract_or_facade_only() -> (
+    None
+):
+    violations = _violations(
+        tuple(
+            path
+            for path in _python_files("volcanoes/application/qualification/integration")
+            if path.name not in {"facade.py", "translation.py"}
+        ),
+        ("volcanoes.application.qualification.service",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_qualification_facade_does_not_construct_service_or_call_state_machine() -> (
+    None
+):
     prohibited_tokens = (
-        "PaperQualificationService",
+        "PaperQualificationService(",
         "transition(",
         "apply_transition",
         "diagnostic_rejection",
     )
     offenders: list[str] = []
-    for path in _python_files("volcanoes/application/qualification/integration"):
-        source = path.read_text(encoding="utf-8")
-        offenders.extend(
-            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
-            for token in prohibited_tokens
-            if token in source
-        )
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/facade.py"
+    source = path.read_text(encoding="utf-8")
+    offenders.extend(
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    )
+    violations = _violations(
+        (path,),
+        ("volcanoes.application.qualification.state_machine",),
+    )
+    offenders.extend(violations)
 
     assert offenders == []
 

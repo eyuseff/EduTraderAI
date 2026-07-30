@@ -15,9 +15,13 @@ from volcanoes.application.qualification.integration.contracts import (
     require_paper_environment,
 )
 from volcanoes.application.qualification.integration.errors import (
+    FacadeIdentityContinuityError,
+    FacadeResultValidationError,
+    FacadeServiceInvocationError,
     IntegrationIdentityError,
     IntegrationTranslationError,
     PaperEnvironmentRequiredError,
+    PaperQualificationFacadeError,
     QualificationIntegrationError,
     RuntimeRequestValidationError,
     UnsafeIntegrationMetadataError,
@@ -31,8 +35,15 @@ from volcanoes.application.qualification.integration.translation import (
     observation_to_qualification_command,
     runtime_request_to_qualification_command,
 )
+from volcanoes.application.qualification.integration.facade import (
+    PaperQualificationFacade,
+    PaperQualificationFacadeResult,
+)
 
 __all__ = [
+    "FacadeIdentityContinuityError",
+    "FacadeResultValidationError",
+    "FacadeServiceInvocationError",
     "IntegrationIdentityError",
     "IntegrationOrderType",
     "IntegrationTimeInForce",
@@ -40,6 +51,9 @@ __all__ = [
     "NormalizedRuntimeObservation",
     "PaperEnvironmentRequiredError",
     "PaperIntegrationEnvironment",
+    "PaperQualificationFacade",
+    "PaperQualificationFacadeError",
+    "PaperQualificationFacadeResult",
     "PaperRuntimeRequest",
     "QualificationIntegrationError",
     "RuntimeActionKind",
