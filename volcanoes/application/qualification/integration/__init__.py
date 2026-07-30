@@ -56,6 +56,16 @@ from volcanoes.application.qualification.integration.runtime_observation import 
     PaperQualificationShadowGate,
     observe_paper_preview_decision,
 )
+from volcanoes.application.qualification.integration.readiness import (
+    ShadowReadinessAssessment,
+    ShadowReadinessAssessmentService,
+    ShadowReadinessCriterionCategory,
+    ShadowReadinessCriterionResult,
+    ShadowReadinessDecision,
+    ShadowReadinessError,
+    ShadowReadinessPolicy,
+    ShadowReadinessSeverity,
+)
 from volcanoes.application.qualification.integration.translation import (
     derive_integration_identity,
     execution_plan_to_runtime_action_request,
@@ -141,6 +151,14 @@ __all__ = [
     "ShadowObservationValidationHarness",
     "ShadowMismatch",
     "ShadowMismatchClassification",
+    "ShadowReadinessAssessment",
+    "ShadowReadinessAssessmentService",
+    "ShadowReadinessCriterionCategory",
+    "ShadowReadinessCriterionResult",
+    "ShadowReadinessDecision",
+    "ShadowReadinessError",
+    "ShadowReadinessPolicy",
+    "ShadowReadinessSeverity",
     "ShadowValidationClassification",
     "ShadowValidationConflict",
     "ShadowValidationConflictType",

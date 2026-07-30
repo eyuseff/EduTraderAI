@@ -647,6 +647,46 @@ boundary results only:
   define advisory shadow-readiness assessment criteria without authorizing
   runtime execution.
 
+## V41-PQ-001F4D implementation mapping
+
+The shadow readiness-assessment slice adds an advisory-only evaluator for
+immutable F4C validation summaries:
+
+- Readiness module location:
+  `volcanoes/application/qualification/integration/readiness.py`.
+- Public API:
+  `ShadowReadinessAssessmentService.assess(summary, policy)`.
+- Input rule: readiness accepts `ShadowValidationSummary` and explicit
+  `ShadowReadinessPolicy` only.
+- Explicit-policy rule: no default policy silently implies operational
+  approval. Factory policies are named `strict_validation_policy` and
+  `development_observation_policy`.
+- Advisory-only rule: every assessment reports `advisory_only=True`,
+  `execution_authorized=False`, `runtime_changed=False`,
+  `broker_accessed=False`, `simulator_accessed=False`, and
+  `live_authorized=False`.
+- Decision model: `READY_FOR_NEXT_PHASE`, `NOT_READY`, and
+  `INSUFFICIENT_EVIDENCE`.
+- Criterion categories: evidence, determinism, continuity, authority,
+  execution safety, environment, qualification stability, and comparison
+  quality.
+- Deterministic precedence: insufficient evidence yields
+  `INSUFFICIENT_EVIDENCE` only when no non-evidence criterion fails; otherwise
+  hard safety or quality failures yield `NOT_READY`.
+- Exact-ratio rule: ratios use `ShadowValidationRatio` and integer
+  cross-multiplication without floating-point conversion.
+- Mismatch-policy rule: mismatch classifications are preserved by name and
+  evaluated against explicit allowed/prohibited policy sets.
+- No-runtime-control rule: readiness decisions never authorize, block, replace,
+  or modify legacy Paper behavior.
+- No-persistence rule: F4D adds no assessment persistence, file output,
+  database, event publication, metrics, logging, dashboard, UI, API, or CLI.
+- No-execution-authorization rule: `READY_FOR_NEXT_PHASE` means only that the
+  evidence satisfies policy for beginning the next engineering design phase.
+- Deferred slice: V41-PQ-001F5A should design Paper executor contracts and
+  safety boundaries, consume readiness only as advisory evidence, and avoid
+  broker execution.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

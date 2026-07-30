@@ -1001,6 +1001,202 @@ def test_no_reverse_dependency_into_shadow_validation_harness() -> None:
     assert violations == (), "\n".join(violations)
 
 
+def test_shadow_readiness_imports_only_validation_contracts() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/readiness.py"
+    allowed_project_prefixes = (
+        "volcanoes.application.qualification.integration.validation",
+    )
+    forbidden_prefixes = (
+        "streamlit",
+        "app",
+        "adapters",
+        "volcanoes.adapters",
+        "broker",
+        "scanner_engine",
+        "engine",
+        "trading",
+        "requests",
+        "http",
+        "urllib",
+        "socket",
+        "subprocess",
+        "os",
+        "pathlib",
+        "random",
+        "uuid",
+        "datetime",
+        "time",
+        "database",
+        "persistence",
+        "volcanoes.database",
+        "volcanoes.persistence",
+        "volcanoes.events",
+        "volcanoes.application.operations",
+        "volcanoes.application.platform",
+        "volcanoes.application.supervisor",
+        "volcanoes.application.qualification.integration.runtime_observation",
+        "volcanoes.application.qualification.integration.boundary",
+        "volcanoes.application.qualification.integration.shadow",
+        "volcanoes.application.qualification.integration.facade",
+        "volcanoes.application.qualification.integration.service",
+        "volcanoes.application.qualification.integration.state_machine",
+        "volcanoes.application.qualification.integration.evidence",
+        "volcanoes.application.qualification.integration.ports",
+        "volcanoes.application.qualification.facade",
+        "volcanoes.application.qualification.service",
+        "volcanoes.application.qualification.state_machine",
+        "volcanoes.application.qualification.evidence",
+        "volcanoes.application.qualification.ports",
+    )
+    project_roots = (
+        "adapters",
+        "broker",
+        "database",
+        "engine",
+        "persistence",
+        "scanner_engine",
+        "streamlit",
+        "trading",
+        "volcanoes",
+    )
+    violations = {
+        reference.module
+        for reference in _imports_for_file(path)
+        if any(
+            _matches_prefix(reference.module, prefix) for prefix in forbidden_prefixes
+        )
+        or (
+            any(_matches_prefix(reference.module, root) for root in project_roots)
+            and not any(
+                _matches_prefix(reference.module, allowed)
+                for allowed in allowed_project_prefixes
+            )
+        )
+    }
+
+    assert violations == set()
+
+
+def test_shadow_readiness_has_no_runtime_effect_or_authority_tokens() -> None:
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/readiness.py"
+    prohibited_tokens = (
+        ".record(",
+        ".summarize(",
+        "evaluate_shadow(",
+        "PaperQualificationShadowRunner(",
+        "PaperQualificationFacade(",
+        "PaperQualificationService(",
+        "transition(",
+        "apply_transition",
+        "RuntimeActionRequest(",
+        "TradingClient",
+        "Alpaca",
+        "BrokerAdapter",
+        "simulated_broker",
+        "scanner",
+        "supervisor",
+        "streamlit",
+        "requests",
+        "http",
+        "https",
+        "socket",
+        "WebSocket",
+        "subprocess",
+        "os.environ",
+        "getenv",
+        "open(",
+        "Path(",
+        "read_text",
+        "write_text",
+        "write_bytes",
+        "uuid4",
+        "random",
+        "datetime.now",
+        "time.time",
+        "EventPublisher",
+        "metrics",
+        "logging",
+        "print(",
+        "execute(",
+        "submit",
+        "cancel",
+        "reconcile",
+        "database",
+        "sqlite",
+        "postgres",
+        "redis",
+        "Kafka",
+        "Rabbit",
+        "API_KEY",
+        "SECRET",
+        "TOKEN",
+        "PASSWORD",
+        "authorization",
+        "cookie",
+        "EXECUTION_AUTHORIZED",
+        "PRODUCTION_READY",
+    )
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+
+    assert offenders == []
+
+
+def test_no_reverse_dependency_into_shadow_readiness() -> None:
+    paths = (
+        PROJECT_ROOT / "volcanoes/application/qualification/service.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/evidence.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/boundary.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/shadow.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/facade.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/translation.py",
+        PROJECT_ROOT
+        / "volcanoes/application/qualification/integration/runtime_observation.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/validation.py",
+    )
+    violations = _violations(
+        paths,
+        ("volcanoes.application.qualification.integration.readiness",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_shadow_readiness_is_not_wired_into_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/__init__.py",
+    )
+    prohibited_tokens = (
+        "ShadowReadinessAssessmentService",
+        "ShadowReadinessPolicy",
+        "ShadowReadinessDecision",
+        "qualification.integration.readiness",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
 def test_controlled_shadow_runtime_observation_has_one_call_site() -> None:
     runtime_paths = (
         PROJECT_ROOT / "app.py",
