@@ -759,7 +759,50 @@ stale-revision enforcement, eligibility service, approval evaluation,
 market-capability evaluation, runtime wiring, scanner wiring, supervisor
 wiring, event publication, metrics, logging, UI, API, CLI, or Live behavior.
 
-The next recommended slice is V41-PQ-001F5C — Execution Eligibility Core.
+## V41-PQ-001F5C implementation mapping
+
+The execution eligibility slice implements a pure advisory eligibility core
+over the inert F5B execution contracts:
+
+- ADR: `docs/adr/ADR-005-PAPER-EXECUTION-MODEL.md`.
+- Package:
+  `volcanoes/application/execution/eligibility/`.
+- Public service:
+  `PaperExecutionEligibilityService.evaluate(command, policy, evaluated_at=...)`.
+- Immutable policy:
+  `PaperExecutionEligibilityPolicy`.
+- Immutable result:
+  `PaperExecutionEligibilityResult`.
+- Implementation report:
+  `docs/engineering/V41_PQ_001F5C_IMPLEMENTATION_REPORT.md`.
+
+ADR-005 is **Accepted**. The eligibility core consumes immutable execution
+commands, evaluates deterministic criteria, and returns immutable advisory
+results. Its decisions are `ELIGIBLE`, `INELIGIBLE`, and `INDETERMINATE`.
+Decision precedence is deterministic: invalid API input or contradictory policy
+raises a typed eligibility error, any failed deterministic criterion yields
+`INELIGIBLE`, unresolved mandatory evidence yields `INDETERMINATE`, and all
+applicable criteria passing yields `ELIGIBLE`.
+
+Eligibility uses an explicit timezone-aware evaluation timestamp and never reads
+the hidden system clock. Approval evidence is evaluated deterministically for
+presence, binding, not-yet-valid status, and expiry. The expiry boundary is
+exclusive: `expires_at <= evaluated_at` is expired.
+
+The eligibility result remains advisory only. `ELIGIBLE` is not authorization.
+`execution_authorized` remains false. `action_executed` remains false.
+Readiness remains advisory and independent. Required external prerequisites
+that F5C cannot evaluate, including market capability, emergency-stop
+clearance, risk clearance, and account clearance, produce `INDETERMINATE`
+rather than guessed approval.
+
+F5C does not add broker integration, broker calls, market-capability
+evaluation, risk evaluation, account evaluation, emergency-stop lookup,
+persistence, durable idempotency reservation, stale-revision storage checks,
+runtime wiring, scanner wiring, supervisor wiring, event publication, metrics,
+external logging, UI, API, CLI, configuration, dependencies, or Live behavior.
+
+The next recommended slice is V41-PQ-001F5D — Deterministic Dry-Run Executor.
 
 ## Sentinel correction: side-effect boundary contract
 

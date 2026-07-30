@@ -63,6 +63,14 @@ def failure_fingerprint(primitive: Any) -> str:
     return fingerprint_payload("pfl", primitive)
 
 
+def eligibility_policy_fingerprint(primitive: Any) -> str:
+    return fingerprint_payload("pep", primitive)
+
+
+def eligibility_result_fingerprint(primitive: Any) -> str:
+    return fingerprint_payload("per", primitive)
+
+
 def _validate_prefix(prefix: str) -> None:
     if not isinstance(prefix, str) or not re.fullmatch(r"[a-z]{3}", prefix):
         raise PaperExecutionIdentityError(
