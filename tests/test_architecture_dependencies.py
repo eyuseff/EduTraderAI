@@ -698,6 +698,88 @@ def test_qualification_facade_does_not_construct_service_or_call_state_machine()
     assert offenders == []
 
 
+def test_qualification_shadow_does_not_construct_facade_service_or_call_state_machine() -> (
+    None
+):
+    prohibited_tokens = (
+        "PaperQualificationFacade(",
+        "PaperQualificationService(",
+        "transition(",
+        "apply_transition",
+        "diagnostic_rejection",
+        "RuntimeActionRequest(",
+    )
+    path = PROJECT_ROOT / "volcanoes/application/qualification/integration/shadow.py"
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+    offenders.extend(
+        _violations(
+            (path,),
+            (
+                "volcanoes.application.qualification.state_machine",
+                "volcanoes.application.qualification.evidence",
+                "volcanoes.application.qualification.ports",
+                "volcanoes.application.qualification.service",
+                "volcanoes.events",
+                "volcanoes.application.operations",
+            ),
+        )
+    )
+
+    assert offenders == []
+
+
+def test_shadow_mode_is_not_wired_into_current_runtime_entry_points() -> None:
+    prohibited_tokens = (
+        "PaperQualificationShadowRunner",
+        "PaperQualificationShadowRequest",
+        "PaperQualificationShadowResult",
+        "LegacyPaperDecision",
+        "qualification.integration.shadow",
+    )
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_no_reverse_dependency_from_facade_or_core_into_shadow_module() -> None:
+    paths = (
+        PROJECT_ROOT / "volcanoes/application/qualification/facade.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/service.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/state_machine.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/evidence.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/facade.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/translation.py",
+    )
+    existing_paths = tuple(path for path in paths if path.exists())
+
+    violations = _violations(
+        existing_paths,
+        ("volcanoes.application.qualification.integration.shadow",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
 def test_qualification_integration_has_no_effect_or_runtime_tokens() -> None:
     prohibited_tokens = (
         "state/simulated_broker.json",

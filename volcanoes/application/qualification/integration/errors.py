@@ -75,3 +75,23 @@ class FacadeResultValidationError(PaperQualificationFacadeError):
 
 class FacadeServiceInvocationError(PaperQualificationFacadeError):
     """Raised when the injected application service fails."""
+
+
+class PaperQualificationShadowError(QualificationIntegrationError):
+    """Raised when shadow comparison cannot proceed safely."""
+
+
+class ShadowInputValidationError(PaperQualificationShadowError):
+    """Raised when a shadow request or legacy decision is invalid."""
+
+
+class ShadowIdentityContinuityError(PaperQualificationShadowError):
+    """Raised when shadow identities do not refer to one logical operation."""
+
+
+class UnsupportedLegacyDecisionError(PaperQualificationShadowError):
+    """Raised when a legacy decision cannot be compared safely."""
+
+
+class ShadowComparisonError(PaperQualificationShadowError):
+    """Raised when shadow comparison cannot be represented safely."""

@@ -481,6 +481,55 @@ The facade invokes `PaperQualificationService` but remains non-executing. It doe
 
 The next slice, V41-PQ-001F3, may connect the facade into a read-only or shadow runtime path. F3 must not influence current Paper decisions, execute returned runtime actions, submit or cancel broker orders, or change Paper workflow behavior.
 
+## V41-PQ-001F3 implementation mapping
+
+The third runtime-integration slice adds a disabled, unwired shadow comparison
+boundary:
+
+- `volcanoes/application/qualification/integration/shadow.py` contains
+  `LegacyPaperDecision`, `PaperQualificationShadowRequest`,
+  `PaperQualificationShadowResult`, `PaperQualificationShadowRunner`,
+  `ShadowComparisonStatus`, `ShadowMismatchClassification`, and
+  deterministic shadow identity derivation.
+- The shadow public API is
+  `PaperQualificationShadowRunner(facade).evaluate(request)`.
+- The legacy decision contract records only safe existing Paper decision facts:
+  environment, legacy decision ID, runtime request ID, qualification run ID,
+  command ID, correlation ID, idempotency key, expected revision, decision type,
+  action type, optional safe order intent, approval/cancellation/reconciliation
+  intent, emergency-stop status, reason code, and safe metadata.
+- The shadow request pairs one `PaperRuntimeRequest` with one
+  `LegacyPaperDecision` and derives a stable `qis-` identity when the caller
+  does not supply one.
+- The shadow result preserves the legacy decision, optional facade result,
+  comparison status, ordered mismatch classifications, safe mismatch records,
+  identity fields, revision fields, qualification state/result, replay status,
+  and the guarantees `action_executed=False` and
+  `legacy_behavior_changed=False`.
+- The comparison model distinguishes exact matches, nonconsequential replay
+  differences, consequential mismatches, incomparable safe-fact gaps, and
+  facade/qualification errors.
+- Mismatch classifications include environment, identity, proceed/block
+  disagreement, action kind, order intent, approval, cancellation,
+  reconciliation, emergency stop, revision, replay, terminal result,
+  unsupported legacy decision/action, and insufficient comparison facts.
+- Identity-continuity rules require the runtime request and legacy decision to
+  agree on environment, runtime request ID, qualification run ID, command ID,
+  correlation ID, idempotency key, expected revision, and order intent when both
+  sides provide one.
+- Paper-only enforcement rejects Live, unknown, or missing environments before
+  facade invocation.
+- The no-effect boundary is explicit: the shadow runner invokes the injected
+  `PaperQualificationFacade` exactly once, compares the returned descriptive
+  action, and never executes that action.
+- The no-runtime-wiring boundary is also explicit: current Paper runtime,
+  scanner, supervisor, broker adapters, simulator, UI, CLI, API, metrics,
+  events, feature flags, and persistence do not import or invoke shadow mode.
+
+The next slice, V41-PQ-001F4, may introduce one controlled Paper-only runtime
+observation point. F4 must remain disabled by default, never execute returned
+runtime actions, never influence legacy decisions, and include instant rollback.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
