@@ -467,8 +467,14 @@ def test_qualification_package_has_no_runtime_side_effect_tokens() -> None:
 
 
 def test_qualification_scenario_harness_has_no_external_dependencies() -> None:
+    scenario_paths = (
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_models.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_catalog.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_validation.py",
+        PROJECT_ROOT / "volcanoes/application/qualification/scenario_harness.py",
+    )
     violations = _violations(
-        _python_files("volcanoes/application/qualification"),
+        scenario_paths,
         (
             "streamlit",
             "adapters",
@@ -826,9 +832,105 @@ def test_shadow_mode_is_not_wired_into_current_runtime_entry_points() -> None:
     assert offenders == []
 
 
-def test_runtime_boundary_is_not_wired_into_current_runtime_entry_points() -> None:
+def test_controlled_shadow_runtime_observation_has_one_call_site() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/__init__.py",
+    )
+    call_sites: list[str] = []
+
+    for path in runtime_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            function = node.func
+            if isinstance(function, ast.Name):
+                called_name = function.id
+            elif isinstance(function, ast.Attribute):
+                called_name = function.attr
+            else:
+                called_name = ""
+            if called_name == "observe_paper_preview_decision":
+                call_sites.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+
+    assert len(call_sites) == 1
+    assert call_sites[0].startswith("adapters/paper_order_preview.py:")
+
+
+def test_controlled_shadow_runtime_wiring_is_preview_only_and_disabled_by_default() -> (
+    None
+):
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+    )
     prohibited_tokens = (
-        "QualificationRuntimeIntegrationBoundary",
+        "PaperQualificationShadowGate.ENABLED_OBSERVE_ONLY",
+        "observe_paper_preview_decision",
+        "PaperPreviewObservationFacts",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    preview_source = (PROJECT_ROOT / "adapters/paper_order_preview.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert offenders == []
+    assert "PaperQualificationShadowGate.DISABLED" in preview_source
+
+
+def test_controlled_shadow_runtime_adapter_does_not_construct_the_stack() -> None:
+    path = (
+        PROJECT_ROOT
+        / "volcanoes/application/qualification/integration/runtime_observation.py"
+    )
+    prohibited_tokens = (
+        "PaperQualificationShadowRunner(",
+        "PaperQualificationFacade(",
+        "PaperQualificationService(",
+        "transition(",
+        "apply_transition",
+        "diagnostic_rejection",
+        "RuntimeActionRequest(",
+        "submit",
+        "cancel",
+        "feature_flag",
+        "os.environ",
+        "getenv",
+        "EventPublisher",
+    )
+    source = path.read_text(encoding="utf-8")
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for token in prohibited_tokens
+        if token in source
+    ]
+
+    assert offenders == []
+
+
+def test_runtime_boundary_is_not_constructed_in_current_runtime_entry_points() -> None:
+    prohibited_tokens = (
         "QualificationRuntimeBoundaryRequest",
         "QualificationRuntimeBoundaryResult",
         "QualificationRuntimeBoundaryMode",

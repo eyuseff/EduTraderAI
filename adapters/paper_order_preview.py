@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -22,6 +23,13 @@ from trading.risk_manager import (
 from volcanoes.application.services import (
     PreviewTradeResult,
     PreviewTradeService,
+)
+from volcanoes.application.qualification.integration import (
+    PaperIntegrationEnvironment,
+    PaperPreviewObservationFacts,
+    PaperQualificationShadowGate,
+    QualificationRuntimeIntegrationBoundary,
+    observe_paper_preview_decision,
 )
 from volcanoes.application.operations import OperationalMetrics
 from volcanoes.domain import TradeSide
@@ -69,6 +77,11 @@ def preview_paper_order(
     correlation_id: str | None = None,
     event_publisher: EventPublisher | None = None,
     operational_metrics: OperationalMetrics | None = None,
+    qualification_shadow_gate: PaperQualificationShadowGate = (
+        PaperQualificationShadowGate.DISABLED
+    ),
+    qualification_boundary: QualificationRuntimeIntegrationBoundary | None = None,
+    qualification_observed_at: datetime | None = None,
 ) -> RiskDecision:
     """Select a preview implementation without changing submission behavior."""
 
@@ -84,6 +97,24 @@ def preview_paper_order(
         operational_metrics=operational_metrics,
     )
     deterministic_decision = _to_legacy_decision(deterministic_result)
+
+    if qualification_shadow_gate is PaperQualificationShadowGate.ENABLED_OBSERVE_ONLY:
+        observe_paper_preview_decision(
+            gate=qualification_shadow_gate,
+            boundary=qualification_boundary,
+            facts=PaperPreviewObservationFacts(
+                environment=PaperIntegrationEnvironment.PAPER,
+                symbol=proposal.symbol,
+                entry_price=Decimal(str(proposal.entry_price)),
+                stop_price=Decimal(str(proposal.stop_price)),
+                target_price=Decimal(str(proposal.target_price)),
+                approved=deterministic_decision.approved,
+                quantity=deterministic_decision.quantity,
+                correlation_id=deterministic_result.correlation_id,
+                occurred_at=qualification_observed_at,
+                reasons=tuple(deterministic_decision.reasons),
+            ),
+        )
 
     if development_mode:
         _run_parity_diagnostics(

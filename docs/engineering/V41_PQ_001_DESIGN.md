@@ -55,6 +55,8 @@ Out of scope until separately approved:
 | Configuration | `volcanoes/application/platform/configuration.py:90-180` | Validates Paper-only broker, feature-flag consistency, and Alpaca credential presence. |
 | Health report | `volcanoes/application/platform/health.py:91-113` | Reports active paths, null publisher, process-local supervisor state, and limitations. |
 | Operational metrics | `volcanoes/application/operations/metrics.py:11-28` | Defines fixed counters for observation, drift, idempotency, duplicates, scanner decisions, and instrumentation failures. |
+| Controlled Paper shadow observation | `adapters/paper_order_preview.py::preview_paper_order` | V41-PQ-001F4B adds one disabled-by-default observe-only call site after deterministic preview and before returning the legacy-compatible decision. |
+| Runtime observation adapter | `volcanoes/application/qualification/integration/runtime_observation.py` | Builds immutable Paper-only observation contracts and calls an injected `QualificationRuntimeIntegrationBoundary` without executing actions. |
 
 ## 5. Proposed domain model
 
@@ -567,10 +569,37 @@ runtime-facing integration seam while keeping it unwired:
   readers, persistence, events, metrics, executor hooks, retries, polling, and
   reconciliation execution.
 
-The next slice, V41-PQ-001F4B, may connect exactly one approved Paper runtime
-observation point to this boundary. F4B must call only the boundary, remain
-disabled by default, never execute returned actions, never alter legacy
-decisions, and prove zero behavioral impact.
+V41-PQ-001F4B connects exactly one approved Paper runtime observation point to
+this boundary. F4B calls only the boundary, remains disabled by default, never
+executes returned actions, never alters legacy decisions, and proves zero
+behavioral impact.
+
+## V41-PQ-001F4B implementation mapping
+
+The controlled runtime-wiring slice adds the first runtime observation point
+while preserving current Paper behavior:
+
+- `adapters/paper_order_preview.py::preview_paper_order` contains the only
+  production call site for `observe_paper_preview_decision`.
+- The observation call is gated by `PaperQualificationShadowGate.DISABLED` by
+  default and `PaperQualificationShadowGate.ENABLED_OBSERVE_ONLY` when
+  explicitly injected by a caller.
+- `volcanoes/application/qualification/integration/runtime_observation.py`
+  contains immutable `PaperPreviewObservationFacts` and
+  `PaperQualificationRuntimeObservation` contracts.
+- The runtime adapter validates `PaperIntegrationEnvironment.PAPER`, derives
+  deterministic IDs, creates `PaperRuntimeRequest`, `LegacyPaperDecision`, and
+  `PaperQualificationShadowRequest`, and invokes only
+  `QualificationRuntimeIntegrationBoundary.evaluate_shadow`.
+- The adapter never constructs the shadow runner, facade, service, state
+  machine, evidence adapter, event publisher, broker adapter, simulator, or
+  executor.
+- The observation result is never authoritative: `action_executed=False`,
+  `legacy_behavior_authoritative=True`, and
+  `legacy_behavior_changed=False`.
+- Scanner, supervisor, broker, simulator, submission, Streamlit UI,
+  persistence, events, metrics, configuration, and environment switches remain
+  unwired.
 
 ## Sentinel correction: side-effect boundary contract
 

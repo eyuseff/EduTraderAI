@@ -49,6 +49,13 @@ from volcanoes.application.qualification.integration.boundary import (
     boundary_status_from_shadow,
     derive_boundary_invocation_id,
 )
+from volcanoes.application.qualification.integration.runtime_observation import (
+    PaperPreviewObservationFacts,
+    PaperQualificationObservationStatus,
+    PaperQualificationRuntimeObservation,
+    PaperQualificationShadowGate,
+    observe_paper_preview_decision,
+)
 from volcanoes.application.qualification.integration.translation import (
     derive_integration_identity,
     execution_plan_to_runtime_action_request,
@@ -92,6 +99,10 @@ __all__ = [
     "PaperQualificationFacadeError",
     "PaperQualificationFacadeResult",
     "PaperQualificationShadowError",
+    "PaperPreviewObservationFacts",
+    "PaperQualificationObservationStatus",
+    "PaperQualificationRuntimeObservation",
+    "PaperQualificationShadowGate",
     "LegacyPaperActionType",
     "LegacyPaperDecision",
     "LegacyPaperDecisionType",
@@ -129,6 +140,7 @@ __all__ = [
     "derive_shadow_invocation_id",
     "derive_integration_identity",
     "execution_plan_to_runtime_action_request",
+    "observe_paper_preview_decision",
     "observation_to_qualification_command",
     "require_paper_environment",
     "runtime_request_to_qualification_command",
