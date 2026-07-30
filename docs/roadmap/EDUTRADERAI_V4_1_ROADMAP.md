@@ -153,15 +153,18 @@ Implementation status:
 - V41-PQ-001F4B — CONTROLLED SHADOW RUNTIME WIRING: IMPLEMENTED.
 - V41-PQ-001F4C — SHADOW OBSERVATION VALIDATION HARNESS: IMPLEMENTED.
 - V41-PQ-001F4D — SHADOW READINESS ASSESSMENT: IMPLEMENTED.
+- V41-PQ-001F5A — PAPER EXECUTOR ARCHITECTURE REVIEW: COMPLETED.
 - V41-PQ-001 overall status: IN PROGRESS.
 - V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
-- Next recommended implementation slice: V41-PQ-001F5A — PAPER EXECUTOR CONTRACTS AND SAFETY DESIGN.
+- V41-PQ-001F5A review disposition: ACCEPTED WITH CONDITIONS.
+- Next recommended implementation slice: V41-PQ-001F5B — PAPER EXECUTOR CONTRACTS.
 - V41-PQ-001F4B connects exactly one approved Paper runtime observation point, calls only `QualificationRuntimeIntegrationBoundary`, never calls the shadow runner, facade, or service directly, remains disabled by default, uses an explicit typed Paper-only gate, never executes returned actions, never alters legacy decisions, provides instant rollback by disabling or removing one narrow call site, preserves broker, simulator, scanner, supervisor, and UI behavior, and proves zero behavioral impact when disabled and zero consequential impact when enabled.
 - V41-PQ-001F4C adds an in-memory validation harness that consumes completed boundary results only, aggregates immutable validation facts, detects duplicates and conflicts, evaluates repeatability and continuity counters, produces deterministic summaries, remains unwired from production runtime, and does not authorize runtime execution.
 - V41-PQ-001F4D consumes immutable F4C validation summaries, defines explicit advisory readiness criteria, distinguishes READY_FOR_NEXT_PHASE, NOT_READY, and INSUFFICIENT_EVIDENCE, requires zero identity and authority violations under strict policy, requires zero nondeterministic conflicts, requires deterministic replay, defines minimum observation counts, defines permitted and prohibited mismatch categories, remains advisory only, does not authorize runtime execution, does not invoke brokers, does not persist, does not add Live support, and does not mark V41-PQ-001 complete.
-- V41-PQ-001F5A should remain design-and-contract focused, define executor ports and immutable commands, define explicit dry-run and Paper-only modes, prohibit Live, define idempotency and optimistic revision rules, define broker preconditions, define approval and emergency-stop guards, define execution receipts without implementing broker calls, define failure and rollback semantics, consume readiness assessment only as advisory evidence, not automatically activate based on READY_FOR_NEXT_PHASE, not wire runtime, not call a broker, not mutate simulator state, and not mark V41-PQ-001 complete.
+- V41-PQ-001F5A completed the Paper executor architecture review, accepts execution as a separate bounded context, keeps readiness advisory only, requires explicit Paper execution approval, deterministic idempotency, optimistic execution revision, unknown-outcome handling, reconciliation, market-capability isolation, broker isolation, Paper-only mode, and structural Live exclusion, and does not implement executor code, contracts, broker adapters, persistence, runtime wiring, broker calls, simulator access, scanner changes, supervisor changes, or execution authority.
+- V41-PQ-001F5B should implement Paper executor contracts only: immutable records, enums, typed failures, deterministic identities, and fingerprints. F5B should not wire runtime, call brokers, persist, authorize execution, add Live behavior, or mark V41-PQ-001 complete.
 - Do not proceed directly to a broker side-effect executor.
-- Broker execution, runtime integration beyond controlled shadow observation, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, V41-PQ-001F2, V41-PQ-001F3, V41-PQ-001F4A, V41-PQ-001F4B, V41-PQ-001F4C, or V41-PQ-001F4D.
+- Broker execution, runtime integration beyond controlled shadow observation, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, V41-PQ-001F2, V41-PQ-001F3, V41-PQ-001F4A, V41-PQ-001F4B, V41-PQ-001F4C, V41-PQ-001F4D, or V41-PQ-001F5A.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001C_IMPLEMENTATION_REPORT.md`.
@@ -175,6 +178,7 @@ Implementation status:
 - Implementation report: `docs/engineering/V41_PQ_001F4B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F4C_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F4D_IMPLEMENTATION_REPORT.md`.
+- Architecture review: `docs/engineering/V41_PQ_001F5A_PAPER_EXECUTOR_ARCHITECTURE_REVIEW.md`.
 
 
 ### Workstream B - Cross-process Coordination

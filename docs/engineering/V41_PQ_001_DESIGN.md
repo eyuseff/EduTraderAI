@@ -687,6 +687,48 @@ immutable F4C validation summaries:
   safety boundaries, consume readiness only as advisory evidence, and avoid
   broker execution.
 
+## V41-PQ-001F5A architecture review mapping
+
+The Paper executor architecture-review slice completed the future execution
+design without implementing execution:
+
+- Architecture review:
+  `docs/engineering/V41_PQ_001F5A_PAPER_EXECUTOR_ARCHITECTURE_REVIEW.md`.
+- Lifecycle design:
+  `docs/engineering/V41_PQ_001F5A_EXECUTION_LIFECYCLE.md`.
+- Contract plan:
+  `docs/engineering/V41_PQ_001F5A_EXECUTION_CONTRACT_PLAN.md`.
+- Risk register:
+  `docs/engineering/V41_PQ_001F5A_EXECUTION_RISK_REGISTER.md`.
+- Failure and recovery model:
+  `docs/engineering/V41_PQ_001F5A_FAILURE_AND_RECOVERY_MODEL.md`.
+- Market-capability model:
+  `docs/engineering/V41_PQ_001F5A_MARKET_CAPABILITY_MODEL.md`.
+- Implementation plan:
+  `docs/engineering/V41_PQ_001F5A_IMPLEMENTATION_PLAN.md`.
+
+F5A accepts execution as a separate bounded context. Qualification may produce
+qualified Paper intent and advisory evidence, but qualification must not call
+brokers or import executor adapters. Readiness remains advisory only:
+`READY_FOR_NEXT_PHASE` is not execution authority.
+
+The future Paper executor architecture requires explicit Paper execution
+approval, immutable execution commands, deterministic idempotency, expected
+execution revision, stale-request rejection, unknown-outcome handling,
+reconciliation, broker isolation, market-capability isolation, Paper-only mode,
+and structural Live exclusion.
+
+The future market-capability boundary should absorb broker, account, symbol,
+venue, session, lot-size, tick-size, time-in-force, cancellation, and
+replacement rules. These rules must not leak into qualification, readiness, the
+scanner, or generic execution orchestration.
+
+The F5A review decision is **ACCEPTED WITH CONDITIONS**. The next recommended
+slice is V41-PQ-001F5B — Paper Executor Contracts. F5B should define immutable
+contracts, enum values, typed failures, and deterministic identity/fingerprint
+behavior only. F5B should not call brokers, wire runtime, persist, authorize
+execution, or add Live behavior.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
