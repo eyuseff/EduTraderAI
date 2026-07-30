@@ -145,14 +145,16 @@ Implementation status:
 - V41-PQ-001B — APPLICATION QUALIFICATION SERVICE: IMPLEMENTED.
 - V41-PQ-001C — QUALIFICATION SCENARIO HARNESS: IMPLEMENTED.
 - V41-PQ-001D — QUALIFICATION EVIDENCE ADAPTER: IMPLEMENTED.
+- V41-PQ-001E — PAPER WORKFLOW INTEGRATION ARCHITECTURE REVIEW: COMPLETED.
 - V41-PQ-001 overall status: IN PROGRESS.
-- Next: V41-PQ-001E — PAPER QUALIFICATION WORKFLOW INTEGRATION DESIGN.
-- Before production workflow integration, V41-PQ-001E should begin with a bounded integration design and compatibility review.
-- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, or V41-PQ-001D.
+- V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
+- Next recommended implementation slice: V41-PQ-001F1 — Integration contracts and compatibility translation, with no broker effects.
+- Broker execution, runtime integration, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, or V41-PQ-001E.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001C_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001D_IMPLEMENTATION_REPORT.md`.
+- Architecture review: `docs/engineering/V41_PQ_001E_INTEGRATION_ARCHITECTURE_REVIEW.md`.
 
 
 ### Workstream B - Cross-process Coordination
