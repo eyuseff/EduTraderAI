@@ -106,6 +106,29 @@ FORBIDDEN_QUALIFICATION_PREFIXES = (
     "subprocess",
 )
 
+FORBIDDEN_PAPER_EXECUTION_PREFIXES = (
+    "adapters",
+    "broker",
+    "scanner_engine",
+    "engine",
+    "database",
+    "persistence",
+    "volcanoes.database",
+    "volcanoes.persistence",
+    "volcanoes.application.qualification.integration",
+    "volcanoes.application.supervisor",
+    "volcanoes.application.operations",
+    "volcanoes.events",
+    "logging",
+    "requests",
+    "aiohttp",
+    "urllib",
+    "http",
+    "socket",
+    "alpaca",
+    "alpaca-py",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -1523,3 +1546,128 @@ def test_prefix_matching_avoids_similarly_named_modules(
     )
 
     assert has_violation is expected_violation
+
+
+def test_qualification_does_not_import_paper_execution_contracts() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/qualification"),
+        ("volcanoes.application.execution",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_readiness_does_not_import_paper_execution_contracts() -> None:
+    readiness_path = (
+        PROJECT_ROOT / "volcanoes/application/qualification/integration/readiness.py"
+    )
+    violations = _violations(
+        (readiness_path,),
+        ("volcanoes.application.execution",),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_paper_execution_contracts_have_no_outward_dependencies() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/execution"),
+        FORBIDDEN_PAPER_EXECUTION_PREFIXES,
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_paper_execution_contracts_do_not_read_environment() -> None:
+    prohibited_tokens = (
+        "os.environ",
+        "os.getenv",
+        "getenv(",
+        "environ[",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_contracts_have_no_live_mode_or_runtime_selection() -> None:
+    package_root = PROJECT_ROOT / "volcanoes/application/execution"
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in ("LIVE", "PRODUCTION", "REAL_MONEY", "endpoint", "base_url")
+            if token in source
+        )
+
+    assert offenders == []
+    assert package_root.exists()
+
+
+def test_paper_execution_contracts_define_no_executor_or_behavior_methods() -> None:
+    prohibited_class_names = {
+        "PaperExecutor",
+        "ExecutionExecutor",
+        "PaperExecutionExecutor",
+        "PaperExecutionService",
+        "PaperExecutionRuntime",
+    }
+    prohibited_method_names = {
+        "execute",
+        "submit",
+        "dispatch",
+        "cancel_order",
+        "replace_order",
+        "retry",
+        "reconcile",
+        "persist",
+        "approve",
+        "authorize",
+        "connect",
+        "send",
+        "call_broker",
+    }
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name in prohibited_class_names:
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name in prohibited_method_names
+            ):
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+
+    assert offenders == []
+
+
+def test_paper_execution_contracts_are_not_used_by_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        if "volcanoes.application.execution" in source:
+            offenders.append(str(path.relative_to(PROJECT_ROOT)))
+
+    assert offenders == []

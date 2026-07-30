@@ -729,6 +729,38 @@ contracts, enum values, typed failures, and deterministic identity/fingerprint
 behavior only. F5B should not call brokers, wire runtime, persist, authorize
 execution, or add Live behavior.
 
+## V41-PQ-001F5B implementation mapping
+
+The Paper executor contracts slice implements the inert execution vocabulary
+without implementing execution behavior:
+
+- Package root: `volcanoes/application/execution/`.
+- Central canonicalization: `volcanoes/application/execution/_canonical.py`.
+- Central fingerprinting: `volcanoes/application/execution/fingerprints.py`.
+- Public enums: `volcanoes/application/execution/enums.py`.
+- Safe construction errors: `volcanoes/application/execution/errors.py`.
+- Strong identities:
+  `volcanoes/application/execution/identities/`.
+- Immutable contracts:
+  `volcanoes/application/execution/contracts/`.
+- Implementation report:
+  `docs/engineering/V41_PQ_001F5B_IMPLEMENTATION_REPORT.md`.
+
+The execution bounded context now exists as immutable contracts only. Commands
+remain inert data. Command identity is distinct from command payload
+fingerprint. Approval remains evidence only. Readiness remains advisory only.
+Paper mode is structurally enforced by a single-member `PaperExecutionMode`.
+Execution identities are deterministic, and `PaperExecutionRevision` is
+dedicated to execution rather than qualification or broker version semantics.
+
+F5B adds normalized receipts and normalized failures, but it does not add a
+broker adapter, broker mapping logic, persistence, idempotency reservation,
+stale-revision enforcement, eligibility service, approval evaluation,
+market-capability evaluation, runtime wiring, scanner wiring, supervisor
+wiring, event publication, metrics, logging, UI, API, CLI, or Live behavior.
+
+The next recommended slice is V41-PQ-001F5C — Execution Eligibility Core.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
