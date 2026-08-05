@@ -9,11 +9,14 @@ Design the future production SQLite schema for the F5E1A persistence records. Th
 - Opaque identities: `TEXT`.
 - Enums: canonical `TEXT` constrained by `CHECK`.
 - Booleans: `INTEGER NOT NULL CHECK(value IN (0, 1))`.
-- Datetimes: normalized UTC `TEXT`.
-- Quantities/prices: canonical decimal `TEXT`; no floating point.
+- Datetimes: normalized UTC `TEXT` in `YYYY-MM-DDTHH:MM:SS.ffffffZ` format.
+- Quantities/prices: canonical decimal `TEXT`; no floating point and no
+  SQLite `REAL`.
 - Fingerprints: deterministic `TEXT`.
 - Mode: constrained to Paper-only values accepted by the contracts.
 - Raw broker objects, credentials, SDK objects, callbacks, and raw payloads: prohibited.
+- Authoritative timestamps must be timezone-aware at the contract boundary and
+  serialized by the application, never by SQLite default clock functions.
 
 ## Table inventory
 
@@ -60,6 +63,10 @@ Constraints:
 - command ID permanently maps to one canonical payload fingerprint;
 - no overwrite/upsert that can change payload binding;
 - no raw Python object or callback.
+- `processing_outcome` is immutable after command insertion. It captures the
+  command registration outcome represented by `ExecutionCommandRecord`; later
+  lifecycle results belong in aggregate state, transitions, receipts, failures,
+  or reconciliation records.
 
 Replay query: load by `command_id`; if fingerprint matches, replay; if fingerprint differs, command conflict.
 
@@ -93,7 +100,9 @@ Constraints:
 - accepted transitions only;
 - append-only.
 
-Recommendation: create SQLite triggers rejecting `UPDATE` and `DELETE` on this table in the implementation slice.
+Recommendation: create SQLite triggers rejecting `UPDATE` and `DELETE` on this
+table in the implementation slice. Trigger failures map to a normalized
+integrity/immutability infrastructure failure.
 
 ## `execution_broker_references`
 
@@ -115,7 +124,7 @@ Constraints:
 
 `execution_failures` primary key: `record_fingerprint` or failure fingerprint extracted from `PaperExecutionFailure`.
 
-Both store normalized safe fields from the contract object, aggregate/command references where available, timestamps, status/kind/severity classifications, reconciliation flags, `schema_version`, and `record_fingerprint`. Both are immutable after insert.
+Both store normalized safe fields from the contract object, aggregate/command references where available, timestamps, status/kind/severity classifications, reconciliation flags, `schema_version`, and `record_fingerprint`. Both are immutable after insert and receive update/delete denial triggers.
 
 ## Approvals
 
@@ -141,6 +150,9 @@ Columns: `migration_name`, `checksum`, `applied_at`, `application_version`, `pre
 
 Duplicate ID with different checksum fails. Failed migrations must not insert false success rows.
 
+Migration rows are immutable after insert and receive update/delete denial
+triggers.
+
 ## Key indexes
 
 - `execution_aggregates(lifecycle_state)`;
@@ -153,3 +165,24 @@ Duplicate ID with different checksum fails. Failed migrations must not insert fa
 - `execution_broker_references(aggregate_id, active)`;
 - `execution_reconciliations(aggregate_id, unresolved)`;
 - `schema_migrations(resulting_schema_version)`.
+
+## Append-only trigger model
+
+Future implementation should define denial triggers for:
+
+- `execution_commands`: reject `UPDATE` and `DELETE`;
+- `execution_transitions`: reject `UPDATE` and `DELETE`;
+- `execution_receipts`: reject `UPDATE` and `DELETE`;
+- `execution_failures`: reject `UPDATE` and `DELETE`;
+- `execution_approvals`: reject `UPDATE` and `DELETE`;
+- `execution_reconciliations`: reject `UPDATE` and `DELETE`;
+- `schema_migrations`: reject `UPDATE` and `DELETE`.
+
+`execution_idempotency` is not fully append-only because controlled status
+resolution is required. Allowed updates are limited to reservation status,
+original result fingerprint, resolved timestamp, conflict flag, and record
+fingerprint under an exact current-status predicate.
+
+`execution_broker_references` allows controlled updates to `last_seen_at`,
+`active`, `reference_status`, and `replaced_by_reference` only under explicit
+ownership checks. Silent active ownership transfer is prohibited.

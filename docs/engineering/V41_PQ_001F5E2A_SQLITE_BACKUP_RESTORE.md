@@ -45,3 +45,11 @@ Restore requires:
 ## Restore limitations
 
 Restore tooling is not implemented. Restore does not reset idempotency, rewrite history, or authorize broker resubmission.
+
+## WAL checkpoint policy
+
+Routine checkpoints should use `PASSIVE`. `FULL` is reserved for controlled
+maintenance windows. `RESTART` and `TRUNCATE` require maintenance mode, no
+active execution writer, validated backup posture, and operator approval.
+Manual deletion of WAL or SHM files is prohibited while the database may be
+active. Filesystem free-space monitoring is a future operational requirement.

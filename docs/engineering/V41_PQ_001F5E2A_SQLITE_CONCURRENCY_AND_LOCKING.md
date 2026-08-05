@@ -2,7 +2,12 @@
 
 ## Initial supported concurrency
 
-The initial SQLite adapter supports one machine, one execution authority, and one active write coordinator. Multiple local connections are allowed for adapter sessions, backups, validation, and read-only inspection, but concurrent execution writers are not approved initially.
+The initial SQLite adapter supports one machine, one application process owning
+execution writes, one execution authority, and one active write coordinator.
+Multiple local connections are allowed for adapter sessions, backups,
+validation, and read-only inspection, but concurrent execution writers are not
+approved initially. Multiple local worker processes are prohibited for
+authoritative execution writes.
 
 ## Durable authority
 
@@ -36,6 +41,13 @@ WAL improves local read/write behavior but does not make SQLite a multi-host dat
 ## Multi-process rule
 
 Local multi-process write access is prohibited until a later validation slice proves it under F5E2D or a separate review. Read-only tools may be allowed if they cannot write and respect WAL/backup rules.
+
+Thread model: one process may use multiple threads only through connections
+created for the owning thread or through a future explicitly validated
+connection policy. Correctness must not rely on Python thread locks.
+
+Process model: maintenance utilities may run only in read-only or maintenance
+mode unless a future slice validates a stronger model.
 
 ## PostgreSQL trigger
 

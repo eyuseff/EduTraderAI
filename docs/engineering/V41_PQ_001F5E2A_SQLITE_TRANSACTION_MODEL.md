@@ -30,6 +30,10 @@ Conceptual order:
 
 If any authoritative insert/update fails, the transaction rolls back.
 
+No `INSERT OR REPLACE` or destructive upsert is allowed for commands,
+idempotency, transitions, broker references, receipts, failures, approvals, or
+reconciliations.
+
 ## CAS statement model
 
 ```sql
@@ -71,3 +75,16 @@ Read-only loading and restart discovery may use ordinary explicit read transacti
 ## Migration transactions
 
 Migrations must be explicit, ordered, checksum-validated, backed up first, and wrapped in transactions where SQLite supports transactional DDL. Failure shuts down startup compatibility rather than recreating the database.
+
+## Authoritative transaction groups
+
+| Group | Mode | Required behavior |
+|---|---|---|
+| Command intake | `BEGIN IMMEDIATE` | Register immutable command, reserve idempotency, detect replay/conflict, commit or roll back. |
+| Lifecycle transition | `BEGIN IMMEDIATE` | Load aggregate, enforce expected revision, append transition, CAS aggregate, commit atomically. |
+| Dispatch preparation | `BEGIN IMMEDIATE` | Persist durable intent and `DISPATCH_PENDING`; no broker call inside transaction. |
+| Dispatch result | `BEGIN IMMEDIATE` | Persist normalized result, receipt/failure/broker reference, transition, aggregate update, or unknown/reconciliation state. |
+| Cancellation request/result | `BEGIN IMMEDIATE` | Preserve command/idempotency/revision semantics; fill/cancel races require broker evidence. |
+| Replacement request/result | `BEGIN IMMEDIATE` | Preserve command/idempotency/revision semantics; replace/fill races require broker evidence. |
+| Reconciliation | `BEGIN IMMEDIATE` | Append reconciliation fact and bounded transition; unresolved states remain visible. |
+| Terminal update | `BEGIN IMMEDIATE` | Terminality changes only through accepted transition and CAS. |

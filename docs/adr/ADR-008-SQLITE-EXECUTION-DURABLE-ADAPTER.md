@@ -6,9 +6,12 @@ SQLite Execution Durable Adapter for initial local Paper execution persistence.
 
 ## 2. Status
 
-Proposed.
+Accepted.
 
-ADR-008 is not Accepted. It requires separate Sentinel review before implementation authorization.
+Accepted by Project Sentinel review on 2026-08-05. Acceptance authorizes only
+`V41-PQ-001F5E2B — SQLite Schema and Migration Foundation`; it does not
+authorize repositories, runtime wiring, broker execution, Paper trading, or
+Live behavior.
 
 ## 3. Date
 
@@ -84,10 +87,12 @@ Every connection must initialize and verify:
 
 - `PRAGMA foreign_keys = ON`;
 - `PRAGMA journal_mode = WAL`;
+- `PRAGMA synchronous = FULL`;
 - explicit `busy_timeout`;
 - explicit transaction boundaries;
 - `row_factory` set to deterministic named/row access;
 - UTF-8 text assumptions;
+- no database default current timestamp for authoritative records;
 - extension loading disabled;
 - no shared-cache reliance;
 - connection timeout configured;
@@ -149,6 +154,11 @@ Receipts, failures, approvals, and reconciliations are immutable or append-only 
 
 Every table includes a `schema_version` or equivalent record schema version. Database-level schema version is tracked through `schema_migrations`.
 
+Canonical decimal values are stored as decimal `TEXT`, not SQLite `REAL`.
+Canonical timestamps are UTC `TEXT` in `YYYY-MM-DDTHH:MM:SS.ffffffZ` format.
+Authoritative timestamps are supplied by the application contract layer, not by
+SQLite default clock functions.
+
 ## 28. Migration checksums
 
 Every migration has immutable ID, name, checksum, previous schema version, resulting schema version, application version, and applied timestamp. Duplicate migration ID with a different checksum fails startup/migration.
@@ -188,6 +198,11 @@ Command records, idempotency records, transition history, broker references, rec
 ## 37. Operational monitoring
 
 Future implementation must expose presentation-neutral health for schema compatibility, WAL status, last backup, integrity status, consequential states, lock failures, disk-space risk, and migration status. This ADR adds no metrics implementation.
+
+WAL checkpoint policy: routine checkpoints use `PASSIVE`; `FULL` is reserved
+for controlled maintenance; `RESTART` and `TRUNCATE` require maintenance mode,
+validated backup posture, and no active execution writer. WAL and SHM files
+must not be manually deleted while active.
 
 ## 38. PostgreSQL migration triggers
 
@@ -239,3 +254,39 @@ Recommended sequence:
 ## 45. Non-execution statement
 
 ADR-008 is design only. It implements no SQLite adapter, deploys no schema, creates no migration runner, creates no database file, wires no runtime persistence, adds no broker port, adds no broker adapter, calls no broker, authorizes no execution, enables no Paper trading, and enables no Live behavior. Broker execution remains `NOT_AUTHORIZED`.
+
+## 46. Sentinel ADR-008 review disposition
+
+Project Sentinel reviewed ADR-008 and the supporting F5E2A design documents on
+2026-08-05.
+
+Review result: APPROVED.
+
+ADR-008 final status: Accepted.
+
+F5E2B readiness: `READY_FOR_IMPLEMENTATION`.
+
+F5E2C readiness: `NOT_YET_AUTHORIZED`.
+
+Broker-execution readiness: `NOT_AUTHORIZED`.
+
+Acceptance basis:
+
+- deployment envelope is explicit and local single-machine only;
+- database path, local filesystem, symlink, cloud-sync, network-share, and
+  permission constraints are fail-closed;
+- connection PRAGMAs are explicit, including WAL, foreign keys,
+  `synchronous = FULL`, and bounded busy timeout;
+- canonical decimal and timestamp representations are defined;
+- schema maps every F5E1A record to a table or justified storage model;
+- command identity and idempotency bindings are immutable;
+- aggregate compare-and-swap is exact and zero-row updates fail closed;
+- transition, command, receipt, failure, approval, reconciliation, and
+  migration immutability protections are explicit;
+- migration, startup validation, backup, restore, integrity, corruption, and
+  PostgreSQL migration trigger rules are testable;
+- F5E2B scope is limited to schema, migration, connection bootstrap, startup
+  validation, and isolated temporary-database tests.
+
+This acceptance does not implement storage and does not authorize broker
+execution.

@@ -2,7 +2,10 @@
 
 ## 1. Executive summary
 
-F5E2A completes a documentation-only SQLite durable adapter design. The review decision is `ACCEPTED WITH CONDITIONS`: the design is coherent and ready for Sentinel ADR-008 review, but implementation must not begin until ADR-008 is reviewed and accepted or otherwise authorized.
+F5E2A completes a documentation-only SQLite durable adapter design. Project
+Sentinel reviewed ADR-008 and accepted it. F5E2B may implement only the SQLite
+schema and migration foundation; repositories, runtime wiring, and broker
+execution remain unauthorized.
 
 ## 2. Starting baseline
 
@@ -188,15 +191,17 @@ Immediate runtime wiring, broker execution, JSON authoritative store, portfolio 
 
 ## 47. ADR-008 readiness
 
-ADR-008 ready for Sentinel review.
+ADR-008 accepted by Sentinel review.
 
 ## 48. F5E2B readiness
 
-F5E2B is ready only after Sentinel ADR-008 review. Until then it is blocked by governance, not by design incompleteness.
+F5E2B is `READY_FOR_IMPLEMENTATION` for schema, migration, connection
+bootstrap, PRAGMA verification, startup validation, quick-check/FK-check
+support, and isolated temporary-database tests only.
 
 ## 49. Next recommended slice
 
-`SENTINEL ADR-008 REVIEW`.
+`V41-PQ-001F5E2B — SQLite Schema and Migration Foundation`.
 
 ## 50. Explicit non-implementation statement
 
@@ -208,7 +213,7 @@ No broker was called, no execution authority was added, no runtime action was ex
 
 ## Review decision
 
-`ACCEPTED WITH CONDITIONS`.
+`ACCEPTED`.
 
 Conditions:
 

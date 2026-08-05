@@ -1138,9 +1138,84 @@ trading enablement, or Live behavior was added. Broker execution remains
 
 Review decision: `ACCEPTED WITH CONDITIONS`.
 
-ADR-008 readiness: ready for Sentinel review.
+ADR-008 readiness: accepted by Sentinel review.
 
-F5E2B readiness: blocked until Sentinel ADR-008 review authorizes
-implementation.
+F5E2B readiness: `READY_FOR_IMPLEMENTATION` for schema, migration, connection
+bootstrap, PRAGMA verification, startup validation, quick-check/FK-check
+support, and isolated temporary-database tests only.
 
-Next recommended slice: `SENTINEL ADR-008 REVIEW`.
+Next recommended slice: `V41-PQ-001F5E2B — SQLITE SCHEMA AND MIGRATION
+FOUNDATION`.
+
+## Sentinel ADR-008 review outcome
+
+Project Sentinel completed ADR-008 review on 2026-08-05.
+
+Outcome: APPROVED.
+
+ADR-008 final status: Accepted.
+
+F5E2B readiness: `READY_FOR_IMPLEMENTATION`.
+
+F5E2C readiness: `NOT_YET_AUTHORIZED`.
+
+Broker-execution readiness: `NOT_AUTHORIZED`.
+
+Final deployment envelope: one machine, local filesystem, one application
+process owning execution writes, one active execution authority, one active
+write coordinator, no concurrent execution writer process, and read-only,
+backup, or maintenance connections only under explicit safe procedures.
+
+Final storage representations: opaque identities as stable `TEXT`; canonical
+decimal values as decimal `TEXT`; canonical timestamps as UTC `TEXT` in
+`YYYY-MM-DDTHH:MM:SS.ffffffZ`; no SQLite `REAL`; no database default current
+timestamp for authoritative records.
+
+Final connection configuration: `PRAGMA foreign_keys = ON`, `PRAGMA
+journal_mode = WAL`, `PRAGMA synchronous = FULL`, bounded busy timeout,
+explicit transactions, deterministic row handling, extension loading disabled,
+UTF-8 text, no shared-cache correctness assumption.
+
+Final transaction mode: authoritative writes use `BEGIN IMMEDIATE`; no local
+transaction may span a broker call; no hidden retries; no destructive upserts.
+
+Final CAS model: exact `aggregate_id` plus `execution_revision`, exactly one
+affected row, zero rows fail closed as stale or not found.
+
+Final append-only trigger model: update/delete denial triggers for commands,
+transitions, receipts, failures, approvals, reconciliations, and migrations;
+controlled status/observation updates only for idempotency and broker-reference
+records under explicit predicates.
+
+Final migration model: ordered migration IDs, immutable checksums, backup
+prerequisite, startup compatibility checks, unknown newer schema rejection,
+failed-migration shutdown, no silent database recreation, and no automatic
+downgrade.
+
+Final startup validation: path, symlink, local filesystem, permissions, SQLite
+version, PRAGMAs, schema version, migration checksums, required objects,
+quick-check, foreign-key check, invariant checks, and consequential-state
+discovery fail closed.
+
+Final backup/restore: backups use SQLite backup API or approved WAL-safe
+method; direct live database copy is rejected; restore requires maintenance
+mode, stopped execution authority, checksum/schema/integrity/FK/invariant
+validation, consequential-state preservation, and operator activation approval.
+
+Final corruption handling: critical integrity failure blocks authoritative
+execution, preserves the database, prohibits automatic repair, prohibits
+history rewrite, prohibits idempotency reset, and prohibits blind broker
+resubmission.
+
+PostgreSQL migration remains mandatory before multiple application hosts,
+multiple active execution workers, shared remote database access, network
+filesystem use, high write concurrency, public multi-user deployment, managed
+web service deployment, failover/high availability, centralized database
+administration, backup/recovery needs beyond local file model, or validated
+SQLite envelope breach.
+
+No production SQLite adapter, SQL schema implementation, migration runner,
+database file, backup tooling, restore tooling, repository implementation,
+runtime persistence wiring, broker port, broker adapter, broker call,
+execution authority, dependency, configuration, UI, API, CLI, Paper trading
+enablement, or Live behavior was added. V41-PQ-001 remains in progress.
