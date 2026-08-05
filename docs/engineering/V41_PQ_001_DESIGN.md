@@ -943,7 +943,7 @@ Implemented dry-run design:
 - no broker, simulator, persistence, event publisher, metrics, logging, UI,
   API, CLI, dependency, configuration, runtime wiring, or Live behavior.
 
-The next recommended implementation slice is V41-PQ-001F5E1A — Persistence Contracts and Unit-of-Work Ports. V41-PQ-001 remains in progress.
+F5E1A persistence contracts and F5E1B deterministic in-memory reference adapter are now implemented. V41-PQ-001 remains in progress; the next recommended implementation slice is V41-PQ-001F5E-SPIKE — SQLite / PostgreSQL Execution Durability Comparison.
 
 ## F5E0 architecture review status: persistence and idempotency
 
@@ -969,7 +969,7 @@ Review outcome:
   compatibility checks, and no deletion/rewrite of command history,
   idempotency, revisions, broker references, or unknown outcomes.
 
-Persistence remains unimplemented. Broker execution remains prohibited. The next recommended slice is V41-PQ-001F5E1A, followed by F5E1B and the authorized comparative storage spike. No durable backend adapter is authorized until spike evidence is reviewed.
+Durable persistence remains unimplemented. A non-durable process-local in-memory reference adapter now exists for contract validation only. Broker execution remains prohibited. The next recommended slice is the authorized V41-PQ-001F5E-SPIKE SQLite/PostgreSQL execution durability comparison. No durable backend adapter is authorized until spike evidence is reviewed.
 
 ## Sentinel correction: side-effect boundary contract
 
@@ -1018,9 +1018,9 @@ Append-only-history decision: accepted lifecycle transitions are immutable. The 
 
 Storage decision: `AUTHORIZE_COMPARATIVE_SPIKE` for SQLite/PostgreSQL execution durability comparison. No durable database adapter is authorized until spike evidence is reviewed.
 
-F5E1A readiness: `READY_FOR_IMPLEMENTATION` for persistence contracts and unit-of-work ports only.
+F5E1A status: `IMPLEMENTED` for persistence contracts and unit-of-work ports only.
 
-F5E1B readiness: `READY_FOR_IMPLEMENTATION` for a deterministic in-memory reference adapter only.
+F5E1B status: `IMPLEMENTED` for a deterministic in-memory reference adapter only.
 
 Broker execution remains prohibited: `NOT_AUTHORIZED`.
 
@@ -1054,8 +1054,16 @@ Excluded boundary:
 - no durable lifecycle state;
 - no broker port, broker adapter, broker call, or execution authority.
 
-Next recommended slice: `V41-PQ-001F5E1B — Deterministic In-Memory Reference
-Adapter`.
+Next recommended slice: `V41-PQ-001F5E-SPIKE — SQLite / PostgreSQL Execution
+Durability Comparison`.
 
-The comparative SQLite/PostgreSQL storage spike remains authorized and may
-follow F5E1B. V41-PQ-001 remains in progress.
+The comparative SQLite/PostgreSQL storage spike remains authorized and is
+the recommended next slice. V41-PQ-001 remains in progress.
+
+## F5E1B implementation status: deterministic in-memory reference adapter
+
+V41-PQ-001F5E1B implements the process-local in-memory reference adapter for the F5E1A execution persistence contracts and unit-of-work ports. The implementation adds deterministic repository implementations, unit-of-work staging, atomic commit validation, explicit rollback, exact command replay, logical idempotency replay, idempotency conflicts, command conflicts, optimistic revision checks, append-only transition journaling, broker-reference uniqueness, receipt/failure/approval/reconciliation fact storage, and restart-discovery queries over current in-memory state.
+
+The adapter is non-durable. State is lost when the adapter instance is discarded and does not survive process restart. It is not safe across multiple processes, does not implement a database, does not implement filesystem persistence, does not add schemas or migrations, and is not wired into runtime execution. It performs no broker calls and does not authorize Paper or Live trading.
+
+V41-PQ-001 remains in progress. Next recommended slice: `V41-PQ-001F5E-SPIKE — SQLite / PostgreSQL Execution Durability Comparison`. The alternative later slice remains `V41-PQ-001F5E1C — Transactional Execution Application Service Design` after storage-spike evidence is reviewed.

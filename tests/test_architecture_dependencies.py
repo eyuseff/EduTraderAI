@@ -1752,7 +1752,9 @@ def test_execution_persistence_has_no_runtime_storage_or_effect_tokens() -> None
     assert offenders == []
 
 
-def test_execution_persistence_defines_no_concrete_adapters_or_schemas() -> None:
+def test_execution_persistence_contract_files_define_no_concrete_adapters_or_schemas() -> (
+    None
+):
     prohibited_class_fragments = (
         "Adapter",
         "InMemory",
@@ -1764,7 +1766,11 @@ def test_execution_persistence_defines_no_concrete_adapters_or_schemas() -> None
         "Runtime",
     )
     offenders: list[str] = []
-    for path in _python_files("volcanoes/application/execution/persistence"):
+    for path in tuple(
+        path
+        for path in _python_files("volcanoes/application/execution/persistence")
+        if "in_memory" not in path.relative_to(PROJECT_ROOT).parts
+    ):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and any(
@@ -1834,6 +1840,173 @@ def test_execution_persistence_is_not_wired_into_runtime_entry_points() -> None:
         offenders.extend(
             f"{path.relative_to(PROJECT_ROOT)} contains {token}"
             for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_in_memory_persistence_implements_ports() -> None:
+    from volcanoes.application.execution.persistence import (
+        ExecutionAggregateRepository,
+        ExecutionApprovalRepository,
+        ExecutionBrokerReferenceRepository,
+        ExecutionCommandRepository,
+        ExecutionFailureRepository,
+        ExecutionIdempotencyRepository,
+        ExecutionReceiptRepository,
+        ExecutionReconciliationRepository,
+        ExecutionRestartDiscoveryRepository,
+        ExecutionTransitionJournal,
+        ExecutionUnitOfWork,
+        InMemoryExecutionPersistence,
+    )
+
+    unit_of_work = InMemoryExecutionPersistence().unit_of_work()
+
+    assert isinstance(unit_of_work, ExecutionUnitOfWork)
+    assert isinstance(unit_of_work.aggregates, ExecutionAggregateRepository)
+    assert isinstance(unit_of_work.commands, ExecutionCommandRepository)
+    assert isinstance(unit_of_work.idempotency, ExecutionIdempotencyRepository)
+    assert isinstance(unit_of_work.transitions, ExecutionTransitionJournal)
+    assert isinstance(
+        unit_of_work.broker_references, ExecutionBrokerReferenceRepository
+    )
+    assert isinstance(unit_of_work.receipts, ExecutionReceiptRepository)
+    assert isinstance(unit_of_work.failures, ExecutionFailureRepository)
+    assert isinstance(unit_of_work.approvals, ExecutionApprovalRepository)
+    assert isinstance(unit_of_work.reconciliations, ExecutionReconciliationRepository)
+    assert isinstance(
+        unit_of_work.restart_discovery, ExecutionRestartDiscoveryRepository
+    )
+
+
+def test_in_memory_persistence_imports_no_infrastructure_or_runtime_modules() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/execution/persistence/in_memory"),
+        (
+            "adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "database",
+            "volcanoes.database",
+            "volcanoes.application.supervisor",
+            "volcanoes.application.operations",
+            "volcanoes.application.platform",
+            "volcanoes.application.qualification.integration",
+            "volcanoes.events",
+            "sqlite3",
+            "psycopg",
+            "sqlalchemy",
+            "redis",
+            "requests",
+            "aiohttp",
+            "urllib",
+            "http",
+            "socket",
+            "subprocess",
+            "os",
+            "pathlib",
+            "datetime",
+            "time",
+            "random",
+            "uuid",
+            "secrets",
+            "threading",
+            "multiprocessing",
+            "logging",
+        ),
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_in_memory_persistence_has_no_storage_effect_or_runtime_tokens() -> None:
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "Alpaca",
+        "WebSocket",
+        "submit_order",
+        "replace_order",
+        "cancel_order",
+        "call_broker",
+        "BrokerAdapter",
+        "EventPublisher",
+        "OperationalMetrics",
+        "sqlite3",
+        "psycopg",
+        "SQLAlchemy",
+        "Redis",
+        "import requests",
+        "from requests",
+        "import http",
+        "from http",
+        "socket",
+        "subprocess",
+        "os.environ",
+        "os.getenv",
+        "getenv(",
+        "Path(",
+        "open(",
+        "read_text",
+        "write_text",
+        "write_bytes",
+        "json.dump",
+        "jsonlines",
+        "datetime.now",
+        "datetime.utcnow",
+        "time.time",
+        "uuid4",
+        "random",
+        "secrets",
+        "threading",
+        "multiprocessing",
+        "logging",
+        "metrics",
+        "create_schema",
+        "execute_sql",
+        "migrate",
+        "fsync",
+        "LIVE",
+        "PRODUCTION",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/persistence/in_memory"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_in_memory_persistence_is_not_wired_into_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in (
+                "InMemoryExecutionPersistence",
+                "persistence.in_memory",
+            )
             if token in source
         )
 
