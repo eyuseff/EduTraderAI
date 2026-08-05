@@ -83,3 +83,7 @@ workers from both believing they won the same revision.
 
 Do not reuse qualification revision, broker version, or database row version as
 execution lifecycle revision. They may be stored as supporting facts only.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Aggregate revision is execution-owned, starts at zero, increments exactly once per accepted transition, and is enforced with exact compare-and-swap. Stale writes fail closed. Qualification revisions and broker status sequence numbers are unrelated.

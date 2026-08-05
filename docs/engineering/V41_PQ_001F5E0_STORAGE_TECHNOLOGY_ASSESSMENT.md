@@ -87,7 +87,7 @@ authoritative execution journal.
 
 ## Technology decision
 
-Decision: `REQUIRE_TECHNOLOGY_SPIKE`.
+Decision after Sentinel review: `AUTHORIZE_COMPARATIVE_SPIKE`.
 
 Rationale: SQLite appears suitable for initial single-machine Paper execution
 under strict conditions, while PostgreSQL is more appropriate for future
@@ -110,3 +110,7 @@ The spike must test:
 - backup/restore;
 - migration version checks;
 - network-filesystem prohibition documentation.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS WITH SPIKE REQUIRED. Final backend selection remains deferred. Sentinel authorizes `V41-PQ-001F5E-SPIKE — SQLite/PostgreSQL Execution Durability Comparison`. SQLite remains constrained to local single-machine deployment if later selected; PostgreSQL remains the likely multi-worker or multi-host candidate. JSON/JSONL and in-memory storage are rejected as authoritative execution stores.

@@ -6,7 +6,7 @@ Execution Persistence and Idempotency Foundation.
 
 ## 2. Status
 
-Proposed.
+Accepted.
 
 ## 3. Date
 
@@ -222,12 +222,9 @@ Final storage selection, schema details, outbox timing, encryption mechanism,
 backup procedure, retention durations, and multi-host deployment support remain
 deferred to review/spike and implementation slices.
 
-## 37. Future review requirements
+## 37. Sentinel review requirements
 
-ADR-007 requires Sentinel review before implementation. F5E1 should not begin
-unless the durable model, transaction boundaries, idempotency semantics,
-revision semantics, restart recovery, and storage recommendation or spike scope
-are accepted.
+Sentinel review is complete. F5E1A and F5E1B may begin only within the bounded scopes accepted by the review: persistence contracts, unit-of-work ports, deterministic in-memory reference behavior, and contract tests. Durable backend implementation remains blocked until the authorized comparative storage spike is completed and reviewed.
 
 ## 38. Non-execution statement
 
@@ -235,3 +232,45 @@ This ADR implements nothing. Persistence does not authorize execution.
 Repository save success does not imply broker success. Idempotency reservation
 does not imply dispatch. Broker references are observations, not authority.
 Broker execution remains prohibited until separately authorized.
+
+## 39. Sentinel ADR-007 review disposition
+
+Project Sentinel reviewed ADR-007 and the supporting F5E0 persistence architecture documents on 2026-08-05.
+
+Review result: APPROVED.
+
+ADR-007 final status: Accepted.
+
+Storage-technology position: `AUTHORIZE_COMPARATIVE_SPIKE`.
+
+F5E1 readiness: `READY_WITH_CONDITIONS`.
+
+F5E1A — Persistence Contracts and Unit-of-Work Ports: `READY_FOR_IMPLEMENTATION`.
+
+F5E1B — Deterministic In-Memory Reference Adapter: `READY_FOR_IMPLEMENTATION`.
+
+Broker-execution readiness: `NOT_AUTHORIZED`.
+
+Acceptance basis:
+
+- source-of-truth hierarchy is explicit;
+- durable record inventory is complete at ADR level;
+- command and idempotency replay/conflict rules are deterministic;
+- aggregate revision compare-and-swap is explicit;
+- transaction boundaries prohibit broker calls inside local transactions;
+- ambiguous external-effect windows require unknown-outcome or reconciliation handling;
+- append-only transition history is preserved;
+- migration, rollback, backup/restore, security, and retention constraints are explicit;
+- no unresolved critical or major findings remain.
+
+This acceptance does not implement storage and does not authorize broker execution.
+
+## 40. Authorized next slices
+
+The next authorized implementation slice is `V41-PQ-001F5E1A — Persistence Contracts and Unit-of-Work Ports`.
+
+`V41-PQ-001F5E1B — Deterministic In-Memory Reference Adapter` is also ready after or alongside F5E1A if it remains non-production and contract-test-only.
+
+`V41-PQ-001F5E-SPIKE — SQLite/PostgreSQL Execution Durability Comparison` is authorized as an isolated, non-production spike. It must not call brokers, wire runtime, mutate production state, use real credentials, use `state/simulated_broker.json`, or select Live behavior.
+
+No durable database adapter is authorized until spike results are reviewed.

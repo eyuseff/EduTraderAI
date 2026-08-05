@@ -87,3 +87,7 @@ facts for the same aggregate, must:
 
 Restarted workers must resolve replay from durable records only. In-memory
 process state is advisory at best and is insufficient for broker execution.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Reservation timing is fixed at command intake / before `IDEMPOTENCY_RESERVED`, before `READY_FOR_DISPATCH`, and before any future broker-call boundary. Replay and conflict decisions are deterministic and revision-neutral. No duplicate broker call may follow replay or conflict.

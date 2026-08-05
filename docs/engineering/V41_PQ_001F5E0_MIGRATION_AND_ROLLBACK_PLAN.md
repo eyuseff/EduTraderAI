@@ -67,3 +67,7 @@ Backup and restore must verify:
 - receipt/failure fingerprint integrity;
 - schema version compatibility;
 - no secret-bearing fields.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Migration and rollback requirements are accepted: schema versioning, ordered migrations, checksums, backup before migration, startup compatibility checks, failure shutdown, restore validation, no silent empty-store initialization over incompatible data, no history deletion, no revision reset, no idempotency reset, and no erasure of unknown outcomes.

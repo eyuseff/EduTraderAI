@@ -2,7 +2,7 @@
 
 ## 1. Executive summary
 
-Review decision: ACCEPTED WITH CONDITIONS.
+Review decision: ACCEPTED AFTER SENTINEL REVIEW.
 
 F5E0 defines the durability architecture required before broker execution:
 transactional command intake, durable idempotency, optimistic execution
@@ -12,7 +12,7 @@ rollback. It implements no persistence.
 
 ## 2. Starting baseline
 
-Starting HEAD: `4df00534acca09732c432811701f0be2b9d72647`.
+Starting HEAD: `4df00534acca09732c432811701f0be2b9d72647`. Sentinel ADR-007 review HEAD: `a6e5cba3c9d927b5a6356d931927d7914199f911`.
 
 Baseline: 1,732 tests, 76 architecture tests, 85.7% coverage, ADR-004/005/006
 Accepted, F5B/F5C/F5D1/F5D2 implemented, and no durable execution persistence.
@@ -173,7 +173,7 @@ See `V41_PQ_001F5E0_STORAGE_TECHNOLOGY_ASSESSMENT.md`.
 
 ## 30. Technology decision
 
-Decision: REQUIRE_TECHNOLOGY_SPIKE.
+Decision after Sentinel review: AUTHORIZE_COMPARATIVE_SPIKE.
 
 SQLite is promising for initial single-machine Paper execution under strict
 conditions, but a bounded spike must prove concurrency, rollback, WAL,
@@ -270,20 +270,19 @@ broker execution without durable idempotency.
 
 ## 44. ADR-007 readiness
 
-ADR-007 is ready for Sentinel review as Proposed.
+ADR-007 has completed Sentinel review and is Accepted.
 
 ## 45. Implementation readiness
 
-F5E1 is blocked pending Sentinel ADR-007 review or explicit approval of the
-bounded storage technology spike.
+F5E1 is split after Sentinel review. F5E1A — Persistence Contracts and Unit-of-Work Ports is ready for implementation. F5E1B — Deterministic In-Memory Reference Adapter is ready for implementation. Durable backend implementation remains blocked until the authorized comparative storage spike is completed and reviewed.
 
 ## 46. Recommended implementation sequence
 
-F5E-SPIKE, F5E1, F5E2, F5E3, then F5F certification harness.
+F5E1A, F5E1B, F5E-SPIKE, F5E2, F5E3, then F5F certification harness.
 
 ## 47. Next recommended slice
 
-SENTINEL ADR-007 REVIEW.
+V41-PQ-001F5E1A — Persistence Contracts and Unit-of-Work Ports.
 
 ## 48. Explicit non-execution statement
 
@@ -292,3 +291,23 @@ No repository was implemented. No durable idempotency was implemented. No
 broker was called. No runtime wiring was added. No simulator state was
 accessed. No execution authority was added. No Live behavior was added.
 V41-PQ-001 remains incomplete.
+
+## 49. Sentinel ADR-007 review update
+
+Project Sentinel completed ADR-007 review on 2026-08-05.
+
+Outcome: APPROVED.
+
+ADR-007 final status: Accepted.
+
+Approval checklist: PASS.
+
+F5E1A readiness: `READY_FOR_IMPLEMENTATION`.
+
+F5E1B readiness: `READY_FOR_IMPLEMENTATION`.
+
+Storage-spike authorization: `AUTHORIZE_COMPARATIVE_SPIKE`.
+
+Broker-execution readiness: `NOT_AUTHORIZED`.
+
+The review closed all critical and major durability, idempotency, transaction-boundary, concurrency, and recovery findings. It keeps durable backend implementation blocked until a storage spike is completed and reviewed. It keeps broker execution prohibited.

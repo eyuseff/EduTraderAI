@@ -128,3 +128,7 @@ roll back with the database. Publish after commit can lose events. Execution
 audit should be local and durable first. A transactional outbox is recommended
 before external event publication becomes required, but F5E0 does not implement
 one.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Authoritative writes for one accepted local transition must commit atomically or not at all. No transaction may span a broker network call. Future broker effects require Transaction A for durable intent, the external operation outside the transaction, and Transaction B for normalized result or unknown/reconciliation state.

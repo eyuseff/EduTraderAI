@@ -55,3 +55,7 @@ to operators with safe reason codes and no credential leakage.
 
 Local durable state represents expected local lifecycle truth. Broker truth is
 external and must be observed, not inferred.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Consequential non-terminal states must be discoverable on restart. `DISPATCH_PENDING`, `DISPATCHED`, `OUTCOME_UNKNOWN`, `RECONCILIATION_REQUIRED`, `CANCEL_PENDING`, `REPLACE_PENDING`, and `PARTIALLY_FILLED` require read-only broker evidence, reconciliation, or operator visibility before new state-changing commands proceed. Blind resubmission remains prohibited.

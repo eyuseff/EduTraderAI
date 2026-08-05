@@ -79,3 +79,7 @@ final retention periods.
 
 Test execution stores must be isolated, clearly named, and safe to delete.
 Production stores must never be selected by default test configuration.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. Secrets, authorization headers, cookies, private keys, raw SDK objects, raw HTTP payloads, environment snapshots, unredacted exception traces, and unnecessary personal data remain excluded. Retention categories are accepted, but final retention periods remain deferred to legal, regulatory, privacy, and operational review.

@@ -95,10 +95,13 @@ or UI.
 
 ## Implementation readiness
 
-F5E1 is not authorized until ADR-007 receives review and the technology spike
-scope is accepted or waived explicitly.
+F5E1A is authorized after Sentinel ADR-007 review for persistence contracts and unit-of-work ports only. F5E1B is authorized for a deterministic in-memory reference adapter only. Durable backend implementation remains blocked until the authorized comparative storage spike is completed and reviewed.
 
 ## Non-execution statement
 
 No persistence, repository, database, migration, durable idempotency, broker
 execution, runtime wiring, or Live behavior is implemented by this plan.
+
+## Sentinel ADR-007 review update
+
+Review result: APPROVED. ADR-007 is Accepted. F5E1 is split: F5E1A — Persistence Contracts and Unit-of-Work Ports is `READY_FOR_IMPLEMENTATION`; F5E1B — Deterministic In-Memory Reference Adapter is `READY_FOR_IMPLEMENTATION`. The storage spike is authorized as isolated non-production work. Durable backend adapters, migrations, runtime wiring, broker ports, broker adapters, and broker execution remain unauthorized.

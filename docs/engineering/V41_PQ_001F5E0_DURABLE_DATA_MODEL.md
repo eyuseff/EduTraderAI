@@ -239,3 +239,7 @@ Restart use: prevent blind resubmission after ambiguity.
 
 Dry-run results, simulator state, validation evidence, and audit JSONL do not
 become execution state.
+
+## Sentinel ADR-007 review update
+
+Review result: PASS. The durable record inventory is accepted at ADR level: execution aggregate, command, idempotency reservation, transition journal entry, broker-reference record, receipt, failure, approval, and reconciliation record. Existing portfolio SQLite tables, JSONL audit files, dry-run output, qualification in-memory repositories, and simulator JSON state remain non-authoritative.

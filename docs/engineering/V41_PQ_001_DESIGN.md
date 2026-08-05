@@ -943,17 +943,15 @@ Implemented dry-run design:
 - no broker, simulator, persistence, event publisher, metrics, logging, UI,
   API, CLI, dependency, configuration, runtime wiring, or Live behavior.
 
-The next recommended implementation slice is V41-PQ-001F5E — Execution
-Persistence and Idempotency Foundation. V41-PQ-001 remains in progress.
+The next recommended implementation slice is V41-PQ-001F5E1A — Persistence Contracts and Unit-of-Work Ports. V41-PQ-001 remains in progress.
 
 ## F5E0 architecture review status: persistence and idempotency
 
-V41-PQ-001F5E0 completes the execution persistence and idempotency architecture
-review. ADR-007 is `Proposed` and ready for Sentinel review.
+V41-PQ-001F5E0 completes the execution persistence and idempotency architecture review. Sentinel ADR-007 review is completed and ADR-007 is `Accepted`.
 
 Review outcome:
 
-- architecture review decision: `ACCEPTED WITH CONDITIONS`;
+- architecture review decision after Sentinel review: `APPROVED`;
 - source-of-truth model: durable execution aggregate plus append-only
   transition journal is local lifecycle truth; broker observations remain
   external broker truth; reconciliation resolves differences without rewriting
@@ -966,16 +964,12 @@ Review outcome:
   `aggregate_id` plus expected `PaperExecutionRevision` compare-and-swap;
 - restart-recovery model: ambiguous and in-flight states require read-only
   recovery or reconciliation, never blind resubmission;
-- storage recommendation: `REQUIRE_TECHNOLOGY_SPIKE`, with SQLite promising for
-  single-machine Paper execution only if WAL, constraints, migrations,
-  backup/restore, and multi-process contention are proven;
+- storage recommendation after Sentinel review: `AUTHORIZE_COMPARATIVE_SPIKE`, with SQLite promising for single-machine Paper execution only if WAL, constraints, migrations, backup/restore, and multi-process contention are proven, and PostgreSQL retained as the multi-worker/multi-host candidate;
 - migration and rollback requirements: schema versioning, backups, checksums,
   compatibility checks, and no deletion/rewrite of command history,
   idempotency, revisions, broker references, or unknown outcomes.
 
-Persistence remains unimplemented. Broker execution remains prohibited. The
-next recommended slice is Sentinel ADR-007 review, followed by the storage
-technology spike or F5E1 only after explicit approval.
+Persistence remains unimplemented. Broker execution remains prohibited. The next recommended slice is V41-PQ-001F5E1A, followed by F5E1B and the authorized comparative storage spike. No durable backend adapter is authorized until spike evidence is reviewed.
 
 ## Sentinel correction: side-effect boundary contract
 
@@ -999,3 +993,33 @@ The initial implementation should target PQ-SCN-005 as the mandatory positive Pa
 ## 27. Approval gate
 
 Implementation may begin only after ADR-004 is reviewed and accepted. Approval must confirm that the design preserves Paper-only scope, explicit operator approval, broker truth, evidence requirements, idempotency, reconciliation, and the deferred boundaries for persistence and cross-process coordination.
+
+## Sentinel ADR-007 review outcome
+
+Project Sentinel completed ADR-007 review on 2026-08-05.
+
+Outcome: APPROVED.
+
+ADR-007 final status: Accepted.
+
+Final source-of-truth decision: immutable execution command record, execution aggregate snapshot, append-only transition journal, normalized broker observations, reconciliation record, supporting evidence, dry-run results, and simulator runtime state in that order. Supporting evidence, dry-runs, and simulator files are never operational execution authority.
+
+Durable record inventory: execution aggregate, execution command, idempotency reservation, lifecycle transition journal entry, broker-reference record, receipt record, failure record, approval record, and reconciliation record.
+
+Transaction-boundary decision: authoritative local writes for one accepted lifecycle transition commit atomically or not at all; no transaction may span a broker network call; future dispatch uses Transaction A for durable intent, an external broker operation outside the transaction, and Transaction B for normalized result or unknown/reconciliation state.
+
+Idempotency decision: command ID binds permanently to one canonical payload fingerprint; idempotency key binds permanently to one logical-operation fingerprint; exact replay returns the original logical result; conflicts fail closed; replay/conflict are revision-neutral and cannot call a broker.
+
+Concurrency decision: aggregate revision is execution-owned, starts at zero, increments exactly once per accepted transition, and is enforced by exact compare-and-swap. Process-local locks may optimize but cannot be authoritative for broker execution.
+
+Restart-recovery decision: consequential non-terminal states are discoverable. Ambiguous external-effect windows become `OUTCOME_UNKNOWN` or `RECONCILIATION_REQUIRED`; blind resubmission is prohibited.
+
+Append-only-history decision: accepted lifecycle transitions are immutable. The materialized aggregate is a current-state view and cannot replace the journal. The design remains materialized aggregate plus append-only journal, not full event sourcing.
+
+Storage decision: `AUTHORIZE_COMPARATIVE_SPIKE` for SQLite/PostgreSQL execution durability comparison. No durable database adapter is authorized until spike evidence is reviewed.
+
+F5E1A readiness: `READY_FOR_IMPLEMENTATION` for persistence contracts and unit-of-work ports only.
+
+F5E1B readiness: `READY_FOR_IMPLEMENTATION` for a deterministic in-memory reference adapter only.
+
+Broker execution remains prohibited: `NOT_AUTHORIZED`.
