@@ -156,6 +156,14 @@ FORBIDDEN_PAPER_LIFECYCLE_PREFIXES = FORBIDDEN_PAPER_EXECUTION_PREFIXES + (
     "volcanoes.application.qualification",
 )
 
+FORBIDDEN_PAPER_DRY_RUN_PREFIXES = FORBIDDEN_PAPER_EXECUTION_PREFIXES + (
+    "volcanoes.application.qualification",
+    "volcanoes.application.qualification.integration",
+    "volcanoes.application.qualification.integration.readiness",
+    "volcanoes.application.supervisor",
+    "volcanoes.events",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -1663,7 +1671,11 @@ def test_paper_execution_contracts_define_no_executor_or_behavior_methods() -> N
         "call_broker",
     }
     offenders: list[str] = []
-    for path in _python_files("volcanoes/application/execution"):
+    for path in tuple(
+        path
+        for path in _python_files("volcanoes/application/execution")
+        if "dry_run" not in path.relative_to(PROJECT_ROOT).parts
+    ):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name in prohibited_class_names:
@@ -1951,6 +1963,126 @@ def test_paper_execution_lifecycle_is_not_wired_into_runtime_entry_points() -> N
         "PaperExecutionLifecycle",
         "volcanoes.application.execution.lifecycle",
         "PX-TRN-",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_dry_run_has_only_approved_dependencies() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/execution/dry_run"),
+        FORBIDDEN_PAPER_DRY_RUN_PREFIXES,
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_paper_execution_dry_run_has_no_runtime_side_effect_tokens() -> None:
+    prohibited_tokens = (
+        "os.environ",
+        "os.getenv",
+        "getenv(",
+        "datetime.now",
+        "time.time",
+        "random",
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "submit_order",
+        "replace_order",
+        "cancel_order",
+        "EventPublisher",
+        "OperationalMetrics",
+        "sqlite",
+        "open(",
+        "write_text",
+        "write_bytes",
+        "import requests",
+        "from requests",
+        "import http",
+        "from http",
+        "socket",
+        "subprocess",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/dry_run"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_dry_run_defines_no_broker_or_persistence_ports() -> None:
+    prohibited_class_names = {
+        "PaperBrokerPort",
+        "PaperExecutionRepository",
+        "PaperExecutionPersistence",
+        "BrokerAdapter",
+        "ExecutionRuntime",
+    }
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/dry_run"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name in prohibited_class_names:
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+
+    assert offenders == []
+
+
+def test_paper_execution_dry_run_has_no_execute_capable_or_live_mode_symbols() -> None:
+    prohibited_tokens = (
+        "EXECUTE =",
+        "BROKER =",
+        "LIVE =",
+        "PRODUCTION =",
+        "REAL =",
+        "ACTIVE =",
+        "EXECUTED",
+        "SUCCESSFULLY_SUBMITTED",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/dry_run"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_dry_run_is_not_wired_into_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+    )
+    prohibited_tokens = (
+        "PaperDryRunExecutor",
+        "PaperDryRunRequest",
+        "volcanoes.application.execution.dry_run",
     )
     offenders: list[str] = []
     for path in runtime_paths:

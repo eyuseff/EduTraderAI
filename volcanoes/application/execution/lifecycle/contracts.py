@@ -365,6 +365,37 @@ class PaperExecutionTransitionContext:
                 normalize_code(self.eligibility_decision, "eligibility_decision"),
             )
 
+    def to_primitive(self) -> dict[str, object]:
+        return {
+            "approval_binding_valid": self.approval_binding_valid,
+            "approval_time_valid": self.approval_time_valid,
+            "broker_observation_conflicts_with_prior": (
+                self.broker_observation_conflicts_with_prior
+            ),
+            "broker_observation_matches_prior": (self.broker_observation_matches_prior),
+            "broker_reference": self.broker_reference,
+            "command_conflicts_with_prior": self.command_conflicts_with_prior,
+            "command_matches_prior": self.command_matches_prior,
+            "eligibility_decision": self.eligibility_decision,
+            "emergency_stop_clearance": self.emergency_stop_clearance,
+            "expected_revision": self.expected_revision,
+            "external_prerequisites_satisfied": (self.external_prerequisites_satisfied),
+            "idempotency_conflicts_with_prior": (self.idempotency_conflicts_with_prior),
+            "idempotency_matches_prior": self.idempotency_matches_prior,
+            "idempotency_reservation_confirmed": (
+                self.idempotency_reservation_confirmed
+            ),
+            "observed_cumulative_fill_quantity": (
+                self.observed_cumulative_fill_quantity
+            ),
+            "paper_mode_confirmed": self.paper_mode_confirmed,
+            "policy_compatible": self.policy_compatible,
+            "reconciliation_destination": self.reconciliation_destination,
+            "reconciliation_outcome": self.reconciliation_outcome,
+            "replacement_quantity": self.replacement_quantity,
+            "requested_quantity": self.requested_quantity,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class PaperExecutionTransitionSpecification:

@@ -924,6 +924,28 @@ acceptance, deterministic replay and conflict handling, stale revision
 rejection, guard failures, fill monotonicity, cancellation and replacement
 safety, reconciliation bounds, immutability, and architecture boundaries.
 
+## F5D2 implementation status: deterministic Paper dry-run executor
+
+V41-PQ-001F5D2 implements a side-effect-free dry-run executor under
+`volcanoes/application/execution/dry_run/`.
+
+Implemented dry-run design:
+
+- separate `PaperExecutionEffectMode.DRY_RUN` effect model;
+- Paper environment remains distinct as `PaperExecutionMode.PAPER`;
+- dry run composes F5C eligibility and F5D1 lifecycle transitions;
+- successful dry run stops at `READY_FOR_DISPATCH`;
+- successful dry run returns `WOULD_DISPATCH` as simulation only;
+- `WOULD_DISPATCH` does not authorize execution;
+- result safety booleans always remain false for execution, broker access,
+  simulator access, persistence access, runtime mutation, and Live authority;
+- deterministic `pdr-`, `pdo-`, `pdt-`, and `pdf-` fingerprints;
+- no broker, simulator, persistence, event publisher, metrics, logging, UI,
+  API, CLI, dependency, configuration, runtime wiring, or Live behavior.
+
+The next recommended implementation slice is V41-PQ-001F5E — Execution
+Persistence and Idempotency Foundation. V41-PQ-001 remains in progress.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

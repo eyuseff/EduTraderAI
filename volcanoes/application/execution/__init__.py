@@ -38,6 +38,20 @@ from volcanoes.application.execution.eligibility import (
     PaperExecutionEligibilityService,
     PaperExecutionEligibilitySeverity,
 )
+from volcanoes.application.execution.dry_run import (
+    PaperDryRunDecision,
+    PaperDryRunError,
+    PaperDryRunExecutor,
+    PaperDryRunFailure,
+    PaperDryRunFailureReason,
+    PaperDryRunOutcomeKind,
+    PaperDryRunReceipt,
+    PaperDryRunRequest,
+    PaperDryRunResult,
+    PaperDryRunStep,
+    PaperDryRunStepKind,
+    PaperExecutionEffectMode,
+)
 from volcanoes.application.execution.errors import (
     PaperExecutionContractError,
     PaperExecutionIdentityError,
@@ -76,6 +90,18 @@ from volcanoes.application.execution.lifecycle import (
 
 __all__ = [
     "PaperBrokerOrderReference",
+    "PaperDryRunDecision",
+    "PaperDryRunError",
+    "PaperDryRunExecutor",
+    "PaperDryRunFailure",
+    "PaperDryRunFailureReason",
+    "PaperDryRunOutcomeKind",
+    "PaperDryRunReceipt",
+    "PaperDryRunRequest",
+    "PaperDryRunResult",
+    "PaperDryRunStep",
+    "PaperDryRunStepKind",
+    "PaperExecutionEffectMode",
     "PaperExecutionAggregateId",
     "PaperExecutionApproval",
     "PaperExecutionApprovalKind",
