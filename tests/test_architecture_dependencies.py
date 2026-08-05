@@ -2494,3 +2494,57 @@ def test_paper_execution_dry_run_is_not_wired_into_runtime_entry_points() -> Non
         )
 
     assert offenders == []
+
+
+def test_execution_durability_spike_is_not_imported_by_production_modules() -> None:
+    production_paths = _python_files(
+        "adapters",
+        "broker",
+        "engine",
+        "scanner_engine",
+        "volcanoes",
+    ) + (PROJECT_ROOT / "app.py",)
+    offenders: list[str] = []
+    for path in production_paths:
+        source = path.read_text(encoding="utf-8")
+        if "spikes.execution_durability" in source:
+            offenders.append(str(path.relative_to(PROJECT_ROOT)))
+
+    assert offenders == []
+
+
+def test_execution_durability_spike_does_not_touch_runtime_state_or_brokers() -> None:
+    spike_paths = _python_files("spikes/execution_durability")
+    violations = _violations(
+        spike_paths,
+        (
+            "adapters",
+            "broker",
+            "scanner_engine",
+            "engine",
+            "trading",
+            "streamlit",
+            "volcanoes.application.supervisor",
+            "volcanoes.events",
+        ),
+    )
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "submit_order",
+        "cancel_order",
+        "replace_order",
+        "LIVE =",
+        "PRODUCTION =",
+    )
+    offenders = list(violations)
+    for path in spike_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []

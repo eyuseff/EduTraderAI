@@ -1066,4 +1066,17 @@ V41-PQ-001F5E1B implements the process-local in-memory reference adapter for the
 
 The adapter is non-durable. State is lost when the adapter instance is discarded and does not survive process restart. It is not safe across multiple processes, does not implement a database, does not implement filesystem persistence, does not add schemas or migrations, and is not wired into runtime execution. It performs no broker calls and does not authorize Paper or Live trading.
 
-V41-PQ-001 remains in progress. Next recommended slice: `V41-PQ-001F5E-SPIKE — SQLite / PostgreSQL Execution Durability Comparison`. The alternative later slice remains `V41-PQ-001F5E1C — Transactional Execution Application Service Design` after storage-spike evidence is reviewed.
+V41-PQ-001 remains in progress. The storage technology spike has selected `SELECT_SQLITE_WITH_MANDATORY_POSTGRESQL_MIGRATION_TRIGGER` for initial local Paper durable adapter design. Next recommended slice: `V41-PQ-001F5E2A — SQLITE DURABLE ADAPTER DESIGN`.
+
+
+## F5E storage technology spike status: SQLite / PostgreSQL durability comparison
+
+V41-PQ-001F5E-SPIKE is completed as an isolated non-production technology comparison. SQLite runtime evidence was obtained with Python 3.14.6 and SQLite 3.50.4 using synthetic local temporary data only. SQLite executed 30/30 backend-neutral scenarios successfully, including command replay/conflict, idempotency replay/conflict, optimistic compare-and-swap, aggregate plus journal atomicity, rollback, append-only transition identity, broker-reference uniqueness, restart discovery after close/reopen, additive migration, backup/restore, foreign-key rollback, journal/snapshot consistency, and secret exclusion.
+
+PostgreSQL runtime evidence was not obtained because safe local PostgreSQL tooling and Python drivers were unavailable without installing dependencies or changing services. PostgreSQL schema, constraints, compare-and-swap statements, row-locking strategy, migration approach, backup/restore procedure design, and multi-worker implications were assessed statically.
+
+Storage decision: `SELECT_SQLITE_WITH_MANDATORY_POSTGRESQL_MIGRATION_TRIGGER` for the initial local Paper durable adapter design only. SQLite is constrained to single-machine, single application authority, local filesystem, WAL, foreign keys, explicit transactions, busy timeout, migrations, backups, and no network filesystem. PostgreSQL migration is mandatory before multiple hosts, multiple active execution workers, remote shared database access, high write concurrency, public multi-user deployment, managed web deployment, network filesystem use, or availability requirements requiring database failover.
+
+No production adapter, production schema, production migration, runtime wiring, broker port, broker adapter, broker call, simulator integration, scanner/supervisor integration, execution authority, dependency, configuration, UI, API, CLI, credentials, Paper trading enablement, or Live behavior was added. Broker execution remains `NOT_AUTHORIZED` and V41-PQ-001 remains in progress.
+
+Next recommended slice: `V41-PQ-001F5E2A — SQLITE DURABLE ADAPTER DESIGN`.
