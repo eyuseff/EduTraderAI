@@ -809,7 +809,7 @@ The next recommended slice is V41-PQ-001F5D — Deterministic Dry-Run Executor.
 The Paper execution lifecycle design slice completed documentation-only review
 before any dry-run executor implementation:
 
-- Proposed ADR:
+- Accepted ADR:
   `docs/adr/ADR-006-PAPER-EXECUTION-LIFECYCLE.md`.
 - State model:
   `docs/engineering/V41_PQ_001F5D0_EXECUTION_STATE_MODEL.md`.
@@ -826,8 +826,10 @@ before any dry-run executor implementation:
 - Review report:
   `docs/engineering/V41_PQ_001F5D0_REVIEW_REPORT.md`.
 
-ADR-006 status is **Proposed**. The architecture review decision is
-**ACCEPTED WITH CONDITIONS** and ready for separate ADR acceptance review.
+ADR-006 status is **Accepted** after Project Sentinel review. The F5D0
+architecture review decision remains **ACCEPTED WITH CONDITIONS**, with all
+critical and major findings closed and F5D1 marked ready for implementation
+under strict non-executing scope.
 
 The proposed lifecycle model separates local execution state from broker truth.
 Eligibility remains advisory and is recorded only through an explicit future
@@ -861,6 +863,31 @@ Dry-run should use a separate future dry-run outcome model rather than entering
 broker-truth states. The next recommended implementation slice is
 V41-PQ-001F5D1 — Execution Lifecycle Core. F5D0 implemented no executor,
 introduced no authority, and added no production Python code.
+
+Sentinel ADR-006 review artifacts:
+
+- Review:
+  `docs/reviews/SENTINEL_ADR_006_REVIEW.md`.
+- Findings register:
+  `docs/reviews/SENTINEL_ADR_006_FINDINGS_REGISTER.md`.
+- Transition audit:
+  `docs/reviews/SENTINEL_ADR_006_TRANSITION_AUDIT.md`.
+- Failure matrix:
+  `docs/reviews/SENTINEL_ADR_006_FAILURE_MATRIX.md`.
+- Approval checklist:
+  `docs/reviews/SENTINEL_ADR_006_APPROVAL_CHECKLIST.md`.
+
+Final Sentinel outcomes: state count 22, transition count 30, command-terminal
+states `INELIGIBLE`, `ABORTED_BEFORE_DISPATCH`, `BROKER_REJECTED`, `REPLACED`,
+and `FAILED_TERMINAL`; aggregate-terminal states `FILLED`,
+`FAILED_TERMINAL`, and `CANCELLED` when no remaining working broker reference
+exists; broker-order-terminal observations `FILLED`, `CANCELLED`, and
+`BROKER_REJECTED`. `RECONCILIATION_REQUIRED` remains non-terminal and
+recoverable. F5D1 authorized scope is pure lifecycle aggregate, state enum,
+input/event contracts, transition specification, pure transition function,
+optional pure apply-transition function, revision validation,
+replay/idempotency decision model, descriptive side-effect intents only, and
+descriptive evidence intents only.
 
 ## Sentinel correction: side-effect boundary contract
 

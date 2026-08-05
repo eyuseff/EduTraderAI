@@ -5,6 +5,9 @@
 Define the proposed Paper execution lifecycle state model before implementing a
 lifecycle core or dry-run executor. This is design only.
 
+Sentinel review status: accepted as part of ADR-006 acceptance on 2026-08-04.
+Final state count remains 22.
+
 ## Current implementation fact
 
 No production execution lifecycle state machine exists. F5B provides inert

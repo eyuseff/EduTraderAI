@@ -55,8 +55,9 @@ support.
 
 ACCEPTED WITH CONDITIONS.
 
-ADR-006 remains Proposed and ready for separate acceptance review. The design
-is sufficient to proceed to F5D1 lifecycle core, provided F5D1 remains pure and
+Project Sentinel completed the separate acceptance review in
+`docs/reviews/SENTINEL_ADR_006_REVIEW.md`. ADR-006 is Accepted. The design is
+sufficient to proceed to F5D1 lifecycle core, provided F5D1 remains pure and
 non-executing.
 
 ## Critical findings
@@ -79,7 +80,7 @@ None.
 
 ## Accepted decisions
 
-- ADR-006 status is Proposed.
+- ADR-006 status is Accepted after Sentinel review.
 - Use a pure deterministic lifecycle core.
 - Separate local state from broker truth.
 - Record eligibility explicitly; do not mutate automatically.
@@ -121,6 +122,7 @@ None.
   event publishing, metrics, logging, UI, API, CLI, configuration, dependency,
   or Live behavior.
 - Architecture tests must preserve ADR-005 boundaries.
+- F5D1 must not implement the dry-run executor; that remains F5D2.
 
 ## Verification placeholder
 

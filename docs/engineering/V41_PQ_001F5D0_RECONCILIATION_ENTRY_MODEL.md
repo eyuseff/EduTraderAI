@@ -5,6 +5,8 @@
 Define when reconciliation becomes mandatory and how recovery may re-enter the
 normal lifecycle. This is design only.
 
+Sentinel review status: accepted as part of ADR-006 acceptance on 2026-08-04.
+
 ## Mandatory reconciliation entry conditions
 
 - Outcome unknown.

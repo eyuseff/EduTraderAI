@@ -5,6 +5,8 @@
 Define what the future deterministic dry-run executor may do after the
 lifecycle core exists. This is design only.
 
+Sentinel review status: accepted as part of ADR-006 acceptance on 2026-08-04.
+
 ## Recommended approach
 
 Use a separate dry-run outcome model rather than entering broker-truth states.

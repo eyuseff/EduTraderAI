@@ -6,7 +6,7 @@ Paper Execution Lifecycle.
 
 ## 2. Status
 
-Proposed.
+Accepted.
 
 ## 3. Date
 
@@ -33,6 +33,12 @@ Define a pure deterministic Paper execution lifecycle as a future aggregate
 state machine. The lifecycle records local execution state, accepts explicit
 inputs, produces transition decisions and future evidence intents, and never
 performs broker work itself.
+
+Project Sentinel accepted this ADR after reviewing the F5D0 state inventory,
+transition table, replay rules, duplicate rules, terminality model,
+reconciliation-entry model, dry-run isolation model, and F5D1 implementation
+scope. The acceptance review is recorded in
+`docs/reviews/SENTINEL_ADR_006_REVIEW.md`.
 
 ## 7. Execution lifecycle ownership
 
@@ -98,7 +104,7 @@ orchestrator.
 ## 16. Revision behavior
 
 One aggregate owns its own execution revision. Qualification revision remains
-separate. Proposed invariant: each accepted lifecycle transition increments the
+separate. Accepted invariant: each accepted lifecycle transition increments the
 execution aggregate revision exactly once. Replays, duplicate observations,
 rejected transitions, stale commands, and no-op inputs do not increment
 revision.
@@ -220,9 +226,19 @@ Recommended sequence: F5D1 lifecycle core, F5D2 deterministic dry-run executor,
 F5E persistence and idempotency foundation, F5F Paper broker certification
 harness, F6A controlled Paper broker submission, and F6B reconciliation.
 
+F5D1 is ready for implementation with strict scope boundaries: immutable
+lifecycle aggregate, lifecycle state enum, lifecycle input/event contracts,
+transition specification, pure transition function, optional pure
+apply-transition function, revision validation, replay/idempotency decision
+model, descriptive side-effect intents only, and descriptive evidence intents
+only. F5D1 must not implement broker ports, broker adapters, broker calls,
+persistence, durable idempotency, executors, dry-run executors, runtime wiring,
+simulator access, event publication, metrics, logging, UI, API, CLI,
+configuration, environment switches, or Live behavior.
+
 ## 35. Non-authorization statement
 
-ADR-006 is Proposed and design-only. It does not authorize broker execution,
+ADR-006 is Accepted and design-only. It does not authorize broker execution,
 runtime dispatch, executor implementation, dry-run executor implementation,
 persistence, durable idempotency reservation, broker ports, broker adapters,
 runtime wiring, event publication, metrics, logging, UI, API, CLI,

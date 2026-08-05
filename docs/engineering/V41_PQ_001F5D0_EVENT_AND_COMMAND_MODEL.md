@@ -5,6 +5,8 @@
 Separate lifecycle inputs from lifecycle states before implementation. This is
 design only.
 
+Sentinel review status: accepted as part of ADR-006 acceptance on 2026-08-04.
+
 ## Input categories
 
 | Category | Examples | Owner | Notes |

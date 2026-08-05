@@ -5,6 +5,9 @@
 Define proposed Paper execution lifecycle transitions for future implementation.
 This document is design only and introduces no production code.
 
+Sentinel review status: accepted as part of ADR-006 acceptance on 2026-08-04.
+Final transition count remains 30.
+
 ## Revision invariant
 
 Each accepted lifecycle transition increments the execution aggregate revision
