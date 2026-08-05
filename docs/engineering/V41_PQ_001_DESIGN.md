@@ -889,6 +889,41 @@ optional pure apply-transition function, revision validation,
 replay/idempotency decision model, descriptive side-effect intents only, and
 descriptive evidence intents only.
 
+## F5D1 implementation status: Paper execution lifecycle core
+
+V41-PQ-001F5D1 implements the accepted ADR-006 Paper execution lifecycle core
+as deterministic application contracts under
+`volcanoes/application/execution/lifecycle/`.
+
+Implemented lifecycle core:
+
+- exactly 22 accepted Paper execution states;
+- exactly 30 transition specifications, `PX-TRN-001` through `PX-TRN-030`;
+- immutable lifecycle aggregate, input, context, specification, decision,
+  side-effect intent, and evidence-intent contracts;
+- expected-revision validation;
+- aggregate/correlation identity validation;
+- deterministic command replay and conflict classification;
+- deterministic idempotency replay and conflict classification;
+- deterministic broker-observation replay and conflict classification;
+- unknown-outcome and reconciliation-required restrictions;
+- bounded reconciliation result handling;
+- cancellation and replacement guards;
+- partial-fill monotonicity and final-fill guards;
+- pure `transition(...)` and pure `apply_transition(...)` APIs.
+
+The implementation preserves the side-effect boundary established by ADR-006.
+It emits descriptive intents only and does not add an executor, dry-run
+executor, broker port, broker adapter, broker call, persistence, simulator
+access, runtime wiring, qualification authority transfer, readiness authority
+transfer, event publication, metrics, logging, configuration, dependency, or
+Live behavior.
+
+F5D1 focused verification covers lifecycle inventory, transition-table
+acceptance, deterministic replay and conflict handling, stale revision
+rejection, guard failures, fill monotonicity, cancellation and replacement
+safety, reconciliation bounds, immutability, and architecture boundaries.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:

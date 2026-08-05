@@ -151,6 +151,11 @@ FORBIDDEN_PAPER_ELIGIBILITY_PREFIXES = (
     "alpaca",
 )
 
+FORBIDDEN_PAPER_LIFECYCLE_PREFIXES = FORBIDDEN_PAPER_EXECUTION_PREFIXES + (
+    "volcanoes.application.execution.eligibility",
+    "volcanoes.application.qualification",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -1820,5 +1825,140 @@ def test_paper_execution_eligibility_is_not_consumed_by_runtime_entry_points() -
         source = path.read_text(encoding="utf-8")
         if "PaperExecutionEligibility" in source:
             offenders.append(str(path.relative_to(PROJECT_ROOT)))
+
+    assert offenders == []
+
+
+def test_paper_execution_lifecycle_has_no_outward_dependencies() -> None:
+    violations = _violations(
+        _python_files("volcanoes/application/execution/lifecycle"),
+        FORBIDDEN_PAPER_LIFECYCLE_PREFIXES,
+    )
+
+    assert violations == (), "\n".join(violations)
+
+
+def test_paper_execution_lifecycle_has_no_runtime_side_effect_tokens() -> None:
+    prohibited_tokens = (
+        "os.environ",
+        "os.getenv",
+        "getenv(",
+        "datetime.now",
+        "time.time",
+        "random",
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "submit_order",
+        "replace_order",
+        "cancel_order",
+        "EventPublisher",
+        "OperationalMetrics",
+        "sqlite",
+        "open(",
+        "write_text",
+        "write_bytes",
+        "requests",
+        "httpx",
+        "socket",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/lifecycle"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_lifecycle_defines_no_executor_ports_or_persistence_ports() -> (
+    None
+):
+    prohibited_class_names = {
+        "PaperExecutor",
+        "PaperExecutionExecutor",
+        "PaperBrokerPort",
+        "PaperExecutionRepository",
+        "PaperExecutionPersistence",
+        "ExecutionRuntime",
+        "DryRunExecutor",
+    }
+    prohibited_method_names = {
+        "execute",
+        "submit",
+        "reserve",
+        "persist",
+        "authorize",
+        "call_broker",
+    }
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/lifecycle"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name in prohibited_class_names:
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name in prohibited_method_names
+            ):
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+
+    assert offenders == []
+
+
+def test_paper_execution_lifecycle_has_no_live_or_dry_run_state_symbols() -> None:
+    prohibited_tokens = (
+        "LIVE",
+        "PRODUCTION",
+        "REAL_MONEY",
+        "DRY_RUN_ACCEPTED",
+        "DRY_RUN_REJECTED",
+        "WORKING",
+        "RECOVERED",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/lifecycle"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_paper_execution_lifecycle_is_not_wired_into_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+    )
+    prohibited_tokens = (
+        "PaperExecutionLifecycle",
+        "volcanoes.application.execution.lifecycle",
+        "PX-TRN-",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
 
     assert offenders == []
