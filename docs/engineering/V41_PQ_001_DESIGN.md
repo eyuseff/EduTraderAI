@@ -1023,3 +1023,39 @@ F5E1A readiness: `READY_FOR_IMPLEMENTATION` for persistence contracts and unit-o
 F5E1B readiness: `READY_FOR_IMPLEMENTATION` for a deterministic in-memory reference adapter only.
 
 Broker execution remains prohibited: `NOT_AUTHORIZED`.
+
+## F5E1A implementation status: persistence contracts and unit-of-work ports
+
+V41-PQ-001F5E1A implements the storage-neutral persistence contracts accepted
+by ADR-007. The package `volcanoes.application.execution.persistence` now
+defines immutable record contracts, repository result contracts, replay and
+conflict contracts, restart-discovery query/result contracts, repository
+ports, and unit-of-work/session ports.
+
+Implemented boundary:
+
+- persistence bounded-context contracts exist;
+- storage-neutral execution aggregate, command, idempotency, transition,
+  broker-reference, receipt, failure, approval, and reconciliation records
+  exist;
+- repository ports exist;
+- unit-of-work and command-intake session ports exist;
+- explicit expected-revision save contracts exist;
+- replay/conflict result contracts exist;
+- restart-discovery query contracts exist.
+
+Excluded boundary:
+
+- no concrete adapter;
+- no in-memory adapter;
+- no durable backend;
+- no runtime persistence wiring;
+- no durable idempotency;
+- no durable lifecycle state;
+- no broker port, broker adapter, broker call, or execution authority.
+
+Next recommended slice: `V41-PQ-001F5E1B — Deterministic In-Memory Reference
+Adapter`.
+
+The comparative SQLite/PostgreSQL storage spike remains authorized and may
+follow F5E1B. V41-PQ-001 remains in progress.

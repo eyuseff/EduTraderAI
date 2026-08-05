@@ -1,0 +1,96 @@
+"""Enums for storage-neutral Paper execution persistence contracts."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class ExecutionCommandProcessingOutcome(StrEnum):
+    """Durable command processing classification."""
+
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REPLAYED = "REPLAYED"
+    CONFLICTED = "CONFLICTED"
+    REJECTED = "REJECTED"
+    ABORTED = "ABORTED"
+
+
+class ExecutionIdempotencyReservationStatus(StrEnum):
+    """State of a logical idempotency reservation."""
+
+    RESERVED = "RESERVED"
+    COMPLETED = "COMPLETED"
+    CONFLICTED = "CONFLICTED"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+
+
+class ExecutionBrokerReferenceStatus(StrEnum):
+    """Normalized broker-reference lifecycle status."""
+
+    ACTIVE = "ACTIVE"
+    TERMINAL = "TERMINAL"
+    REPLACED = "REPLACED"
+
+
+class ExecutionPersistenceResultStatus(StrEnum):
+    """Repository and unit-of-work result status."""
+
+    CREATED = "CREATED"
+    LOADED = "LOADED"
+    SAVED = "SAVED"
+    APPENDED = "APPENDED"
+    EXACT_REPLAY = "EXACT_REPLAY"
+    LOGICAL_REPLAY = "LOGICAL_REPLAY"
+    STALE_REVISION = "STALE_REVISION"
+    COMMAND_CONFLICT = "COMMAND_CONFLICT"
+    IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT"
+    DUPLICATE_BROKER_REFERENCE = "DUPLICATE_BROKER_REFERENCE"
+    NOT_FOUND = "NOT_FOUND"
+    ALREADY_TERMINAL = "ALREADY_TERMINAL"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    TRANSACTION_ABORTED = "TRANSACTION_ABORTED"
+
+
+class ExecutionReplayKind(StrEnum):
+    """Replay classification for persistence lookups."""
+
+    NONE = "NONE"
+    EXACT_COMMAND = "EXACT_COMMAND"
+    LOGICAL_IDEMPOTENCY = "LOGICAL_IDEMPOTENCY"
+
+
+class ExecutionPersistenceConflictKind(StrEnum):
+    """Expected conflict kinds represented as data."""
+
+    COMMAND_PAYLOAD_CONFLICT = "COMMAND_PAYLOAD_CONFLICT"
+    IDEMPOTENCY_PAYLOAD_CONFLICT = "IDEMPOTENCY_PAYLOAD_CONFLICT"
+    STALE_REVISION = "STALE_REVISION"
+    AGGREGATE_ALREADY_EXISTS = "AGGREGATE_ALREADY_EXISTS"
+    BROKER_REFERENCE_CONFLICT = "BROKER_REFERENCE_CONFLICT"
+    TRANSITION_REVISION_CONFLICT = "TRANSITION_REVISION_CONFLICT"
+    TERMINAL_STATE_CONFLICT = "TERMINAL_STATE_CONFLICT"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    RECORD_VERSION_CONFLICT = "RECORD_VERSION_CONFLICT"
+
+
+class ExecutionPersistenceConflictSeverity(StrEnum):
+    """Operator-safe conflict severity."""
+
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class ExecutionReconciliationResultClassification(StrEnum):
+    """Bounded reconciliation result classifications."""
+
+    CONSISTENT = "CONSISTENT"
+    LOCAL_AHEAD = "LOCAL_AHEAD"
+    BROKER_AHEAD = "BROKER_AHEAD"
+    MISSING_LOCALLY = "MISSING_LOCALLY"
+    MISSING_AT_BROKER = "MISSING_AT_BROKER"
+    CONFLICTING = "CONFLICTING"
+    UNRESOLVED = "UNRESOLVED"
+    OPERATOR_ACTION_REQUIRED = "OPERATOR_ACTION_REQUIRED"

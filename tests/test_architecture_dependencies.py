@@ -164,6 +164,51 @@ FORBIDDEN_PAPER_DRY_RUN_PREFIXES = FORBIDDEN_PAPER_EXECUTION_PREFIXES + (
     "volcanoes.events",
 )
 
+ALLOWED_EXECUTION_PERSISTENCE_PREFIXES = (
+    "volcanoes.application.execution._canonical",
+    "volcanoes.application.execution.contracts",
+    "volcanoes.application.execution.enums",
+    "volcanoes.application.execution.errors",
+    "volcanoes.application.execution.fingerprints",
+    "volcanoes.application.execution.identities",
+    "volcanoes.application.execution.lifecycle",
+    "volcanoes.application.execution.persistence",
+)
+
+FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES = (
+    "adapters",
+    "broker",
+    "scanner_engine",
+    "engine",
+    "trading",
+    "database",
+    "persistence",
+    "volcanoes.database",
+    "volcanoes.persistence",
+    "volcanoes.application.supervisor",
+    "volcanoes.application.operations",
+    "volcanoes.application.platform",
+    "volcanoes.application.qualification.integration",
+    "volcanoes.events",
+    "sqlite3",
+    "psycopg",
+    "sqlalchemy",
+    "redis",
+    "requests",
+    "aiohttp",
+    "urllib",
+    "http",
+    "socket",
+    "subprocess",
+    "os",
+    "pathlib",
+    "random",
+    "uuid",
+    "threading",
+    "multiprocessing",
+    "logging",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -1611,6 +1656,188 @@ def test_paper_execution_contracts_have_no_outward_dependencies() -> None:
     )
 
     assert violations == (), "\n".join(violations)
+
+
+def test_execution_persistence_imports_only_contract_dependencies() -> None:
+    project_roots = (
+        "adapters",
+        "broker",
+        "database",
+        "engine",
+        "persistence",
+        "scanner_engine",
+        "streamlit",
+        "trading",
+        "volcanoes",
+    )
+    violations: set[str] = set()
+    for path in _python_files("volcanoes/application/execution/persistence"):
+        for reference in _imports_for_file(path):
+            if any(
+                _matches_prefix(reference.module, prefix)
+                for prefix in FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES
+            ):
+                violations.add(
+                    f"{path.relative_to(PROJECT_ROOT)}:{reference.line} "
+                    f"imports {reference.module}"
+                )
+            if any(_matches_prefix(reference.module, root) for root in project_roots):
+                if not any(
+                    _matches_prefix(reference.module, allowed)
+                    for allowed in ALLOWED_EXECUTION_PERSISTENCE_PREFIXES
+                ):
+                    violations.add(
+                        f"{path.relative_to(PROJECT_ROOT)}:{reference.line} "
+                        f"imports {reference.module}"
+                    )
+
+    assert tuple(sorted(violations)) == ()
+
+
+def test_execution_persistence_has_no_runtime_storage_or_effect_tokens() -> None:
+    prohibited_tokens = (
+        "state/simulated_broker.json",
+        "simulated_broker",
+        "TradingClient",
+        "Alpaca",
+        "WebSocket",
+        "submit_order",
+        "replace_order",
+        "cancel_order",
+        "call_broker",
+        "BrokerAdapter",
+        "PaperBrokerPort",
+        "EventPublisher",
+        "OperationalMetrics",
+        "sqlite3",
+        "psycopg",
+        "SQLAlchemy",
+        "Redis",
+        "import requests",
+        "from requests",
+        "import http",
+        "from http",
+        "socket",
+        "subprocess",
+        "os.environ",
+        "os.getenv",
+        "getenv(",
+        "Path(",
+        "open(",
+        "read_text",
+        "write_text",
+        "write_bytes",
+        "datetime.now",
+        "time.time",
+        "random",
+        "uuid4",
+        "threading",
+        "multiprocessing",
+        "logging",
+        "metrics",
+        "create_schema",
+        "execute_sql",
+        "migrate",
+        "fsync",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/persistence"):
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
+
+
+def test_execution_persistence_defines_no_concrete_adapters_or_schemas() -> None:
+    prohibited_class_fragments = (
+        "Adapter",
+        "InMemory",
+        "SQLite",
+        "Postgres",
+        "Redis",
+        "Schema",
+        "Migration",
+        "Runtime",
+    )
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/persistence"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and any(
+                fragment in node.name for fragment in prohibited_class_fragments
+            ):
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+
+    assert offenders == []
+
+
+def test_execution_persistence_defines_no_broker_or_runtime_call_site() -> None:
+    prohibited_method_names = {
+        "connect",
+        "create_schema",
+        "migrate",
+        "execute_sql",
+        "flush_to_disk",
+        "fsync",
+        "acquire_lock",
+        "publish",
+        "call_broker",
+        "recover_automatically",
+        "retry",
+        "submit",
+        "dispatch",
+        "cancel_order",
+        "replace_order",
+    }
+    offenders: list[str] = []
+    for path in _python_files("volcanoes/application/execution/persistence"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name in prohibited_method_names
+            ):
+                offenders.append(
+                    f"{path.relative_to(PROJECT_ROOT)} defines {node.name}"
+                )
+
+    assert offenders == []
+
+
+def test_execution_persistence_is_not_wired_into_runtime_entry_points() -> None:
+    runtime_paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_order_preview.py",
+        PROJECT_ROOT / "adapters/paper_order_submission.py",
+        PROJECT_ROOT / "adapters/scanner_execution.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "broker/simulated.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+        PROJECT_ROOT / "engine/brain.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+    )
+    prohibited_tokens = (
+        "volcanoes.application.execution.persistence",
+        "ExecutionUnitOfWork",
+        "ExecutionPersistenceSession",
+        "ExecutionAggregateRepository",
+    )
+    offenders: list[str] = []
+    for path in runtime_paths:
+        source = path.read_text(encoding="utf-8")
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+            for token in prohibited_tokens
+            if token in source
+        )
+
+    assert offenders == []
 
 
 def test_paper_execution_contracts_do_not_read_environment() -> None:
