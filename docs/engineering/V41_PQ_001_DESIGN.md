@@ -804,6 +804,64 @@ external logging, UI, API, CLI, configuration, dependencies, or Live behavior.
 
 The next recommended slice is V41-PQ-001F5D — Deterministic Dry-Run Executor.
 
+## V41-PQ-001F5D0 lifecycle design mapping
+
+The Paper execution lifecycle design slice completed documentation-only review
+before any dry-run executor implementation:
+
+- Proposed ADR:
+  `docs/adr/ADR-006-PAPER-EXECUTION-LIFECYCLE.md`.
+- State model:
+  `docs/engineering/V41_PQ_001F5D0_EXECUTION_STATE_MODEL.md`.
+- Transition table:
+  `docs/engineering/V41_PQ_001F5D0_TRANSITION_TABLE.md`.
+- Event and command model:
+  `docs/engineering/V41_PQ_001F5D0_EVENT_AND_COMMAND_MODEL.md`.
+- Concurrency and replay model:
+  `docs/engineering/V41_PQ_001F5D0_CONCURRENCY_AND_REPLAY_MODEL.md`.
+- Reconciliation entry model:
+  `docs/engineering/V41_PQ_001F5D0_RECONCILIATION_ENTRY_MODEL.md`.
+- Dry-run executor plan:
+  `docs/engineering/V41_PQ_001F5D0_DRY_RUN_EXECUTOR_PLAN.md`.
+- Review report:
+  `docs/engineering/V41_PQ_001F5D0_REVIEW_REPORT.md`.
+
+ADR-006 status is **Proposed**. The architecture review decision is
+**ACCEPTED WITH CONDITIONS** and ready for separate ADR acceptance review.
+
+The proposed lifecycle model separates local execution state from broker truth.
+Eligibility remains advisory and is recorded only through an explicit future
+lifecycle input. `ELIGIBLE` does not mutate state, does not create a submitted
+state, and does not authorize dispatch.
+
+The proposed revision rule is: each accepted lifecycle transition increments
+the execution aggregate revision exactly once. Rejected transitions, stale
+commands, duplicate command replays, duplicate broker observations, and
+observational no-ops do not increment revision.
+
+Replay and duplicate rules are explicit: same command ID with same payload
+replays the original logical outcome; same command ID with different payload is
+a duplicate conflict; same idempotency key with materially different payload is
+an idempotency conflict; duplicate broker observations are safe no-ops unless
+they contain new monotonic facts.
+
+Unknown outcome is a restricted non-terminal state. It does not imply success
+or failure, prohibits automatic resubmission, and requires reconciliation.
+Reconciliation entry conditions include outcome ambiguity, local/broker gaps,
+duplicate broker references, conflicting fills, cancellation ambiguity,
+replacement ambiguity, restart after incomplete dispatch, revision conflicts,
+and conflicting observations.
+
+Cancellation and replacement remain distinct lifecycle paths. Cancellation does
+not reverse fills; cancellation request is not cancellation. Replacement is
+native replace only in the proposed model; replacement request is not
+replacement and cancel-and-submit fallback remains rejected.
+
+Dry-run should use a separate future dry-run outcome model rather than entering
+broker-truth states. The next recommended implementation slice is
+V41-PQ-001F5D1 — Execution Lifecycle Core. F5D0 implemented no executor,
+introduced no authority, and added no production Python code.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
