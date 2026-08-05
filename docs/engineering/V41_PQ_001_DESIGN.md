@@ -1080,3 +1080,67 @@ Storage decision: `SELECT_SQLITE_WITH_MANDATORY_POSTGRESQL_MIGRATION_TRIGGER` fo
 No production adapter, production schema, production migration, runtime wiring, broker port, broker adapter, broker call, simulator integration, scanner/supervisor integration, execution authority, dependency, configuration, UI, API, CLI, credentials, Paper trading enablement, or Live behavior was added. Broker execution remains `NOT_AUTHORIZED` and V41-PQ-001 remains in progress.
 
 Next recommended slice: `V41-PQ-001F5E2A — SQLITE DURABLE ADAPTER DESIGN`.
+
+## F5E2A design status: SQLite durable adapter architecture
+
+V41-PQ-001F5E2A is completed as a design/documentation slice only. It creates
+ADR-008 as `Proposed` and defines the future SQLite durable execution adapter
+architecture for the F5E1A persistence contracts. ADR-008 is ready for Sentinel
+review but is not Accepted.
+
+Design decisions:
+
+- deployment envelope: one machine, local filesystem, one active EMERS
+  application deployment authority, one active execution write coordinator,
+  and one SQLite execution database;
+- database ownership: execution persistence records only; broker truth,
+  simulator state, scanner state, portfolio persistence, validation evidence,
+  and UI state remain outside SQLite;
+- database path: future approved local application data directory outside the
+  source tree, Git, `state/`, `state/simulated_broker.json`, build paths,
+  temporary spike paths, cloud-synced folders, and network/shared folders;
+- connection requirements: `PRAGMA foreign_keys = ON`, `PRAGMA journal_mode =
+  WAL`, `PRAGMA synchronous = FULL`, bounded busy timeout, explicit
+  transactions, extension loading disabled, and deterministic row handling;
+- transaction decision: authoritative writes use `BEGIN IMMEDIATE`; no local
+  transaction may span a broker network call;
+- CAS decision: aggregate updates require exact `aggregate_id` plus
+  `execution_revision` compare-and-swap with exactly one affected row;
+- append-only journal decision: transition history is append-only with unique
+  `(aggregate_id, next_revision)` and implementation-time triggers recommended
+  to reject update/delete on immutable history tables;
+- schema decision: future tables map to F5E1A records:
+  `execution_aggregates`, `execution_commands`, `execution_idempotency`,
+  `execution_transitions`, `execution_broker_references`,
+  `execution_receipts`, `execution_failures`, `execution_approvals`,
+  `execution_reconciliations`, and `schema_migrations`;
+- migration decision: migrations require IDs, checksums, ordering, backup
+  prerequisite, startup compatibility checks, validation, and fail-closed
+  behavior;
+- backup/restore decision: future backups use SQLite backup API or another
+  WAL-safe approved method; restore requires maintenance mode, checksum,
+  schema, integrity, foreign-key, invariant, and consequential-state
+  validation;
+- corruption handling: stop authoritative execution, preserve the database,
+  do not rewrite history, do not clear idempotency, do not resubmit orders,
+  and require operator recovery;
+- PostgreSQL migration triggers remain mandatory before multiple hosts,
+  multiple active execution workers, shared remote database access, high write
+  concurrency, public multi-user deployment, managed web service deployment,
+  network filesystem use, failover requirements, or any operating envelope
+  beyond validated local SQLite constraints.
+
+No production SQLite adapter, production schema, production migration runner,
+database file, runtime persistence wiring, broker port, broker adapter, broker
+call, execution authority, dependency, configuration, UI, API, CLI, Paper
+trading enablement, or Live behavior was added. Broker execution remains
+`NOT_AUTHORIZED` and V41-PQ-001 remains in progress.
+
+Review decision: `ACCEPTED WITH CONDITIONS`.
+
+ADR-008 readiness: ready for Sentinel review.
+
+F5E2B readiness: blocked until Sentinel ADR-008 review authorizes
+implementation.
+
+Next recommended slice: `SENTINEL ADR-008 REVIEW`.
