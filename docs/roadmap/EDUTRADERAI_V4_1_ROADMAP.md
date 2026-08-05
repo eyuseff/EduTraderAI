@@ -162,10 +162,12 @@ Implementation status:
 - ADR-006 — PAPER EXECUTION LIFECYCLE: ACCEPTED.
 - V41-PQ-001F5D1 — EXECUTION LIFECYCLE CORE: IMPLEMENTED.
 - V41-PQ-001F5D2 — DETERMINISTIC PAPER DRY-RUN EXECUTOR: IMPLEMENTED.
+- V41-PQ-001F5E0 — PERSISTENCE ARCHITECTURE REVIEW: COMPLETED.
+- ADR-007 — EXECUTION PERSISTENCE AND IDEMPOTENCY: PROPOSED.
 - V41-PQ-001 overall status: IN PROGRESS.
 - V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
 - V41-PQ-001F5A review disposition: ACCEPTED WITH CONDITIONS.
-- Next recommended implementation slice: V41-PQ-001F5E — EXECUTION PERSISTENCE AND IDEMPOTENCY FOUNDATION.
+- Next recommended slice: SENTINEL ADR-007 REVIEW.
 - V41-PQ-001F4B connects exactly one approved Paper runtime observation point, calls only `QualificationRuntimeIntegrationBoundary`, never calls the shadow runner, facade, or service directly, remains disabled by default, uses an explicit typed Paper-only gate, never executes returned actions, never alters legacy decisions, provides instant rollback by disabling or removing one narrow call site, preserves broker, simulator, scanner, supervisor, and UI behavior, and proves zero behavioral impact when disabled and zero consequential impact when enabled.
 - V41-PQ-001F4C adds an in-memory validation harness that consumes completed boundary results only, aggregates immutable validation facts, detects duplicates and conflicts, evaluates repeatability and continuity counters, produces deterministic summaries, remains unwired from production runtime, and does not authorize runtime execution.
 - V41-PQ-001F4D consumes immutable F4C validation summaries, defines explicit advisory readiness criteria, distinguishes READY_FOR_NEXT_PHASE, NOT_READY, and INSUFFICIENT_EVIDENCE, requires zero identity and authority violations under strict policy, requires zero nondeterministic conflicts, requires deterministic replay, defines minimum observation counts, defines permitted and prohibited mismatch categories, remains advisory only, does not authorize runtime execution, does not invoke brokers, does not persist, does not add Live support, and does not mark V41-PQ-001 complete.
@@ -175,6 +177,7 @@ Implementation status:
 - V41-PQ-001F5D0 completes the Paper execution lifecycle design only. Project Sentinel accepted ADR-006 after review, with state count 22, transition count 30, explicit command/aggregate/broker-order terminality, replay and duplicate semantics, unknown-outcome and reconciliation-entry rules, cancellation and replacement safety, partial-fill handling, dry-run isolation, and the recommendation to implement V41-PQ-001F5D1 lifecycle core before V41-PQ-001F5D2 deterministic dry-run executor. F5D0 adds no production lifecycle state machine, executor, dry-run executor, broker port, broker adapter, persistence, runtime wiring, event publisher, metrics, logging, configuration, dependency, or Live behavior.
 - V41-PQ-001F5D1 implements the pure Paper execution lifecycle core accepted by ADR-006: exactly 22 states, exactly 30 transition specifications, immutable aggregate/input/context/specification/decision contracts, expected-revision validation, deterministic replay and conflict decisions, unknown-outcome and reconciliation-required restrictions, cancellation/replacement guards, partial-fill monotonicity, and descriptive side-effect/evidence intents only. F5D1 adds no executor, dry-run executor, broker port, broker adapter, broker call, persistence, simulator access, runtime wiring, qualification authority transfer, readiness authority transfer, or Live behavior.
 - V41-PQ-001F5D2 implements a deterministic Paper dry-run executor. It composes F5C eligibility and F5D1 lifecycle transitions, introduces a separate `DRY_RUN` effect model, produces immutable dry-run requests, results, steps, receipts, and failures, stops successful submit simulation at `READY_FOR_DISPATCH`, returns `WOULD_DISPATCH` as simulation only, and keeps execution authorization, action execution, broker access, simulator access, persistence access, runtime mutation, and Live authority false. F5D2 adds no broker port, broker adapter, broker call, simulator access, persistence, durable idempotency, runtime wiring, event publisher, metrics, logging, UI, API, CLI, dependency, configuration, or Live behavior.
+- V41-PQ-001F5E0 completes the persistence and idempotency architecture review. ADR-007 is Proposed and ready for Sentinel review. The review decision is ACCEPTED WITH CONDITIONS, the storage decision is REQUIRE_TECHNOLOGY_SPIKE, persistence remains unimplemented, durable idempotency remains unimplemented, broker execution remains prohibited, Paper trading is not enabled, and Live remains unsupported.
 - Do not proceed directly to a broker side-effect executor.
 - Broker execution, runtime integration beyond controlled shadow observation, persistence, durable evidence storage, and cross-process coordination remain pending and are not part of V41-PQ-001A, V41-PQ-001B, V41-PQ-001C, V41-PQ-001D, V41-PQ-001E, V41-PQ-001F1, V41-PQ-001F2, V41-PQ-001F3, V41-PQ-001F4A, V41-PQ-001F4B, V41-PQ-001F4C, V41-PQ-001F4D, V41-PQ-001F5A, or V41-PQ-001F5B.
 - Implementation report: `docs/engineering/V41_PQ_001A_IMPLEMENTATION_REPORT.md`.
@@ -194,6 +197,7 @@ Implementation status:
 - Implementation report: `docs/engineering/V41_PQ_001F5B_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F5D1_IMPLEMENTATION_REPORT.md`.
 - Implementation report: `docs/engineering/V41_PQ_001F5D2_IMPLEMENTATION_REPORT.md`.
+- Architecture review: `docs/engineering/V41_PQ_001F5E0_PERSISTENCE_ARCHITECTURE_REVIEW.md`.
 
 
 ### Workstream B - Cross-process Coordination

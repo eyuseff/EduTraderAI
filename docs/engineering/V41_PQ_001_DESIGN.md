@@ -946,6 +946,37 @@ Implemented dry-run design:
 The next recommended implementation slice is V41-PQ-001F5E — Execution
 Persistence and Idempotency Foundation. V41-PQ-001 remains in progress.
 
+## F5E0 architecture review status: persistence and idempotency
+
+V41-PQ-001F5E0 completes the execution persistence and idempotency architecture
+review. ADR-007 is `Proposed` and ready for Sentinel review.
+
+Review outcome:
+
+- architecture review decision: `ACCEPTED WITH CONDITIONS`;
+- source-of-truth model: durable execution aggregate plus append-only
+  transition journal is local lifecycle truth; broker observations remain
+  external broker truth; reconciliation resolves differences without rewriting
+  history;
+- transaction-boundary model: local authoritative writes commit atomically; no
+  transaction spans an external broker call;
+- idempotency model: command ID and idempotency key uniqueness must be durable
+  before broker execution;
+- optimistic-concurrency model: aggregate writes require
+  `aggregate_id` plus expected `PaperExecutionRevision` compare-and-swap;
+- restart-recovery model: ambiguous and in-flight states require read-only
+  recovery or reconciliation, never blind resubmission;
+- storage recommendation: `REQUIRE_TECHNOLOGY_SPIKE`, with SQLite promising for
+  single-machine Paper execution only if WAL, constraints, migrations,
+  backup/restore, and multi-process contention are proven;
+- migration and rollback requirements: schema versioning, backups, checksums,
+  compatibility checks, and no deletion/rewrite of command history,
+  idempotency, revisions, broker references, or unknown outcomes.
+
+Persistence remains unimplemented. Broker execution remains prohibited. The
+next recommended slice is Sentinel ADR-007 review, followed by the storage
+technology spike or F5E1 only after explicit approval.
+
 ## Sentinel correction: side-effect boundary contract
 
 The implementation must split command processing into these explicit records:
