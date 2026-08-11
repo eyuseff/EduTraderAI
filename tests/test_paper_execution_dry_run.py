@@ -6,6 +6,7 @@ from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -141,7 +142,7 @@ def lifecycle_context(
     current: PaperExecutionLifecycle,
     **overrides: object,
 ) -> PaperExecutionTransitionContext:
-    values = {
+    values: dict[str, Any] = {
         "expected_revision": current.revision,
         "approval_binding_valid": True,
         "approval_time_valid": True,
@@ -156,7 +157,7 @@ def lifecycle_context(
 
 
 def policy(**overrides: object) -> PaperExecutionEligibilityPolicy:
-    values = {"policy_version": "dry-run-eligibility"}
+    values: dict[str, Any] = {"policy_version": "dry-run-eligibility"}
     values.update(overrides)
     return PaperExecutionEligibilityPolicy(**values)
 
@@ -789,7 +790,7 @@ def test_all_outcomes_preserve_safety_boolean_defaults(
     ),
 )
 def test_safety_booleans_are_not_caller_configurable(flag: str) -> None:
-    result = replace(run_success(), **{flag: True})
+    result = replace(run_success(), **cast(Any, {flag: True}))
     assert getattr(result, flag) is False
 
 
