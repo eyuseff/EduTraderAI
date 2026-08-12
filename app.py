@@ -18,8 +18,8 @@ from adapters.scanner_execution import (
     build_scanner_execution_runtime,
 )
 from broker.alpaca_paper import AlpacaPaperBroker
+from broker.app_runtime import build_local_simulated_broker
 from broker.base import PaperBroker
-from broker.simulated import SimulatedPaperBroker
 from engine.brain import EduTraderBrain
 from engine.supervised_brain import SupervisedEduTraderBrain
 from trading.execution import PaperExecutionEngine
@@ -77,8 +77,8 @@ st.set_page_config(
 
 
 @st.cache_resource
-def local_broker(starting_cash: float) -> SimulatedPaperBroker:
-    return SimulatedPaperBroker(starting_cash=starting_cash)
+def local_broker(starting_cash: float) -> PaperBroker:
+    return build_local_simulated_broker(starting_cash=starting_cash)
 
 
 @st.cache_resource
