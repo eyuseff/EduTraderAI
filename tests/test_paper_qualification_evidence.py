@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import io
 import os
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -84,6 +85,143 @@ DEFAULT_EVIDENCE_TYPES = (
     QualificationEvidenceType.QUALIFICATION_TRANSITION_ACCEPTED,
     QualificationEvidenceType.QUALIFICATION_TERMINAL_RESULT,
 )
+
+
+def _install_protected_state_access_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[str]:
+    """Fail if evidence construction targets the production state path."""
+
+    protected_path = os.path.normcase(
+        os.path.abspath(
+            os.path.normpath(os.fspath(PROJECT_ROOT / "state/simulated_broker.json"))
+        )
+    )
+    attempts: list[str] = []
+
+    def normalized_path(candidate: object) -> str | None:
+        if isinstance(candidate, int):
+            return None
+        if not isinstance(candidate, (str, bytes, os.PathLike)):
+            return None
+        try:
+            raw_path = os.fspath(candidate)
+        except TypeError:
+            return None
+        return os.path.normcase(
+            os.path.abspath(os.path.normpath(os.fsdecode(raw_path)))
+        )
+
+    def guard(operation: str, *candidates: object) -> None:
+        if any(
+            normalized_path(candidate) == protected_path for candidate in candidates
+        ):
+            attempts.append(operation)
+            raise AssertionError(
+                f"protected simulator-state access attempted via {operation}"
+            )
+
+    def guard_one_path(operation: str, original: object):
+        def wrapped(path: object, *args: object, **kwargs: object) -> object:
+            guard(operation, path)
+            return original(path, *args, **kwargs)  # type: ignore[operator]
+
+        return wrapped
+
+    def guard_two_paths(operation: str, original: object):
+        def wrapped(
+            source: object,
+            destination: object,
+            *args: object,
+            **kwargs: object,
+        ) -> object:
+            guard(operation, source, destination)
+            return original(source, destination, *args, **kwargs)  # type: ignore[operator]
+
+        return wrapped
+
+    original_builtins_open = builtins.open
+    original_io_open = io.open
+    original_os_open = os.open
+    original_os_stat = os.stat
+    original_os_lstat = os.lstat
+    original_os_access = os.access
+    original_os_unlink = os.unlink
+    original_os_remove = os.remove
+    original_os_rename = os.rename
+    original_os_replace = os.replace
+    original_path_open = Path.open
+    original_path_read_bytes = Path.read_bytes
+    original_path_read_text = Path.read_text
+    original_path_write_bytes = Path.write_bytes
+    original_path_write_text = Path.write_text
+    original_path_exists = Path.exists
+    original_path_stat = Path.stat
+    original_path_lstat = Path.lstat
+    original_path_is_file = Path.is_file
+    original_path_is_dir = Path.is_dir
+    original_path_touch = Path.touch
+    original_path_unlink = Path.unlink
+    original_path_rename = Path.rename
+    original_path_replace = Path.replace
+
+    monkeypatch.setattr(
+        builtins, "open", guard_one_path("builtins.open", original_builtins_open)
+    )
+    monkeypatch.setattr(io, "open", guard_one_path("io.open", original_io_open))
+    monkeypatch.setattr(os, "open", guard_one_path("os.open", original_os_open))
+    monkeypatch.setattr(os, "stat", guard_one_path("os.stat", original_os_stat))
+    monkeypatch.setattr(os, "lstat", guard_one_path("os.lstat", original_os_lstat))
+    monkeypatch.setattr(os, "access", guard_one_path("os.access", original_os_access))
+    monkeypatch.setattr(os, "unlink", guard_one_path("os.unlink", original_os_unlink))
+    monkeypatch.setattr(os, "remove", guard_one_path("os.remove", original_os_remove))
+    monkeypatch.setattr(os, "rename", guard_two_paths("os.rename", original_os_rename))
+    monkeypatch.setattr(
+        os, "replace", guard_two_paths("os.replace", original_os_replace)
+    )
+    monkeypatch.setattr(Path, "open", guard_one_path("Path.open", original_path_open))
+    monkeypatch.setattr(
+        Path, "read_bytes", guard_one_path("Path.read_bytes", original_path_read_bytes)
+    )
+    monkeypatch.setattr(
+        Path, "read_text", guard_one_path("Path.read_text", original_path_read_text)
+    )
+    monkeypatch.setattr(
+        Path,
+        "write_bytes",
+        guard_one_path("Path.write_bytes", original_path_write_bytes),
+    )
+    monkeypatch.setattr(
+        Path,
+        "write_text",
+        guard_one_path("Path.write_text", original_path_write_text),
+    )
+    monkeypatch.setattr(
+        Path, "exists", guard_one_path("Path.exists", original_path_exists)
+    )
+    monkeypatch.setattr(Path, "stat", guard_one_path("Path.stat", original_path_stat))
+    monkeypatch.setattr(
+        Path, "lstat", guard_one_path("Path.lstat", original_path_lstat)
+    )
+    monkeypatch.setattr(
+        Path, "is_file", guard_one_path("Path.is_file", original_path_is_file)
+    )
+    monkeypatch.setattr(
+        Path, "is_dir", guard_one_path("Path.is_dir", original_path_is_dir)
+    )
+    monkeypatch.setattr(
+        Path, "touch", guard_one_path("Path.touch", original_path_touch)
+    )
+    monkeypatch.setattr(
+        Path, "unlink", guard_one_path("Path.unlink", original_path_unlink)
+    )
+    monkeypatch.setattr(
+        Path, "rename", guard_two_paths("Path.rename", original_path_rename)
+    )
+    monkeypatch.setattr(
+        Path, "replace", guard_two_paths("Path.replace", original_path_replace)
+    )
+    return attempts
 
 
 def sample_intent(
@@ -645,14 +783,11 @@ def test_no_runtime_file_is_created_by_adapter(monkeypatch: pytest.MonkeyPatch) 
     assert build_record().transition_id == "PQ-TRN-001"
 
 
-def test_no_simulator_state_is_accessed() -> None:
-    simulator_state = PROJECT_ROOT / "state/simulated_broker.json"
-    before = simulator_state.read_bytes() if simulator_state.exists() else b""
-
+def test_no_simulator_state_is_accessed(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts = _install_protected_state_access_guard(monkeypatch)
     build_record()
 
-    after = simulator_state.read_bytes() if simulator_state.exists() else b""
-    assert after == before
+    assert attempts == []
 
 
 def test_no_environment_variables_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
