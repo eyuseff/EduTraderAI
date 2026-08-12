@@ -1,0 +1,157 @@
+"""Repository ports for Paper execution persistence contracts."""
+
+from __future__ import annotations
+
+from typing import Protocol, runtime_checkable
+
+from volcanoes.application.execution.identities import (
+    PaperBrokerOrderReference,
+    PaperExecutionAggregateId,
+    PaperExecutionCommandId,
+    PaperExecutionIdempotencyKey,
+    PaperExecutionRevision,
+)
+from volcanoes.application.execution.persistence.contracts import (
+    AggregateSaveResult,
+    CommandRegistrationResult,
+    ExecutionAggregateRecord,
+    ExecutionApprovalRecord,
+    ExecutionBrokerReferenceRecord,
+    ExecutionCommandRecord,
+    ExecutionFailureRecord,
+    ExecutionIdempotencyRecord,
+    ExecutionReceiptRecord,
+    ExecutionReconciliationRecord,
+    ExecutionRestartDiscoveryQuery,
+    ExecutionTransitionRecord,
+    IdempotencyReservationResult,
+    RecordLoadResult,
+    ReplayLookupResult,
+    RestartDiscoveryResult,
+    TransitionAppendResult,
+)
+
+
+@runtime_checkable
+class ExecutionAggregateRepository(Protocol):
+    """Storage-neutral aggregate repository contract."""
+
+    def get(self, aggregate_id: PaperExecutionAggregateId) -> RecordLoadResult:
+        """Return a load result for one aggregate identity."""
+
+    def save(
+        self,
+        record: ExecutionAggregateRecord,
+        *,
+        expected_revision: PaperExecutionRevision,
+    ) -> AggregateSaveResult:
+        """Save a materialized aggregate with explicit revision checking."""
+
+
+@runtime_checkable
+class ExecutionCommandRepository(Protocol):
+    """Storage-neutral command repository contract."""
+
+    def get(self, command_id: PaperExecutionCommandId) -> RecordLoadResult:
+        """Return a load result for one command identity."""
+
+    def register(
+        self,
+        record: ExecutionCommandRecord,
+    ) -> CommandRegistrationResult:
+        """Register an immutable command record or return replay/conflict data."""
+
+    def lookup_replay(
+        self,
+        command_id: PaperExecutionCommandId,
+        payload_fingerprint: str,
+    ) -> ReplayLookupResult:
+        """Return deterministic exact replay or conflict status."""
+
+
+@runtime_checkable
+class ExecutionIdempotencyRepository(Protocol):
+    """Storage-neutral idempotency repository contract."""
+
+    def get(self, key: PaperExecutionIdempotencyKey) -> RecordLoadResult:
+        """Return a load result for one idempotency key."""
+
+    def reserve(
+        self,
+        record: ExecutionIdempotencyRecord,
+    ) -> IdempotencyReservationResult:
+        """Reserve a logical operation or return replay/conflict data."""
+
+
+@runtime_checkable
+class ExecutionTransitionJournal(Protocol):
+    """Append-only transition journal contract."""
+
+    def append(
+        self,
+        record: ExecutionTransitionRecord,
+    ) -> TransitionAppendResult:
+        """Append one accepted lifecycle transition record."""
+
+
+@runtime_checkable
+class ExecutionBrokerReferenceRepository(Protocol):
+    """Storage-neutral broker-reference repository contract."""
+
+    def get(
+        self,
+        reference: PaperBrokerOrderReference,
+    ) -> RecordLoadResult:
+        """Return a load result for one normalized broker reference."""
+
+    def register(
+        self,
+        record: ExecutionBrokerReferenceRecord,
+    ) -> RecordLoadResult:
+        """Register or locate a normalized broker reference."""
+
+
+@runtime_checkable
+class ExecutionReceiptRepository(Protocol):
+    """Storage-neutral receipt repository contract."""
+
+    def record(self, receipt: ExecutionReceiptRecord) -> RecordLoadResult:
+        """Record one normalized receipt snapshot."""
+
+
+@runtime_checkable
+class ExecutionFailureRepository(Protocol):
+    """Storage-neutral failure repository contract."""
+
+    def record(self, failure: ExecutionFailureRecord) -> RecordLoadResult:
+        """Record one normalized failure snapshot."""
+
+
+@runtime_checkable
+class ExecutionApprovalRepository(Protocol):
+    """Storage-neutral approval repository contract."""
+
+    def record(self, approval: ExecutionApprovalRecord) -> RecordLoadResult:
+        """Record one approval reference."""
+
+
+@runtime_checkable
+class ExecutionReconciliationRepository(Protocol):
+    """Storage-neutral reconciliation repository contract."""
+
+    def record(
+        self,
+        reconciliation: ExecutionReconciliationRecord,
+    ) -> RecordLoadResult:
+        """Record one reconciliation fact."""
+
+
+@runtime_checkable
+class ExecutionRestartDiscoveryRepository(Protocol):
+    """Query contract for consequential aggregate discovery after restart."""
+
+    def discover(
+        self,
+        query: ExecutionRestartDiscoveryQuery,
+    ) -> RestartDiscoveryResult:
+        """Return aggregate records matching a restart discovery query."""

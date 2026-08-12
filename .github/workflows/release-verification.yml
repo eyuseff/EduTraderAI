@@ -1,0 +1,52 @@
+name: Release verification
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - development
+      - "release/**"
+  push:
+    branches:
+      - develop
+      - development
+      - "release/**"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ALPACA_API_KEY: ""
+      ALPACA_SECRET_KEY: ""
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install verification dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run the complete local release gate
+        run: make verify
+
+      - name: Upload coverage and verification metadata
+        if: ${{ always() && hashFiles('build/coverage.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-verification
+          path: |
+            build/coverage.json
+            build/verification.json
+          if-no-files-found: warn

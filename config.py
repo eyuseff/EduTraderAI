@@ -11,7 +11,7 @@ Modify values here instead of changing source code.
 # ======================================================
 
 APP_NAME = "EduTrader AI"
-APP_VERSION = "2.0.0"
+APP_VERSION = "4.0.0-rc1"
 
 # ======================================================
 # Market

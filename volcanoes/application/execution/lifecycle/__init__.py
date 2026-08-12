@@ -1,0 +1,97 @@
+"""Pure Paper execution lifecycle core exports.
+
+The lifecycle package models execution state only. It executes nothing,
+persists nothing, and contacts no broker.
+"""
+
+from volcanoes.application.execution.lifecycle.contracts import (
+    BROKER_ORDER_TERMINAL_STATES,
+    COMMAND_TERMINAL_STATES,
+    RESTRICTED_NON_TERMINAL_STATES,
+    PaperExecutionLifecycle,
+    PaperExecutionLifecycleEvidenceIntent,
+    PaperExecutionLifecycleInput,
+    PaperExecutionLifecycleSideEffectIntent,
+    PaperExecutionTransitionContext,
+    PaperExecutionTransitionDecision,
+    PaperExecutionTransitionSpecification,
+    input_category,
+    is_aggregate_terminal,
+    is_broker_order_terminal,
+    is_command_terminal,
+)
+from volcanoes.application.execution.lifecycle.enums import (
+    PaperExecutionLifecycleEvidenceIntentKind,
+    PaperExecutionLifecycleGuard,
+    PaperExecutionLifecycleInputCategory,
+    PaperExecutionLifecycleInputType,
+    PaperExecutionLifecycleSideEffectIntentKind,
+    PaperExecutionLifecycleState,
+    PaperExecutionReconciliationOutcome,
+    PaperExecutionReplayKind,
+    PaperExecutionTransitionDecisionType,
+)
+from volcanoes.application.execution.lifecycle.errors import (
+    InvalidLifecycleTransitionError,
+    LifecycleBrokerObservationConflictError,
+    LifecycleCommandConflictError,
+    LifecycleGuardError,
+    LifecycleIdempotencyConflictError,
+    LifecycleInvariantError,
+    LifecycleTerminalStateError,
+    PaperExecutionLifecycleError,
+    StaleExecutionRevisionError,
+)
+from volcanoes.application.execution.lifecycle.state_machine import (
+    apply_transition,
+    next_revision_after_acceptance,
+    transition,
+)
+from volcanoes.application.execution.lifecycle.transition_table import (
+    TRANSITION_BY_ID,
+    TRANSITION_IDS,
+    TRANSITION_SPECS,
+    matching_specs,
+)
+
+__all__ = [
+    "BROKER_ORDER_TERMINAL_STATES",
+    "COMMAND_TERMINAL_STATES",
+    "RESTRICTED_NON_TERMINAL_STATES",
+    "InvalidLifecycleTransitionError",
+    "LifecycleBrokerObservationConflictError",
+    "LifecycleCommandConflictError",
+    "LifecycleGuardError",
+    "LifecycleIdempotencyConflictError",
+    "LifecycleInvariantError",
+    "LifecycleTerminalStateError",
+    "PaperExecutionLifecycle",
+    "PaperExecutionLifecycleError",
+    "PaperExecutionLifecycleEvidenceIntent",
+    "PaperExecutionLifecycleEvidenceIntentKind",
+    "PaperExecutionLifecycleGuard",
+    "PaperExecutionLifecycleInput",
+    "PaperExecutionLifecycleInputCategory",
+    "PaperExecutionLifecycleInputType",
+    "PaperExecutionLifecycleSideEffectIntent",
+    "PaperExecutionLifecycleSideEffectIntentKind",
+    "PaperExecutionLifecycleState",
+    "PaperExecutionReconciliationOutcome",
+    "PaperExecutionReplayKind",
+    "PaperExecutionTransitionContext",
+    "PaperExecutionTransitionDecision",
+    "PaperExecutionTransitionDecisionType",
+    "PaperExecutionTransitionSpecification",
+    "StaleExecutionRevisionError",
+    "TRANSITION_BY_ID",
+    "TRANSITION_IDS",
+    "TRANSITION_SPECS",
+    "apply_transition",
+    "input_category",
+    "is_aggregate_terminal",
+    "is_broker_order_terminal",
+    "is_command_terminal",
+    "matching_specs",
+    "next_revision_after_acceptance",
+    "transition",
+]

@@ -1,0 +1,11 @@
+<svg viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">EMERS working mark</title>
+  <desc id="desc">A simple geometric prototype mark with five points around a disciplined center.</desc>
+  <rect x="10" y="10" width="76" height="76" rx="22" fill="none" stroke="currentColor" stroke-width="6"/>
+  <circle cx="48" cy="48" r="10" fill="currentColor"/>
+  <circle cx="48" cy="24" r="5" fill="currentColor"/>
+  <circle cx="70" cy="40" r="5" fill="currentColor"/>
+  <circle cx="62" cy="66" r="5" fill="currentColor"/>
+  <circle cx="34" cy="66" r="5" fill="currentColor"/>
+  <circle cx="26" cy="40" r="5" fill="currentColor"/>
+</svg>
