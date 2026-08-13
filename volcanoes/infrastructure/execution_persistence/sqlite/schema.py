@@ -9,6 +9,7 @@ SCHEMA_RESOURCE_PACKAGE = (
 )
 INITIAL_SCHEMA_RESOURCE = "v001_initial_schema.sql"
 CONTRACT_ALIGNMENT_SCHEMA_RESOURCE = "v002_contract_alignment.sql"
+SCHEMA_VERSION_TEXT_RESOURCE = "v003_schema_version_text.sql"
 
 EXPECTED_TABLES: tuple[str, ...] = (
     "execution_aggregates",
@@ -263,6 +264,16 @@ def load_contract_alignment_schema_sql() -> str:
     )
 
 
+def load_schema_version_text_sql() -> str:
+    """Return the canonical v003 schema-version text SQL."""
+
+    return (
+        resources.files(SCHEMA_RESOURCE_PACKAGE)
+        .joinpath(SCHEMA_VERSION_TEXT_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
+
+
 __all__ = [
     "AGGREGATE_CAS_UPDATE_SQL",
     "CONTRACT_ALIGNMENT_SCHEMA_RESOURCE",
@@ -272,6 +283,8 @@ __all__ = [
     "EXPECTED_TRIGGERS",
     "INITIAL_SCHEMA_RESOURCE",
     "SCHEMA_RESOURCE_PACKAGE",
+    "SCHEMA_VERSION_TEXT_RESOURCE",
     "load_initial_schema_sql",
     "load_contract_alignment_schema_sql",
+    "load_schema_version_text_sql",
 ]

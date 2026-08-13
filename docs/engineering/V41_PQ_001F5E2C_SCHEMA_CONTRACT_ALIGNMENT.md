@@ -67,3 +67,27 @@ no public persistence interface changes were made.
 This phase adds the migration, schema metadata, focused contract tests, and
 in-memory reference alignment only. It does not implement the F5E2C durable
 repository or unit of work. Phase 1 validation is complete: Ruff, Black, and MyPy passed, and 221 tests passed (62 focused SQLite, 72 in-memory/ports, and 87 architecture); Phase 2 remains unimplemented and requires separate authorization.
+
+## F5E2C Phase 1 V003 completion
+
+F5E2C Phase 1 is `COMPLETED`. The registered schema progression is V001 → V002
+→ V003; V003 transitions schema version 2 → 3, and current and maximum schema
+versions are 3. All nine durable execution tables now store `schema_version` as
+canonical positive-decimal `TEXT`, including arbitrary-size canonical positive
+integers without precision loss. All other data, identities, foreign keys,
+named indexes, triggers, and append-only protections are preserved.
+
+The V003 conversion is transactional. Unsafe PRAGMA states, corrupt legacy
+values, missing recreated objects, and foreign-key corruption are rejected;
+failed attempts restore the exact V002 state. Successful completion removes
+temporary legacy and guard objects and verifies foreign keys. No manual database
+repair, conversion, or operator action is required.
+
+Validation evidence: targeted V003 validation passed 170 tests; the full SQLite
+persistence regression passed 219 tests; the full repository suite exited 0
+(totals unavailable); Black passed; Ruff passed with 0 findings; and MyPy passed
+across 41 source files with 0 issues.
+
+No runtime persistence, repository/unit-of-work, or broker execution behavior
+was enabled. F5E2C Phase 2 remains `NOT_AUTHORIZED`; broker execution remains
+`NOT_AUTHORIZED`.

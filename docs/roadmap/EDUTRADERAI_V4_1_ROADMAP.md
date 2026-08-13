@@ -171,11 +171,11 @@ Implementation status:
 - V41-PQ-001F5E2A — SQLITE DURABLE ADAPTER DESIGN: COMPLETED.
 - SENTINEL ADR-008 REVIEW — COMPLETED.
 - ADR-008 — SQLITE EXECUTION DURABLE ADAPTER: ACCEPTED.
-- V41-PQ-001F5E2B — SQLITE SCHEMA AND MIGRATION FOUNDATION: READY FOR IMPLEMENTATION.
+- V41-PQ-001F5E2C Phase 1/V003 — SQLITE SCHEMA-CONTRACT ALIGNMENT: COMPLETED AND VALIDATED; V003 is the registered current schema version.
 - V41-PQ-001 overall status: IN PROGRESS.
 - V41-PQ-001E review disposition: ACCEPTED WITH CONDITIONS.
 - V41-PQ-001F5A review disposition: ACCEPTED WITH CONDITIONS.
-- Next recommended slice: V41-PQ-001F5E2B — SQLITE SCHEMA AND MIGRATION FOUNDATION.
+- Next recommended slice: F5E2C Phase 2 repository/unit-of-work implementation remains `NOT_AUTHORIZED` and requires separate authorization; broker execution remains `NOT_AUTHORIZED`.
 - V41-PQ-001F4B connects exactly one approved Paper runtime observation point, calls only `QualificationRuntimeIntegrationBoundary`, never calls the shadow runner, facade, or service directly, remains disabled by default, uses an explicit typed Paper-only gate, never executes returned actions, never alters legacy decisions, provides instant rollback by disabling or removing one narrow call site, preserves broker, simulator, scanner, supervisor, and UI behavior, and proves zero behavioral impact when disabled and zero consequential impact when enabled.
 - V41-PQ-001F4C adds an in-memory validation harness that consumes completed boundary results only, aggregates immutable validation facts, detects duplicates and conflicts, evaluates repeatability and continuity counters, produces deterministic summaries, remains unwired from production runtime, and does not authorize runtime execution.
 - V41-PQ-001F4D consumes immutable F4C validation summaries, defines explicit advisory readiness criteria, distinguishes READY_FOR_NEXT_PHASE, NOT_READY, and INSUFFICIENT_EVIDENCE, requires zero identity and authority violations under strict policy, requires zero nondeterministic conflicts, requires deterministic replay, defines minimum observation counts, defines permitted and prohibited mismatch categories, remains advisory only, does not authorize runtime execution, does not invoke brokers, does not persist, does not add Live support, and does not mark V41-PQ-001 complete.

@@ -424,7 +424,7 @@ def test_v002_keeps_v001_checksum_and_is_idempotent(tmp_path) -> None:
 def test_v002_checksum_mismatch_is_rejected_without_schema_mutation(tmp_path) -> None:
     connection = _connection(tmp_path, "checksum.sqlite")
     try:
-        _apply(connection)
+        _apply(connection, _v002_only_migrations())
         before = _schema_shape(connection)
         tampered = type(CONTRACT_ALIGNMENT_MIGRATION).create(
             migration_id="v002",

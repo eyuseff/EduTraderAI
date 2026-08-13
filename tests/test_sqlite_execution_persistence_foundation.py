@@ -19,6 +19,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite import (
     MAXIMUM_SUPPORTED_SCHEMA_VERSION,
     MINIMUM_SUPPORTED_SCHEMA_VERSION,
     SqliteExecutionMigration,
+    SCHEMA_VERSION_TEXT_MIGRATION,
     apply_pending_migrations,
     inspect_schema_state,
     open_sqlite_execution_connection,
@@ -50,6 +51,7 @@ EXPECTED_PUBLIC_EXPORTS = {
     "DEFAULT_BUSY_TIMEOUT_MS",
     "INITIAL_MIGRATION",
     "KNOWN_MIGRATIONS",
+    "SCHEMA_VERSION_TEXT_MIGRATION",
     "IntegrityCheckResult",
     "InvariantCheckResult",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
@@ -576,15 +578,23 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
     )
 
     assert EXPECTED_PUBLIC_EXPORTS.issubset(set(module.__all__))
-    assert CURRENT_SCHEMA_VERSION == 2
+    assert CURRENT_SCHEMA_VERSION == 3
     assert MINIMUM_SUPPORTED_SCHEMA_VERSION == 1
-    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 2
+    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 3
     assert INITIAL_MIGRATION.migration_id == "v001"
     assert INITIAL_MIGRATION.previous_version == 0
     assert INITIAL_MIGRATION.resulting_version == 1
     assert CONTRACT_ALIGNMENT_MIGRATION.migration_id == "v002"
     assert CONTRACT_ALIGNMENT_MIGRATION.previous_version == 1
     assert CONTRACT_ALIGNMENT_MIGRATION.resulting_version == 2
+    assert SCHEMA_VERSION_TEXT_MIGRATION.migration_id == "v003"
+    assert SCHEMA_VERSION_TEXT_MIGRATION.previous_version == 2
+    assert SCHEMA_VERSION_TEXT_MIGRATION.resulting_version == 3
+    assert tuple(item.migration_id for item in KNOWN_MIGRATIONS) == (
+        "v001",
+        "v002",
+        "v003",
+    )
     assert after == before
 
 
@@ -594,8 +604,8 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         result = apply_initial_schema(connection)
 
         assert result.changed is True
-        assert result.applied_migration_ids == ("v001", "v002")
-        assert result.schema_state.current_version == 2
+        assert result.applied_migration_ids == ("v001", "v002", "v003")
+        assert result.schema_state.current_version == 3
         assert sqlite_objects(connection, "table") == EXPECTED_TABLES
         assert EXPECTED_INDEXES.issubset(sqlite_objects(connection, "index"))
         assert sqlite_objects(connection, "trigger") == EXPECTED_TRIGGERS
@@ -631,6 +641,9 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         assert dict(migration_rows[1])["migration_id"] == "v002"
         assert dict(migration_rows[1])["previous_schema_version"] == 1
         assert dict(migration_rows[1])["resulting_schema_version"] == 2
+        assert dict(migration_rows[2])["migration_id"] == "v003"
+        assert dict(migration_rows[2])["previous_schema_version"] == 2
+        assert dict(migration_rows[2])["resulting_schema_version"] == 3
         assert int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) == 1
         assert (
             str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
@@ -749,7 +762,7 @@ def test_migration_replay_checksum_mismatch_and_future_schema_rejection(tmp_path
         with pytest.raises(SqliteExecutionMigrationError):
             apply_pending_migrations(
                 connection,
-                (tampered, CONTRACT_ALIGNMENT_MIGRATION),
+                (tampered, CONTRACT_ALIGNMENT_MIGRATION, SCHEMA_VERSION_TEXT_MIGRATION),
                 applied_at=UTC_NOW,
                 application_version="f5e2b-durable-test",
             )

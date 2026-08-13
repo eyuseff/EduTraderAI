@@ -1219,3 +1219,11 @@ database file, backup tooling, restore tooling, repository implementation,
 runtime persistence wiring, broker port, broker adapter, broker call,
 execution authority, dependency, configuration, UI, API, CLI, Paper trading
 enablement, or Live behavior was added. V41-PQ-001 remains in progress.
+
+## F5E2C Phase 1 V003 current status
+
+F5E2C Phase 1 is `COMPLETED`. The V003 schema contract is implemented and
+validated: V003 is registered as the current schema version and transitions the
+durable execution schema from version 2 to version 3. F5E2C Phase 2
+repository/unit-of-work implementation remains `NOT_AUTHORIZED`. Broker
+execution remains `NOT_AUTHORIZED`.

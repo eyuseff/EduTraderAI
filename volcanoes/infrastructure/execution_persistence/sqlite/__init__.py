@@ -30,6 +30,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
     MigrationApplicationResult,
     SchemaState,
     SqliteExecutionMigration,
+    SCHEMA_VERSION_TEXT_MIGRATION,
     apply_pending_migrations,
     inspect_schema_state,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "InvariantCheckResult",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
     "MINIMUM_SUPPORTED_SCHEMA_VERSION",
+    "SCHEMA_VERSION_TEXT_MIGRATION",
     "MigrationApplicationResult",
     "SchemaState",
     "SchemaValidationResult",

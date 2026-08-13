@@ -14,11 +14,12 @@ from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
 from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
     load_contract_alignment_schema_sql,
     load_initial_schema_sql,
+    load_schema_version_text_sql,
 )
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 MINIMUM_SUPPORTED_SCHEMA_VERSION = 1
-MAXIMUM_SUPPORTED_SCHEMA_VERSION = 2
+MAXIMUM_SUPPORTED_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -379,7 +380,23 @@ CONTRACT_ALIGNMENT_MIGRATION = SqliteExecutionMigration.create(
     ),
 )
 
-KNOWN_MIGRATIONS = (INITIAL_MIGRATION, CONTRACT_ALIGNMENT_MIGRATION)
+SCHEMA_VERSION_TEXT_MIGRATION = SqliteExecutionMigration.create(
+    migration_id="v003",
+    name="store execution schema versions as canonical text",
+    previous_version=2,
+    resulting_version=3,
+    sql_text=load_schema_version_text_sql(),
+    irreversible=True,
+    safe_description=(
+        "Store execution schema versions as canonical positive-decimal text."
+    ),
+)
+
+KNOWN_MIGRATIONS = (
+    INITIAL_MIGRATION,
+    CONTRACT_ALIGNMENT_MIGRATION,
+    SCHEMA_VERSION_TEXT_MIGRATION,
+)
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
@@ -388,6 +405,7 @@ __all__ = [
     "KNOWN_MIGRATIONS",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
     "MINIMUM_SUPPORTED_SCHEMA_VERSION",
+    "SCHEMA_VERSION_TEXT_MIGRATION",
     "AppliedMigration",
     "MigrationApplicationResult",
     "SchemaState",
