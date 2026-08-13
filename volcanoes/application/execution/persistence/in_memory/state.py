@@ -15,6 +15,7 @@ from volcanoes.application.execution.identities import (
     PaperExecutionAggregateId,
     PaperExecutionCommandId,
     PaperExecutionIdempotencyKey,
+    PaperExecutionRevision,
 )
 from volcanoes.application.execution.persistence.contracts import (
     ExecutionAggregateRecord,
@@ -45,6 +46,14 @@ class InMemoryExecutionPersistenceState:
     _transitions_by_id: dict[str, ExecutionTransitionRecord] = field(
         default_factory=dict
     )
+    _transitions_by_aggregate_revision: dict[
+        tuple[PaperExecutionAggregateId, PaperExecutionRevision],
+        ExecutionTransitionRecord,
+    ] = field(default_factory=dict)
+    _transitions_by_aggregate_transition_id: dict[
+        tuple[PaperExecutionAggregateId, str],
+        ExecutionTransitionRecord,
+    ] = field(default_factory=dict)
     _transition_order: tuple[str, ...] = ()
     _broker_references: dict[
         PaperBrokerOrderReference, ExecutionBrokerReferenceRecord
@@ -65,6 +74,12 @@ class InMemoryExecutionPersistenceState:
             _commands=dict(self._commands),
             _idempotency=dict(self._idempotency),
             _transitions_by_id=dict(self._transitions_by_id),
+            _transitions_by_aggregate_revision=dict(
+                self._transitions_by_aggregate_revision
+            ),
+            _transitions_by_aggregate_transition_id=dict(
+                self._transitions_by_aggregate_transition_id
+            ),
             _transition_order=tuple(self._transition_order),
             _broker_references=dict(self._broker_references),
             _receipts=dict(self._receipts),
@@ -81,6 +96,12 @@ class InMemoryExecutionPersistenceState:
         self._commands = dict(other._commands)
         self._idempotency = dict(other._idempotency)
         self._transitions_by_id = dict(other._transitions_by_id)
+        self._transitions_by_aggregate_revision = dict(
+            other._transitions_by_aggregate_revision
+        )
+        self._transitions_by_aggregate_transition_id = dict(
+            other._transitions_by_aggregate_transition_id
+        )
         self._transition_order = tuple(other._transition_order)
         self._broker_references = dict(other._broker_references)
         self._receipts = dict(other._receipts)

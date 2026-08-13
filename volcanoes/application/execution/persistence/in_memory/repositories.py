@@ -267,12 +267,31 @@ class InMemoryExecutionTransitionJournal(_RepositoryBase):
         existing = self._unit_of_work.transaction_state._transitions_by_id.get(
             record.transition_record_id
         )
-        result = _transition_result(record, existing)
+        existing_revision = (
+            self._unit_of_work.transaction_state._transitions_by_aggregate_revision.get(
+                (record.aggregate_id, record.next_revision)
+            )
+        )
+        existing_transition_id = self._unit_of_work.transaction_state._transitions_by_aggregate_transition_id.get(
+            (record.aggregate_id, record.transition_id)
+        )
+        result = _transition_result(
+            record,
+            existing,
+            existing_revision,
+            existing_transition_id,
+        )
         if result.conflict is not None:
             self._unit_of_work.stage_conflict(result.conflict)
         if result.status is ExecutionPersistenceResultStatus.APPENDED:
             self._unit_of_work.transaction_state._transitions_by_id[
                 record.transition_record_id
+            ] = record
+            self._unit_of_work.transaction_state._transitions_by_aggregate_revision[
+                (record.aggregate_id, record.next_revision)
+            ] = record
+            self._unit_of_work.transaction_state._transitions_by_aggregate_transition_id[
+                (record.aggregate_id, record.transition_id)
             ] = record
             self._unit_of_work.transaction_state._transition_order = (
                 *self._unit_of_work.transaction_state._transition_order,
@@ -667,25 +686,56 @@ def _idempotency_result(
 def _transition_result(
     record: ExecutionTransitionRecord,
     existing: ExecutionTransitionRecord | None,
+    existing_revision: ExecutionTransitionRecord | None = None,
+    existing_transition_id: ExecutionTransitionRecord | None = None,
 ) -> TransitionAppendResult:
-    if existing is None:
-        return TransitionAppendResult(
-            status=ExecutionPersistenceResultStatus.APPENDED,
-            aggregate_id=record.aggregate_id,
-            previous_revision=record.previous_revision,
-            next_revision=record.next_revision,
-            transition_fingerprint=record.record_fingerprint,
-            schema_version=SCHEMA_VERSION,
+    if existing is not None:
+        if existing.record_fingerprint == record.record_fingerprint:
+            return TransitionAppendResult(
+                status=ExecutionPersistenceResultStatus.EXACT_REPLAY,
+                aggregate_id=record.aggregate_id,
+                previous_revision=record.previous_revision,
+                next_revision=existing.next_revision,
+                transition_fingerprint=existing.record_fingerprint,
+                schema_version=SCHEMA_VERSION,
+            )
+        return _transition_conflict_result(
+            record,
+            existing,
+            code="TRANSITION_RECORD_CONFLICT",
+            safe_message="Transition record identity already exists with different content.",
         )
-    if existing.record_fingerprint == record.record_fingerprint:
-        return TransitionAppendResult(
-            status=ExecutionPersistenceResultStatus.EXACT_REPLAY,
-            aggregate_id=record.aggregate_id,
-            previous_revision=record.previous_revision,
-            next_revision=existing.next_revision,
-            transition_fingerprint=existing.record_fingerprint,
-            schema_version=SCHEMA_VERSION,
+    if existing_revision is not None:
+        return _transition_conflict_result(
+            record,
+            existing_revision,
+            code="TRANSITION_REVISION_CONFLICT",
+            safe_message="Transition revision is already owned by another record.",
         )
+    if existing_transition_id is not None:
+        return _transition_conflict_result(
+            record,
+            existing_transition_id,
+            code="TRANSITION_ID_CONFLICT",
+            safe_message="Transition identity is already owned by another record.",
+        )
+    return TransitionAppendResult(
+        status=ExecutionPersistenceResultStatus.APPENDED,
+        aggregate_id=record.aggregate_id,
+        previous_revision=record.previous_revision,
+        next_revision=record.next_revision,
+        transition_fingerprint=record.record_fingerprint,
+        schema_version=SCHEMA_VERSION,
+    )
+
+
+def _transition_conflict_result(
+    record: ExecutionTransitionRecord,
+    existing: ExecutionTransitionRecord,
+    *,
+    code: str,
+    safe_message: str,
+) -> TransitionAppendResult:
     return TransitionAppendResult(
         status=ExecutionPersistenceResultStatus.COMMAND_CONFLICT,
         aggregate_id=record.aggregate_id,
@@ -693,8 +743,8 @@ def _transition_result(
         next_revision=None,
         conflict=_conflict(
             kind=ExecutionPersistenceConflictKind.TRANSITION_REVISION_CONFLICT,
-            code="TRANSITION_RECORD_CONFLICT",
-            safe_message="Transition record identity already exists with different content.",
+            code=code,
+            safe_message=safe_message,
             aggregate_id=record.aggregate_id,
             command_id=record.command_id,
             expected_revision=record.previous_revision,

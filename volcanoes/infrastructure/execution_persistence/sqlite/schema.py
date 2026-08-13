@@ -8,6 +8,8 @@ SCHEMA_RESOURCE_PACKAGE = (
     "volcanoes.infrastructure.execution_persistence.sqlite.migrations"
 )
 INITIAL_SCHEMA_RESOURCE = "v001_initial_schema.sql"
+CONTRACT_ALIGNMENT_SCHEMA_RESOURCE = "v002_contract_alignment.sql"
+SCHEMA_VERSION_TEXT_RESOURCE = "v003_schema_version_text.sql"
 
 EXPECTED_TABLES: tuple[str, ...] = (
     "execution_aggregates",
@@ -152,10 +154,16 @@ EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
         "receipt_fingerprint",
         "aggregate_id",
         "command_id",
+        "correlation_id",
+        "operation",
         "receipt_kind",
+        "status",
+        "observed_execution_revision",
+        "observed_at",
+        "message_code",
         "broker_reference",
-        "safe_status",
-        "safe_message_code",
+        "outcome_known",
+        "reconciliation_required",
         "recorded_at",
         "mode",
         "schema_version",
@@ -165,12 +173,16 @@ EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
         "failure_fingerprint",
         "aggregate_id",
         "command_id",
+        "correlation_id",
         "failure_kind",
         "severity",
+        "code",
+        "safe_message",
         "retryable",
         "terminal",
         "reconciliation_required",
-        "safe_message_code",
+        "operator_action_required",
+        "authority_impacting",
         "recorded_at",
         "mode",
         "schema_version",
@@ -242,13 +254,37 @@ def load_initial_schema_sql() -> str:
     )
 
 
+def load_contract_alignment_schema_sql() -> str:
+    """Return the canonical v002 schema-contract alignment SQL text."""
+
+    return (
+        resources.files(SCHEMA_RESOURCE_PACKAGE)
+        .joinpath(CONTRACT_ALIGNMENT_SCHEMA_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
+
+
+def load_schema_version_text_sql() -> str:
+    """Return the canonical v003 schema-version text SQL."""
+
+    return (
+        resources.files(SCHEMA_RESOURCE_PACKAGE)
+        .joinpath(SCHEMA_VERSION_TEXT_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
+
+
 __all__ = [
     "AGGREGATE_CAS_UPDATE_SQL",
+    "CONTRACT_ALIGNMENT_SCHEMA_RESOURCE",
     "EXPECTED_COLUMNS",
     "EXPECTED_INDEXES",
     "EXPECTED_TABLES",
     "EXPECTED_TRIGGERS",
     "INITIAL_SCHEMA_RESOURCE",
     "SCHEMA_RESOURCE_PACKAGE",
+    "SCHEMA_VERSION_TEXT_RESOURCE",
     "load_initial_schema_sql",
+    "load_contract_alignment_schema_sql",
+    "load_schema_version_text_sql",
 ]

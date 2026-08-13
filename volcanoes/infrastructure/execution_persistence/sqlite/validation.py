@@ -14,7 +14,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
     CURRENT_SCHEMA_VERSION,
-    INITIAL_MIGRATION,
+    KNOWN_MIGRATIONS,
     inspect_schema_state,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
@@ -125,15 +125,17 @@ def _validate_migrations(
     *,
     failures: list[str],
 ) -> None:
-    state = inspect_schema_state(connection, known_migrations=(INITIAL_MIGRATION,))
+    state = inspect_schema_state(connection, known_migrations=KNOWN_MIGRATIONS)
     if state.incompatible_reason:
         failures.append(state.incompatible_reason)
     if state.current_version != CURRENT_SCHEMA_VERSION:
         failures.append("schema version is not current")
+    expected_checksums = {
+        migration.migration_id: migration.checksum for migration in KNOWN_MIGRATIONS
+    }
     for applied in state.applied_migrations:
-        if applied.migration_id == INITIAL_MIGRATION.migration_id:
-            if applied.checksum != INITIAL_MIGRATION.checksum:
-                failures.append("known migration checksum changed")
+        if expected_checksums.get(applied.migration_id) != applied.checksum:
+            failures.append("known migration checksum changed")
 
 
 def _sqlite_objects(connection: sqlite3.Connection, object_type: str) -> frozenset[str]:

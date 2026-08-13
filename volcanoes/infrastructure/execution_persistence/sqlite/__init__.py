@@ -21,13 +21,16 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     run_quick_check,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
+    CONTRACT_ALIGNMENT_MIGRATION,
     CURRENT_SCHEMA_VERSION,
     MAXIMUM_SUPPORTED_SCHEMA_VERSION,
     MINIMUM_SUPPORTED_SCHEMA_VERSION,
     INITIAL_MIGRATION,
+    KNOWN_MIGRATIONS,
     MigrationApplicationResult,
     SchemaState,
     SqliteExecutionMigration,
+    SCHEMA_VERSION_TEXT_MIGRATION,
     apply_pending_migrations,
     inspect_schema_state,
 )
@@ -38,12 +41,15 @@ from volcanoes.infrastructure.execution_persistence.sqlite.validation import (
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
+    "CONTRACT_ALIGNMENT_MIGRATION",
     "DEFAULT_BUSY_TIMEOUT_MS",
     "INITIAL_MIGRATION",
+    "KNOWN_MIGRATIONS",
     "IntegrityCheckResult",
     "InvariantCheckResult",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
     "MINIMUM_SUPPORTED_SCHEMA_VERSION",
+    "SCHEMA_VERSION_TEXT_MIGRATION",
     "MigrationApplicationResult",
     "SchemaState",
     "SchemaValidationResult",
