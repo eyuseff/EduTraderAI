@@ -12,8 +12,10 @@ import pytest
 
 from volcanoes.infrastructure.execution_persistence.sqlite import (
     CURRENT_SCHEMA_VERSION,
+    CONTRACT_ALIGNMENT_MIGRATION,
     DEFAULT_BUSY_TIMEOUT_MS,
     INITIAL_MIGRATION,
+    KNOWN_MIGRATIONS,
     MAXIMUM_SUPPORTED_SCHEMA_VERSION,
     MINIMUM_SUPPORTED_SCHEMA_VERSION,
     SqliteExecutionMigration,
@@ -44,8 +46,10 @@ UTC_LATER_TEXT = "2026-08-10T12:01:00.000000Z"
 
 EXPECTED_PUBLIC_EXPORTS = {
     "CURRENT_SCHEMA_VERSION",
+    "CONTRACT_ALIGNMENT_MIGRATION",
     "DEFAULT_BUSY_TIMEOUT_MS",
     "INITIAL_MIGRATION",
+    "KNOWN_MIGRATIONS",
     "IntegrityCheckResult",
     "InvariantCheckResult",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
@@ -210,10 +214,16 @@ EXPECTED_COLUMNS = {
         "receipt_fingerprint",
         "aggregate_id",
         "command_id",
+        "correlation_id",
+        "operation",
         "receipt_kind",
+        "status",
+        "observed_execution_revision",
+        "observed_at",
+        "message_code",
         "broker_reference",
-        "safe_status",
-        "safe_message_code",
+        "outcome_known",
+        "reconciliation_required",
         "recorded_at",
         "mode",
         "schema_version",
@@ -223,12 +233,16 @@ EXPECTED_COLUMNS = {
         "failure_fingerprint",
         "aggregate_id",
         "command_id",
+        "correlation_id",
         "failure_kind",
         "severity",
+        "code",
+        "safe_message",
         "retryable",
         "terminal",
         "reconciliation_required",
-        "safe_message_code",
+        "operator_action_required",
+        "authority_impacting",
         "recorded_at",
         "mode",
         "schema_version",
@@ -284,7 +298,7 @@ def open_database(tmp_path: Path, name: str = "execution.sqlite") -> sqlite3.Con
 def apply_initial_schema(connection: sqlite3.Connection):
     return apply_pending_migrations(
         connection,
-        (INITIAL_MIGRATION,),
+        KNOWN_MIGRATIONS,
         applied_at=UTC_NOW,
         application_version="f5e2b-durable-test",
     )
@@ -375,7 +389,7 @@ def insert_minimum_aggregate_command_and_idempotency(
             "approval-fp",
             "policy-fp",
             UTC_TEXT,
-            "REGISTERED",
+            "PENDING",
             "PAPER",
             1,
             "cmd-fp",
@@ -435,7 +449,7 @@ def insert_trigger_exercise_rows(connection: sqlite3.Connection) -> None:
             None,
             None,
             None,
-            "NOT_REPLAY",
+            "NONE",
             "[]",
             "[]",
             "OK",
@@ -448,18 +462,26 @@ def insert_trigger_exercise_rows(connection: sqlite3.Connection) -> None:
     connection.execute(
         """
         INSERT INTO execution_receipts (
-            receipt_fingerprint, aggregate_id, command_id, receipt_kind,
-            safe_status, safe_message_code, recorded_at, mode, schema_version,
-            record_fingerprint
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            receipt_fingerprint, aggregate_id, command_id, correlation_id, operation,
+            receipt_kind, status, observed_execution_revision, observed_at,
+            message_code, broker_reference, outcome_known, reconciliation_required,
+            recorded_at, mode, schema_version, record_fingerprint
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "receipt-fp",
             "agg-1",
             "cmd-1",
-            "DRY_RUN",
+            "corr-1",
+            "SUBMIT",
+            "COMMAND_ACCEPTED_LOCALLY",
+            "CREATED",
+            1,
+            UTC_LATER_TEXT,
             "OK",
-            "OK",
+            None,
+            1,
+            0,
             UTC_LATER_TEXT,
             "PAPER",
             1,
@@ -469,21 +491,26 @@ def insert_trigger_exercise_rows(connection: sqlite3.Connection) -> None:
     connection.execute(
         """
         INSERT INTO execution_failures (
-            failure_fingerprint, aggregate_id, command_id, failure_kind, severity,
-            retryable, terminal, reconciliation_required, safe_message_code,
+            failure_fingerprint, aggregate_id, command_id, correlation_id,
+            failure_kind, severity, code, safe_message, retryable, terminal,
+            reconciliation_required, operator_action_required, authority_impacting,
             recorded_at, mode, schema_version, record_fingerprint
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "failure-fp",
             "agg-1",
             "cmd-1",
-            "VALIDATION",
-            "LOW",
+            "corr-1",
+            "CONTRACT_VALIDATION",
+            "INFO",
+            "SAFE",
+            "safe failure",
             0,
             1,
             0,
-            "SAFE",
+            0,
+            0,
             UTC_LATER_TEXT,
             "PAPER",
             1,
@@ -549,12 +576,15 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
     )
 
     assert EXPECTED_PUBLIC_EXPORTS.issubset(set(module.__all__))
-    assert CURRENT_SCHEMA_VERSION == 1
+    assert CURRENT_SCHEMA_VERSION == 2
     assert MINIMUM_SUPPORTED_SCHEMA_VERSION == 1
-    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 1
+    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 2
     assert INITIAL_MIGRATION.migration_id == "v001"
     assert INITIAL_MIGRATION.previous_version == 0
     assert INITIAL_MIGRATION.resulting_version == 1
+    assert CONTRACT_ALIGNMENT_MIGRATION.migration_id == "v002"
+    assert CONTRACT_ALIGNMENT_MIGRATION.previous_version == 1
+    assert CONTRACT_ALIGNMENT_MIGRATION.resulting_version == 2
     assert after == before
 
 
@@ -564,19 +594,19 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         result = apply_initial_schema(connection)
 
         assert result.changed is True
-        assert result.applied_migration_ids == ("v001",)
-        assert result.schema_state.current_version == 1
+        assert result.applied_migration_ids == ("v001", "v002")
+        assert result.schema_state.current_version == 2
         assert sqlite_objects(connection, "table") == EXPECTED_TABLES
         assert EXPECTED_INDEXES.issubset(sqlite_objects(connection, "index"))
         assert sqlite_objects(connection, "trigger") == EXPECTED_TRIGGERS
         for table_name, expected_column_names in EXPECTED_COLUMNS.items():
             assert tuple(table_columns(connection, table_name)) == expected_column_names
 
-        migration_row = connection.execute("""
+        migration_rows = connection.execute("""
             SELECT migration_id, migration_name, checksum, application_version,
                    previous_schema_version, resulting_schema_version, safe_notes
             FROM schema_migrations
-            """).fetchone()
+            """).fetchall()
         expected_sql = (
             resources.files(
                 "volcanoes.infrastructure.execution_persistence.sqlite.migrations"
@@ -589,7 +619,7 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         )
         independent_checksum = hashlib.sha256(expected_sql.encode("utf-8")).hexdigest()
 
-        assert dict(migration_row) == {
+        assert dict(migration_rows[0]) == {
             "migration_id": "v001",
             "migration_name": "initial execution persistence schema",
             "checksum": independent_checksum,
@@ -598,6 +628,9 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
             "resulting_schema_version": 1,
             "safe_notes": "Initial SQLite execution persistence schema.",
         }
+        assert dict(migration_rows[1])["migration_id"] == "v002"
+        assert dict(migration_rows[1])["previous_schema_version"] == 1
+        assert dict(migration_rows[1])["resulting_schema_version"] == 2
         assert int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) == 1
         assert (
             str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
@@ -716,7 +749,7 @@ def test_migration_replay_checksum_mismatch_and_future_schema_rejection(tmp_path
         with pytest.raises(SqliteExecutionMigrationError):
             apply_pending_migrations(
                 connection,
-                (tampered,),
+                (tampered, CONTRACT_ALIGNMENT_MIGRATION),
                 applied_at=UTC_NOW,
                 application_version="f5e2b-durable-test",
             )
@@ -732,7 +765,7 @@ def test_migration_replay_checksum_mismatch_and_future_schema_rejection(tmp_path
             (UTC_TEXT,),
         )
         future_state = inspect_schema_state(
-            connection, known_migrations=(INITIAL_MIGRATION,)
+            connection, known_migrations=KNOWN_MIGRATIONS
         )
         assert future_state.incompatible_reason == "unknown newer schema"
         with pytest.raises(SqliteExecutionSchemaError):
@@ -745,7 +778,7 @@ def test_partial_tampered_and_missing_schema_objects_fail_validation(tmp_path):
     partial = open_database(tmp_path, "partial.sqlite")
     try:
         partial.execute("CREATE TABLE unexpected_existing_table (id TEXT PRIMARY KEY)")
-        state = inspect_schema_state(partial, known_migrations=(INITIAL_MIGRATION,))
+        state = inspect_schema_state(partial, known_migrations=KNOWN_MIGRATIONS)
         assert state.incompatible_reason == "missing migrations table"
         with pytest.raises(SqliteExecutionSchemaError):
             apply_initial_schema(partial)
@@ -841,7 +874,7 @@ def test_quick_integrity_foreign_key_and_invariant_checks(tmp_path):
                 canonical_command_json, approval_fingerprint, policy_fingerprint,
                 received_at, processing_outcome, mode, schema_version, record_fingerprint
             ) VALUES ('orphan', 'missing-agg', 'corr', 'idem', 'SUBMIT', 0,
-                      'payload', '{}', 'approval', 'policy', ?, 'REGISTERED',
+                      'payload', '{}', 'approval', 'policy', ?, 'PENDING',
                       'PAPER', 1, 'orphan-fp')
             """,
             (UTC_TEXT,),

@@ -12,12 +12,13 @@ from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
     SqliteExecutionSchemaError,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
+    load_contract_alignment_schema_sql,
     load_initial_schema_sql,
 )
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 MINIMUM_SUPPORTED_SCHEMA_VERSION = 1
-MAXIMUM_SUPPORTED_SCHEMA_VERSION = 1
+MAXIMUM_SUPPORTED_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +182,10 @@ def apply_pending_migrations(
 ) -> MigrationApplicationResult:
     """Explicitly apply pending migrations to the supplied connection."""
 
+    if connection.in_transaction:
+        raise SqliteExecutionMigrationError(
+            "Migration cannot run inside an active transaction."
+        )
     if not migrations:
         raise SqliteExecutionMigrationError("No migrations were supplied.")
     if applied_at.tzinfo is None:
@@ -247,10 +252,9 @@ def _apply_one_migration(
     applied_at: datetime,
     application_version: str,
 ) -> None:
-    script = "\n".join(
+    migration_statements = _complete_sql_statements(migration.sql_text)
+    metadata_statement = "\n".join(
         (
-            "BEGIN IMMEDIATE;",
-            migration.sql_text,
             "INSERT INTO schema_migrations (",
             "migration_id, migration_name, checksum, applied_at, application_version,",
             "previous_schema_version, resulting_schema_version, safe_notes",
@@ -268,17 +272,44 @@ def _apply_one_migration(
                 )
             ),
             ");",
-            "COMMIT;",
         )
     )
+    statements = (
+        "BEGIN IMMEDIATE;",
+        *migration_statements,
+        metadata_statement,
+        "COMMIT;",
+    )
+    migration_started = False
     try:
-        connection.executescript(script)
+        for statement in statements:
+            connection.execute(statement)
+            if statement.lstrip().upper().startswith("BEGIN"):
+                migration_started = True
     except sqlite3.Error as exc:
-        try:
-            connection.rollback()
-        except sqlite3.Error:
-            pass
+        if migration_started and connection.in_transaction:
+            try:
+                connection.rollback()
+            except sqlite3.Error:
+                pass
         raise SqliteExecutionMigrationError("SQLite migration failed.") from exc
+
+
+def _complete_sql_statements(script: str) -> tuple[str, ...]:
+    """Split complete SQLite statements without executing or normalizing SQL."""
+
+    statements: list[str] = []
+    pending = ""
+    for line in script.splitlines(keepends=True):
+        pending += line
+        if sqlite3.complete_statement(pending):
+            statements.append(pending)
+            pending = ""
+    if pending.strip():
+        raise SqliteExecutionMigrationError("Migration SQL is incomplete.")
+    if not statements:
+        raise SqliteExecutionMigrationError("Migration SQL is empty.")
+    return tuple(statements)
 
 
 def _validate_migration_descriptors(
@@ -335,9 +366,26 @@ INITIAL_MIGRATION = SqliteExecutionMigration.create(
     safe_description="Initial SQLite execution persistence schema.",
 )
 
+CONTRACT_ALIGNMENT_MIGRATION = SqliteExecutionMigration.create(
+    migration_id="v002",
+    name="align SQLite persistence schema with application contracts",
+    previous_version=1,
+    resulting_version=2,
+    sql_text=load_contract_alignment_schema_sql(),
+    irreversible=True,
+    safe_description=(
+        "Align SQLite enum vocabulary, deferred aggregate foreign keys, and "
+        "lossless receipt and failure storage with persistence contracts."
+    ),
+)
+
+KNOWN_MIGRATIONS = (INITIAL_MIGRATION, CONTRACT_ALIGNMENT_MIGRATION)
+
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
+    "CONTRACT_ALIGNMENT_MIGRATION",
     "INITIAL_MIGRATION",
+    "KNOWN_MIGRATIONS",
     "MAXIMUM_SUPPORTED_SCHEMA_VERSION",
     "MINIMUM_SUPPORTED_SCHEMA_VERSION",
     "AppliedMigration",

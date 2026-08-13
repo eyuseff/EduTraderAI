@@ -272,6 +272,12 @@ class InMemoryExecutionUnitOfWork:
                 validation_state._transitions_by_id.get(
                     transition.transition_record_id
                 ),
+                validation_state._transitions_by_aggregate_revision.get(
+                    (transition.aggregate_id, transition.next_revision)
+                ),
+                validation_state._transitions_by_aggregate_transition_id.get(
+                    (transition.aggregate_id, transition.transition_id)
+                ),
             )
             if transition_result.conflict is not None:
                 return transition_result.conflict
@@ -279,6 +285,12 @@ class InMemoryExecutionUnitOfWork:
                 validation_state._transitions_by_id[transition.transition_record_id] = (
                     transition
                 )
+                validation_state._transitions_by_aggregate_revision[
+                    (transition.aggregate_id, transition.next_revision)
+                ] = transition
+                validation_state._transitions_by_aggregate_transition_id[
+                    (transition.aggregate_id, transition.transition_id)
+                ] = transition
                 validation_state._transition_order = (
                     *validation_state._transition_order,
                     transition.transition_record_id,
