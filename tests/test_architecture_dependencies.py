@@ -209,6 +209,11 @@ FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES = (
     "logging",
 )
 
+FORBIDDEN_TRANSACTIONAL_INTAKE_PREFIXES = FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES + (
+    "volcanoes.infrastructure",
+    "volcanoes.execution",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -2601,3 +2606,29 @@ def test_paper_execution_persistence_runtime_is_not_implicitly_wired() -> None:
     assert all(
         runtime_module not in path.read_text(encoding="utf-8") for path in entry_points
     )
+
+
+def test_transactional_intake_is_brokerless_and_storage_neutral() -> None:
+    paths = tuple(
+        sorted((PROJECT_ROOT / "volcanoes/application/execution/intake").glob("*.py"))
+    )
+    assert _violations(paths, FORBIDDEN_TRANSACTIONAL_INTAKE_PREFIXES) == ()
+
+    prohibited_tokens = (
+        "submit_order",
+        "cancel_order",
+        "replace_order",
+        "call_broker",
+        "ExecutionPipeline",
+        "PaperBrokerExecutionAdapter",
+        "PaperExecutionPersistenceRuntime",
+        "sqlite3",
+        "state/",
+    )
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {token}"
+        for path in paths
+        for token in prohibited_tokens
+        if token in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []

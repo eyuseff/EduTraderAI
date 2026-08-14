@@ -87,6 +87,13 @@ from volcanoes.application.execution.lifecycle import (
     apply_transition,
     transition,
 )
+from volcanoes.application.execution.intake import (
+    ExecutionUnitOfWorkProvider,
+    TransactionalExecutionIntakeService,
+    TransactionalIntakeRequest,
+    TransactionalIntakeResult,
+    TransactionalIntakeStatus,
+)
 from volcanoes.application.execution.persistence import (
     AggregateSaveResult,
     CommandRegistrationResult,
@@ -152,6 +159,7 @@ from volcanoes.application.execution.persistence import (
 )
 
 __all__ = [
+    "ExecutionUnitOfWorkProvider",
     "PaperBrokerOrderReference",
     "PaperDryRunDecision",
     "PaperDryRunError",
@@ -214,6 +222,10 @@ __all__ = [
     "PaperExecutionSide",
     "PaperExecutionStatus",
     "PaperExecutionTimeInForce",
+    "TransactionalExecutionIntakeService",
+    "TransactionalIntakeRequest",
+    "TransactionalIntakeResult",
+    "TransactionalIntakeStatus",
     "PaperExecutionTransitionContext",
     "PaperExecutionTransitionDecision",
     "PaperExecutionTransitionDecisionType",
