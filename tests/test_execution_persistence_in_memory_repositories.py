@@ -15,6 +15,7 @@ from volcanoes.application.execution import (
     ExecutionFailureRecord,
     ExecutionIdempotencyRecord,
     ExecutionIdempotencyReservationStatus,
+    ExecutionPersistenceConflictKind,
     ExecutionPersistenceResultStatus,
     ExecutionReceiptRecord,
     ExecutionReconciliationRecord,
@@ -227,16 +228,24 @@ def failure(symbol: str = "AAPL") -> PaperExecutionFailure:
     )
 
 
-def receipt_record(symbol: str = "AAPL"):
-    return ExecutionReceiptRecord(
-        receipt=receipt(symbol), recorded_at=NOW, schema_version=SCHEMA_VERSION
-    )
+def receipt_record(symbol: str = "AAPL", **overrides: object):
+    values = {
+        "receipt": receipt(symbol),
+        "recorded_at": NOW,
+        "schema_version": SCHEMA_VERSION,
+    }
+    values.update(overrides)
+    return ExecutionReceiptRecord(**values)
 
 
-def failure_record(symbol: str = "AAPL"):
-    return ExecutionFailureRecord(
-        failure=failure(symbol), recorded_at=NOW, schema_version=SCHEMA_VERSION
-    )
+def failure_record(symbol: str = "AAPL", **overrides: object):
+    values = {
+        "failure": failure(symbol),
+        "recorded_at": NOW,
+        "schema_version": SCHEMA_VERSION,
+    }
+    values.update(overrides)
+    return ExecutionFailureRecord(**values)
 
 
 def approval_record(symbol: str = "AAPL", **overrides: object):
@@ -511,6 +520,65 @@ def test_broker_reference_register_replay_and_conflict_without_access() -> None:
     assert (
         conflict.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
     )
+    assert conflict.conflict is not None
+    assert conflict.conflict.code == "BROKER_REFERENCE_CONFLICT"
+
+
+def test_broker_reference_enforces_one_active_reference_per_aggregate() -> None:
+    store = InMemoryExecutionPersistence()
+    uow = store.unit_of_work()
+    first = broker_reference_record()
+    second = broker_reference_record(
+        "MSFT",
+        aggregate_id=first.aggregate_id,
+        command_id=first.command_id,
+    )
+
+    assert (
+        uow.broker_references.register(first).status
+        is ExecutionPersistenceResultStatus.CREATED
+    )
+    conflict = uow.broker_references.register(second)
+
+    assert (
+        conflict.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
+    )
+    assert conflict.conflict is not None
+    assert (
+        conflict.conflict.kind
+        is ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT
+    )
+    assert conflict.conflict.code == "ACTIVE_BROKER_REFERENCE_CONFLICT"
+    assert (
+        conflict.conflict.safe_message
+        == "Aggregate already has an active broker reference."
+    )
+    assert conflict.conflict.aggregate_id == second.aggregate_id
+    assert conflict.conflict.command_id == second.command_id
+
+
+def test_inactive_broker_references_can_share_an_aggregate() -> None:
+    store = InMemoryExecutionPersistence()
+    uow = store.unit_of_work()
+    first = broker_reference_record(
+        active=False, reference_status=ExecutionBrokerReferenceStatus.TERMINAL
+    )
+    second = broker_reference_record(
+        "MSFT",
+        aggregate_id=first.aggregate_id,
+        command_id=first.command_id,
+        active=False,
+        reference_status=ExecutionBrokerReferenceStatus.TERMINAL,
+    )
+
+    assert (
+        uow.broker_references.register(first).status
+        is ExecutionPersistenceResultStatus.CREATED
+    )
+    assert (
+        uow.broker_references.register(second).status
+        is ExecutionPersistenceResultStatus.CREATED
+    )
 
 
 @pytest.mark.parametrize(
@@ -536,6 +604,47 @@ def test_fact_repositories_record_duplicate_and_iterate(
         is ExecutionPersistenceResultStatus.EXACT_REPLAY
     )
     assert getattr(uow.transaction_state, records_method)() == (record,)
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "record_factory", "code", "message"),
+    [
+        (
+            "receipts",
+            receipt_record,
+            "RECEIPT_CONFLICT",
+            "Receipt record fingerprint conflict.",
+        ),
+        (
+            "failures",
+            failure_record,
+            "FAILURE_CONFLICT",
+            "Failure record fingerprint conflict.",
+        ),
+    ],
+)
+def test_fact_identity_uses_embedded_fingerprint_and_wrapper_for_conflict(
+    repository_name, record_factory, code, message
+) -> None:
+    store = InMemoryExecutionPersistence()
+    uow = store.unit_of_work()
+    repository = getattr(uow, repository_name)
+    record = record_factory()
+    conflicting = record_factory(recorded_at=LATER)
+
+    assert repository.record(record).status is ExecutionPersistenceResultStatus.CREATED
+    conflict = repository.record(conflicting)
+
+    assert conflict.status is ExecutionPersistenceResultStatus.COMMAND_CONFLICT
+    assert conflict.conflict is not None
+    assert (
+        conflict.conflict.kind
+        is ExecutionPersistenceConflictKind.RECORD_VERSION_CONFLICT
+    )
+    assert conflict.conflict.code == code
+    assert conflict.conflict.safe_message == message
+    assert conflict.conflict.aggregate_id == aggregate_id()
+    assert conflict.conflict.command_id == command_id()
 
 
 def test_approval_same_identity_different_content_conflicts() -> None:

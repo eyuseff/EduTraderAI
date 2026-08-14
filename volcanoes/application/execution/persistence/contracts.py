@@ -554,7 +554,11 @@ class ExecutionBrokerReferenceRecord:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionReceiptRecord:
-    """Durable normalized receipt snapshot."""
+    """Durable receipt keyed by its embedded receipt fingerprint.
+
+    The wrapper fingerprint distinguishes exact replay from conflicting wrapper
+    content for an already-recorded embedded receipt identity.
+    """
 
     receipt: PaperExecutionReceipt
     recorded_at: datetime
@@ -595,7 +599,11 @@ class ExecutionReceiptRecord:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionFailureRecord:
-    """Durable normalized failure snapshot."""
+    """Durable failure keyed by its embedded failure fingerprint.
+
+    The wrapper fingerprint distinguishes exact replay from conflicting wrapper
+    content for an already-recorded embedded failure identity.
+    """
 
     failure: PaperExecutionFailure
     recorded_at: datetime
@@ -1114,7 +1122,11 @@ class ReplayLookupResult:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRestartDiscoveryQuery:
-    """Pure query contract for restart discovery."""
+    """Pure query contract for aggregate-identity-ordered restart discovery.
+
+    Cursor encodings are adapter-private and bind every filter except ``cursor``
+    and ``limit``. Invalid, unknown, or cross-filter cursors restart at page one.
+    """
 
     lifecycle_states: tuple[PaperExecutionLifecycleState, ...]
     schema_version: int

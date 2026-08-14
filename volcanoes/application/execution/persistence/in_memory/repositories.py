@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
+from volcanoes.application.execution.fingerprints import fingerprint_payload
+
 from volcanoes.application.execution.identities import (
     PaperBrokerOrderReference,
     PaperExecutionAggregateId,
@@ -348,16 +350,15 @@ class InMemoryExecutionBrokerReferenceRepository(_RepositoryBase):
         existing = self._unit_of_work.transaction_state._broker_references.get(
             record.broker_reference
         )
-        result = _record_result_for_unique_identity(
-            record.record_fingerprint,
-            existing.record_fingerprint if existing is not None else None,
-            conflict_kind=ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT,
-            conflict_status=ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE,
-            code="BROKER_REFERENCE_CONFLICT",
-            safe_message="Broker reference is already bound to another record.",
-            aggregate_id=record.aggregate_id,
-            command_id=record.command_id,
+        active_owner = next(
+            (
+                candidate
+                for candidate in self._unit_of_work.transaction_state._broker_references.values()
+                if candidate.aggregate_id == record.aggregate_id and candidate.active
+            ),
+            None,
         )
+        result = _broker_reference_result(record, existing, active_owner)
         if result.conflict is not None:
             self._unit_of_work.stage_conflict(result.conflict)
         if result.status is ExecutionPersistenceResultStatus.CREATED:
@@ -377,17 +378,20 @@ class InMemoryExecutionReceiptRepository(_RepositoryBase):
 
     def record(self, receipt: ExecutionReceiptRecord) -> RecordLoadResult:
         self._ensure_active()
-        result = _insert_by_fingerprint(
+        identity = receipt.receipt.receipt_fingerprint
+        existing = self._unit_of_work.transaction_state._receipts.get(identity)
+        result = _fact_result(
             receipt.record_fingerprint,
-            self._unit_of_work.transaction_state._receipts,
-            ExecutionPersistenceConflictKind.RECORD_VERSION_CONFLICT,
-            "RECEIPT_CONFLICT",
-            "Receipt record fingerprint conflict.",
+            existing,
+            code="RECEIPT_CONFLICT",
+            safe_message="Receipt record fingerprint conflict.",
+            aggregate_id=receipt.receipt.aggregate_id,
+            command_id=receipt.receipt.command_id,
         )
+        if result.conflict is not None:
+            self._unit_of_work.stage_conflict(result.conflict)
         if result.status is ExecutionPersistenceResultStatus.CREATED:
-            self._unit_of_work.transaction_state._receipts[
-                receipt.record_fingerprint
-            ] = receipt
+            self._unit_of_work.transaction_state._receipts[identity] = receipt
             self._unit_of_work.stage_receipt(receipt)
         return result
 
@@ -401,17 +405,20 @@ class InMemoryExecutionFailureRepository(_RepositoryBase):
 
     def record(self, failure: ExecutionFailureRecord) -> RecordLoadResult:
         self._ensure_active()
-        result = _insert_by_fingerprint(
+        identity = failure.failure.failure_fingerprint
+        existing = self._unit_of_work.transaction_state._failures.get(identity)
+        result = _fact_result(
             failure.record_fingerprint,
-            self._unit_of_work.transaction_state._failures,
-            ExecutionPersistenceConflictKind.RECORD_VERSION_CONFLICT,
-            "FAILURE_CONFLICT",
-            "Failure record fingerprint conflict.",
+            existing,
+            code="FAILURE_CONFLICT",
+            safe_message="Failure record fingerprint conflict.",
+            aggregate_id=failure.failure.aggregate_id,
+            command_id=failure.failure.command_id,
         )
+        if result.conflict is not None:
+            self._unit_of_work.stage_conflict(result.conflict)
         if result.status is ExecutionPersistenceResultStatus.CREATED:
-            self._unit_of_work.transaction_state._failures[
-                failure.record_fingerprint
-            ] = failure
+            self._unit_of_work.transaction_state._failures[identity] = failure
             self._unit_of_work.stage_failure(failure)
         return result
 
@@ -492,18 +499,18 @@ class InMemoryExecutionRestartDiscoveryRepository(_RepositoryBase):
         query: ExecutionRestartDiscoveryQuery,
     ) -> RestartDiscoveryResult:
         self._ensure_active()
-        offset = _cursor_offset(query.cursor)
         candidates = tuple(
             record
             for record in self._unit_of_work.transaction_state.aggregate_records()
             if _matches_restart_query(record, query)
         )
+        offset = _cursor_offset(query.cursor, query, len(candidates))
         limited = candidates[offset:]
         next_cursor = None
         complete = True
         if query.limit is not None and len(limited) > query.limit:
             limited = limited[: query.limit]
-            next_cursor = f"cursor-{offset + query.limit}"
+            next_cursor = _cursor_token(query, offset + query.limit)
             complete = False
         return RestartDiscoveryResult(
             aggregates=limited,
@@ -790,6 +797,59 @@ def _record_result_for_unique_identity(
     )
 
 
+def _broker_reference_result(
+    record: ExecutionBrokerReferenceRecord,
+    existing: ExecutionBrokerReferenceRecord | None,
+    active_owner: ExecutionBrokerReferenceRecord | None,
+) -> RecordLoadResult:
+    identity_result = _record_result_for_unique_identity(
+        record.record_fingerprint,
+        existing.record_fingerprint if existing is not None else None,
+        conflict_kind=ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT,
+        conflict_status=ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE,
+        code="BROKER_REFERENCE_CONFLICT",
+        safe_message="Broker reference is already bound to another record.",
+        aggregate_id=record.aggregate_id,
+        command_id=record.command_id,
+    )
+    if identity_result.status is not ExecutionPersistenceResultStatus.CREATED:
+        return identity_result
+    if record.active and active_owner is not None:
+        return RecordLoadResult(
+            status=ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE,
+            conflict=_conflict(
+                kind=ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT,
+                code="ACTIVE_BROKER_REFERENCE_CONFLICT",
+                safe_message="Aggregate already has an active broker reference.",
+                aggregate_id=record.aggregate_id,
+                command_id=record.command_id,
+            ),
+            schema_version=SCHEMA_VERSION,
+        )
+    return identity_result
+
+
+def _fact_result(
+    incoming_fingerprint: str,
+    existing: ExecutionReceiptRecord | ExecutionFailureRecord | None,
+    *,
+    code: str,
+    safe_message: str,
+    aggregate_id: PaperExecutionAggregateId | None,
+    command_id: PaperExecutionCommandId | None,
+) -> RecordLoadResult:
+    return _record_result_for_unique_identity(
+        incoming_fingerprint,
+        existing.record_fingerprint if existing is not None else None,
+        conflict_kind=ExecutionPersistenceConflictKind.RECORD_VERSION_CONFLICT,
+        conflict_status=ExecutionPersistenceResultStatus.COMMAND_CONFLICT,
+        code=code,
+        safe_message=safe_message,
+        aggregate_id=aggregate_id,
+        command_id=command_id,
+    )
+
+
 def _insert_by_fingerprint(
     fingerprint: str,
     collection: Mapping[str, object],
@@ -834,17 +894,44 @@ def _matches_restart_query(
     return True
 
 
-def _cursor_offset(cursor: str | None) -> int:
+def _cursor_scope(query: ExecutionRestartDiscoveryQuery) -> str:
+    return fingerprint_payload(
+        "pdc",
+        {
+            "include_outcome_unknown": query.include_outcome_unknown,
+            "include_reconciliation_required": query.include_reconciliation_required,
+            "lifecycle_states": tuple(
+                sorted(state.value for state in query.lifecycle_states)
+            ),
+            "maximum_updated_at": query.maximum_updated_at,
+            "minimum_updated_at": query.minimum_updated_at,
+            "mode": query.mode,
+            "schema_version": query.schema_version,
+        },
+    )
+
+
+def _cursor_token(query: ExecutionRestartDiscoveryQuery, offset: int) -> str:
+    return f"cursor-{_cursor_scope(query)}-{offset}"
+
+
+def _cursor_offset(
+    cursor: str | None,
+    query: ExecutionRestartDiscoveryQuery,
+    candidate_count: int,
+) -> int:
     if cursor is None:
         return 0
-    prefix = "cursor-"
+    prefix = f"cursor-{_cursor_scope(query)}-"
     if not cursor.startswith(prefix):
         return 0
     try:
         offset = int(cursor[len(prefix) :])
     except ValueError:
         return 0
-    return max(offset, 0)
+    if offset < 0 or offset > candidate_count:
+        return 0
+    return offset
 
 
 __all__ = [

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from volcanoes.application.execution import (
     ExecutionPersistenceResultStatus,
     InMemoryExecutionPersistence,
@@ -7,6 +9,7 @@ from volcanoes.application.execution import (
 )
 from volcanoes.application.execution.fingerprints import fingerprint_payload
 from test_execution_persistence_in_memory_repositories import (
+    LATER,
     aggregate_record,
     aggregate_revision_one,
     approval_record,
@@ -150,6 +153,91 @@ def test_broker_reference_conflict_rolls_back_all_staged_records() -> None:
 
     assert result.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
     assert len(store.snapshot().command_records()) == 0
+
+
+def test_active_broker_reference_conflict_rolls_back_all_staged_records() -> None:
+    store = InMemoryExecutionPersistence()
+    first = store.unit_of_work()
+    original = broker_reference_record()
+    first.broker_references.register(original)
+    first.commit()
+
+    second = store.unit_of_work()
+    second.commands.register(command_record("MSFT"))
+    second.broker_references.register(
+        broker_reference_record(
+            "MSFT",
+            aggregate_id=original.aggregate_id,
+            command_id=original.command_id,
+        )
+    )
+    result = second.commit()
+
+    assert result.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
+    assert len(store.snapshot().command_records()) == 0
+    assert len(store.snapshot().broker_reference_records()) == 1
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "record_factory", "snapshot_method"),
+    [
+        ("receipts", receipt_record, "receipt_records"),
+        ("failures", failure_record, "failure_records"),
+    ],
+)
+def test_fact_content_conflict_rolls_back_all_staged_records(
+    repository_name, record_factory, snapshot_method
+) -> None:
+    store = InMemoryExecutionPersistence()
+    first = store.unit_of_work()
+    getattr(first, repository_name).record(record_factory())
+    first.commit()
+
+    second = store.unit_of_work()
+    second.commands.register(command_record("MSFT"))
+    getattr(second, repository_name).record(record_factory(recorded_at=LATER))
+    result = second.commit()
+
+    assert result.status is ExecutionPersistenceResultStatus.TRANSACTION_ABORTED
+    assert len(store.snapshot().command_records()) == 0
+    assert len(getattr(store.snapshot(), snapshot_method)()) == 1
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "original", "conflicting", "snapshot_method"),
+    [
+        (
+            "approvals",
+            approval_record(),
+            approval_record(
+                bound_fingerprint=fingerprint_payload("pcf", ("other", "approval"))
+            ),
+            "approval_records",
+        ),
+        (
+            "reconciliations",
+            reconciliation_record(),
+            reconciliation_record(safe_reason_code="DIFFERENT_REASON"),
+            "reconciliation_records",
+        ),
+    ],
+)
+def test_reference_content_conflict_rolls_back_all_staged_records(
+    repository_name, original, conflicting, snapshot_method
+) -> None:
+    store = InMemoryExecutionPersistence()
+    first = store.unit_of_work()
+    getattr(first, repository_name).record(original)
+    first.commit()
+
+    second = store.unit_of_work()
+    second.commands.register(command_record("MSFT"))
+    getattr(second, repository_name).record(conflicting)
+    result = second.commit()
+
+    assert result.status is ExecutionPersistenceResultStatus.TRANSACTION_ABORTED
+    assert len(store.snapshot().command_records()) == 0
+    assert len(getattr(store.snapshot(), snapshot_method)()) == 1
 
 
 def test_explicit_rollback_of_full_stage_leaves_no_partial_records() -> None:
