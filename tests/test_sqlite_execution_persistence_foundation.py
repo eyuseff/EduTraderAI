@@ -73,12 +73,19 @@ EXPECTED_PUBLIC_EXPORTS = {
     "validate_sqlite_execution_schema",
 }
 
-AUTHORIZED_PHASE2_SLICE1_CLASSES = {
+AUTHORIZED_PHASE2_SLICE2_CLASSES = {
     ("unit_of_work.py", "_SqliteExecutionTransaction"),
     ("repositories.py", "_RepositoryBase"),
     ("repositories.py", "SqliteExecutionAggregateRepository"),
     ("repositories.py", "SqliteExecutionCommandRepository"),
     ("repositories.py", "SqliteExecutionIdempotencyRepository"),
+    ("repositories.py", "SqliteExecutionTransitionJournal"),
+    ("repositories.py", "SqliteExecutionBrokerReferenceRepository"),
+    ("repositories.py", "SqliteExecutionReceiptRepository"),
+    ("repositories.py", "SqliteExecutionFailureRepository"),
+    ("repositories.py", "SqliteExecutionApprovalRepository"),
+    ("repositories.py", "SqliteExecutionReconciliationRepository"),
+    ("repositories.py", "SqliteExecutionRestartDiscoveryRepository"),
 }
 
 EXPECTED_TABLES = {
@@ -1056,12 +1063,12 @@ def test_sqlite_infrastructure_allows_only_private_phase2_slice1_behavior():
                     fragment in node.name
                     for fragment in ("Repository", "UnitOfWork", "Service")
                 )
-                and class_identity not in AUTHORIZED_PHASE2_SLICE1_CLASSES
+                and class_identity not in AUTHORIZED_PHASE2_SLICE2_CLASSES
             ):
                 offenders.append(f"{path} defines {node.name}")
 
-    assert discovered_phase2_classes == AUTHORIZED_PHASE2_SLICE1_CLASSES
-    assert ("repositories.py", "_RepositoryBase") in AUTHORIZED_PHASE2_SLICE1_CLASSES
+    assert discovered_phase2_classes == AUTHORIZED_PHASE2_SLICE2_CLASSES
+    assert ("repositories.py", "_RepositoryBase") in AUTHORIZED_PHASE2_SLICE2_CLASSES
     assert "_RepositoryBase".startswith("_")
     import volcanoes.infrastructure.execution_persistence.sqlite as sqlite_package
 

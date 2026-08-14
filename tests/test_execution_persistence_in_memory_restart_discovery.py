@@ -97,9 +97,95 @@ def test_restart_discovery_limit_and_cursor() -> None:
     )
 
     assert first.complete is False
-    assert first.next_cursor == "cursor-2"
+    assert first.next_cursor is not None
     assert second.complete is True
     assert first.aggregates != second.aggregates
+
+
+def test_restart_discovery_malformed_unknown_and_cross_filter_cursors_restart() -> None:
+    store = _store_with_states()
+    states = (
+        PaperExecutionLifecycleState.DISPATCH_PENDING,
+        PaperExecutionLifecycleState.DISPATCHED,
+        PaperExecutionLifecycleState.OUTCOME_UNKNOWN,
+    )
+    base = ExecutionRestartDiscoveryQuery(
+        lifecycle_states=states,
+        limit=1,
+        schema_version=1,
+    )
+    repository = store.unit_of_work().restart_discovery
+    first = repository.discover(base)
+    malformed = repository.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=states,
+            cursor="malformed-cursor",
+            limit=1,
+            schema_version=1,
+        )
+    )
+    unknown = repository.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=states,
+            cursor=first.next_cursor.rsplit("-", 1)[0] + "-999",
+            limit=1,
+            schema_version=1,
+        )
+    )
+    cross_filter = repository.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=(PaperExecutionLifecycleState.DISPATCH_PENDING,),
+            cursor=first.next_cursor,
+            limit=1,
+            schema_version=1,
+        )
+    )
+
+    assert malformed.aggregates == first.aggregates
+    assert unknown.aggregates == first.aggregates
+    assert (
+        cross_filter.aggregates[0].lifecycle_state
+        is PaperExecutionLifecycleState.DISPATCH_PENDING
+    )
+
+
+def test_restart_discovery_candidate_count_cursor_is_empty_terminal_page() -> None:
+    store = _store_with_states()
+    states = (
+        PaperExecutionLifecycleState.DISPATCH_PENDING,
+        PaperExecutionLifecycleState.DISPATCHED,
+        PaperExecutionLifecycleState.OUTCOME_UNKNOWN,
+    )
+    first = store.unit_of_work().restart_discovery.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=states,
+            limit=3,
+            schema_version=1,
+        )
+    )
+    scoped_cursor = (
+        first.result_fingerprint
+    )  # prove result fingerprints are not cursors
+    page_one = store.unit_of_work().restart_discovery.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=states,
+            limit=2,
+            schema_version=1,
+        )
+    )
+    terminal = store.unit_of_work().restart_discovery.discover(
+        ExecutionRestartDiscoveryQuery(
+            lifecycle_states=states,
+            cursor=page_one.next_cursor.rsplit("-", 1)[0] + "-3",
+            limit=2,
+            schema_version=1,
+        )
+    )
+
+    assert scoped_cursor != page_one.next_cursor
+    assert terminal.aggregates == ()
+    assert terminal.complete is True
+    assert terminal.next_cursor is None
 
 
 def test_restart_discovery_empty_result_is_complete() -> None:

@@ -96,7 +96,7 @@ class ExecutionTransitionJournal(Protocol):
 
 @runtime_checkable
 class ExecutionBrokerReferenceRepository(Protocol):
-    """Storage-neutral broker-reference repository contract."""
+    """Broker-reference repository with one active reference per aggregate."""
 
     def get(
         self,
@@ -113,7 +113,7 @@ class ExecutionBrokerReferenceRepository(Protocol):
 
 @runtime_checkable
 class ExecutionReceiptRepository(Protocol):
-    """Storage-neutral receipt repository contract."""
+    """Receipt repository keyed by the embedded receipt fingerprint."""
 
     def record(self, receipt: ExecutionReceiptRecord) -> RecordLoadResult:
         """Record one normalized receipt snapshot."""
@@ -121,7 +121,7 @@ class ExecutionReceiptRepository(Protocol):
 
 @runtime_checkable
 class ExecutionFailureRepository(Protocol):
-    """Storage-neutral failure repository contract."""
+    """Failure repository keyed by the embedded failure fingerprint."""
 
     def record(self, failure: ExecutionFailureRecord) -> RecordLoadResult:
         """Record one normalized failure snapshot."""
@@ -148,10 +148,10 @@ class ExecutionReconciliationRepository(Protocol):
 
 @runtime_checkable
 class ExecutionRestartDiscoveryRepository(Protocol):
-    """Query contract for consequential aggregate discovery after restart."""
+    """Identity-ordered restart discovery with filter-bound opaque cursors."""
 
     def discover(
         self,
         query: ExecutionRestartDiscoveryQuery,
     ) -> RestartDiscoveryResult:
-        """Return aggregate records matching a restart discovery query."""
+        """Return a page; invalid or cross-filter cursors restart at page one."""

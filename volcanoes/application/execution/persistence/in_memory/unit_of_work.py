@@ -50,7 +50,9 @@ from volcanoes.application.execution.persistence.in_memory.repositories import (
     InMemoryExecutionRestartDiscoveryRepository,
     InMemoryExecutionTransitionJournal,
     _aggregate_save_result,
+    _broker_reference_result,
     _command_registration_result,
+    _fact_result,
     _idempotency_result,
     _record_result_for_unique_identity,
     _transition_result,
@@ -300,15 +302,17 @@ class InMemoryExecutionUnitOfWork:
             existing = validation_state._broker_references.get(
                 reference.broker_reference
             )
-            broker_reference_result = _record_result_for_unique_identity(
-                reference.record_fingerprint,
-                existing.record_fingerprint if existing is not None else None,
-                conflict_kind=ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT,
-                conflict_status=ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE,
-                code="BROKER_REFERENCE_CONFLICT",
-                safe_message="Broker reference is already bound to another record.",
-                aggregate_id=reference.aggregate_id,
-                command_id=reference.command_id,
+            active_owner = next(
+                (
+                    candidate
+                    for candidate in validation_state._broker_references.values()
+                    if candidate.aggregate_id == reference.aggregate_id
+                    and candidate.active
+                ),
+                None,
+            )
+            broker_reference_result = _broker_reference_result(
+                reference, existing, active_owner
             )
             if broker_reference_result.conflict is not None:
                 return broker_reference_result.conflict
@@ -321,12 +325,34 @@ class InMemoryExecutionUnitOfWork:
                 )
 
         for receipt in self._staged_receipts:
-            if receipt.record_fingerprint not in validation_state._receipts:
-                validation_state._receipts[receipt.record_fingerprint] = receipt
+            identity = receipt.receipt.receipt_fingerprint
+            receipt_result = _fact_result(
+                receipt.record_fingerprint,
+                validation_state._receipts.get(identity),
+                code="RECEIPT_CONFLICT",
+                safe_message="Receipt record fingerprint conflict.",
+                aggregate_id=receipt.receipt.aggregate_id,
+                command_id=receipt.receipt.command_id,
+            )
+            if receipt_result.conflict is not None:
+                return receipt_result.conflict
+            if receipt_result.status is ExecutionPersistenceResultStatus.CREATED:
+                validation_state._receipts[identity] = receipt
 
         for failure in self._staged_failures:
-            if failure.record_fingerprint not in validation_state._failures:
-                validation_state._failures[failure.record_fingerprint] = failure
+            identity = failure.failure.failure_fingerprint
+            failure_result = _fact_result(
+                failure.record_fingerprint,
+                validation_state._failures.get(identity),
+                code="FAILURE_CONFLICT",
+                safe_message="Failure record fingerprint conflict.",
+                aggregate_id=failure.failure.aggregate_id,
+                command_id=failure.failure.command_id,
+            )
+            if failure_result.conflict is not None:
+                return failure_result.conflict
+            if failure_result.status is ExecutionPersistenceResultStatus.CREATED:
+                validation_state._failures[identity] = failure
 
         for approval in self._staged_approvals:
             existing_approval = validation_state._approvals.get(

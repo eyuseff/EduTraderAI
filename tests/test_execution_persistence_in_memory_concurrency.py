@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import pytest
+
 from volcanoes.application.execution import (
     ExecutionPersistenceResultStatus,
     InMemoryExecutionPersistence,
     PaperExecutionRevision,
 )
 from test_execution_persistence_in_memory_repositories import (
+    LATER,
     aggregate_id,
     aggregate_record,
     aggregate_revision_one,
     broker_reference_record,
+    failure_record,
+    receipt_record,
     transition_record,
 )
 
@@ -112,6 +117,49 @@ def test_competing_broker_reference_second_commit_aborts_without_partial_state()
 
     assert result.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
     assert len(store.snapshot().broker_reference_records()) == 1
+
+
+def test_competing_active_broker_reference_first_commit_wins() -> None:
+    store = InMemoryExecutionPersistence()
+    first = store.unit_of_work()
+    second = store.unit_of_work()
+    original = broker_reference_record()
+    competing = broker_reference_record(
+        "MSFT",
+        aggregate_id=original.aggregate_id,
+        command_id=original.command_id,
+    )
+    first.broker_references.register(original)
+    second.broker_references.register(competing)
+
+    assert first.commit().committed is True
+    result = second.commit()
+
+    assert result.status is ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE
+    assert len(store.snapshot().broker_reference_records()) == 1
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "record_factory", "snapshot_method"),
+    [
+        ("receipts", receipt_record, "receipt_records"),
+        ("failures", failure_record, "failure_records"),
+    ],
+)
+def test_competing_fact_wrapper_first_commit_wins(
+    repository_name, record_factory, snapshot_method
+) -> None:
+    store = InMemoryExecutionPersistence()
+    first = store.unit_of_work()
+    second = store.unit_of_work()
+    getattr(first, repository_name).record(record_factory())
+    getattr(second, repository_name).record(record_factory(recorded_at=LATER))
+
+    assert first.commit().committed is True
+    result = second.commit()
+
+    assert result.status is ExecutionPersistenceResultStatus.TRANSACTION_ABORTED
+    assert len(getattr(store.snapshot(), snapshot_method)()) == 1
 
 
 def test_commit_order_deterministically_selects_winner() -> None:
