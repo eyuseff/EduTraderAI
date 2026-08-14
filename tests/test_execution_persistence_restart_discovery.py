@@ -65,6 +65,23 @@ def test_restart_query_targets_consequential_states() -> None:
     assert query.query_fingerprint.startswith("pdq-")
 
 
+def test_consequential_restart_states_remain_operator_review_only() -> None:
+    states = {
+        PaperExecutionLifecycleState.DISPATCH_PENDING,
+        PaperExecutionLifecycleState.DISPATCHED,
+        PaperExecutionLifecycleState.OUTCOME_UNKNOWN,
+        PaperExecutionLifecycleState.RECONCILIATION_REQUIRED,
+        PaperExecutionLifecycleState.CANCEL_PENDING,
+        PaperExecutionLifecycleState.REPLACE_PENDING,
+        PaperExecutionLifecycleState.PARTIALLY_FILLED,
+    }
+
+    assert PaperExecutionLifecycleState.CREATED not in states
+    assert PaperExecutionLifecycleState.ELIGIBILITY_EVALUATED not in states
+    assert PaperExecutionLifecycleState.READY_FOR_DISPATCH not in states
+    assert PaperExecutionLifecycleState.FILLED not in states
+
+
 def test_restart_query_is_immutable_and_action_free() -> None:
     query = ExecutionRestartDiscoveryQuery(
         lifecycle_states=(PaperExecutionLifecycleState.DISPATCH_PENDING,),

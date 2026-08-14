@@ -2548,3 +2548,56 @@ def test_execution_durability_spike_does_not_touch_runtime_state_or_brokers() ->
         )
 
     assert offenders == []
+
+
+def test_paper_execution_persistence_runtime_has_strict_dependency_boundary() -> None:
+    path = PROJECT_ROOT / "adapters/paper_execution_persistence_runtime.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imports = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    prohibited_roots = {
+        "alpaca",
+        "broker",
+        "config",
+        "dotenv",
+        "http",
+        "requests",
+        "scanner_engine",
+        "socket",
+        "streamlit",
+        "urllib",
+    }
+    assert not any(
+        module.split(".", maxsplit=1)[0] in prohibited_roots for module in imports
+    )
+    prohibited_symbols = {
+        "ExecutionPipeline",
+        "PaperBrokerExecutionAdapter",
+        "SubmitTradeService",
+        "getenv",
+        "os.environ",
+    }
+    assert not any(symbol in source for symbol in prohibited_symbols)
+
+
+def test_paper_execution_persistence_runtime_is_not_implicitly_wired() -> None:
+    runtime_module = "adapters.paper_execution_persistence_runtime"
+    entry_points = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "main.py",
+        PROJECT_ROOT / "scanner_engine/automated_scanner.py",
+        PROJECT_ROOT / "engine/supervised_brain.py",
+    )
+
+    assert all(
+        runtime_module not in path.read_text(encoding="utf-8") for path in entry_points
+    )

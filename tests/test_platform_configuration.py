@@ -22,8 +22,105 @@ from volcanoes.application.platform import (
     validate_broker_runtime,
     validate_configuration,
 )
+from volcanoes.application.platform.configuration import (
+    PaperExecutionPersistenceRuntimeConfiguration,
+    validate_paper_execution_persistence_runtime_configuration,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def persistence_configuration(
+    tmp_path: Path, **overrides: object
+) -> PaperExecutionPersistenceRuntimeConfiguration:
+    values: dict[str, object] = {
+        "database_path": (tmp_path / "execution.sqlite").resolve(),
+        "application_version": "4.1.0-slice4",
+        "busy_timeout_ms": 200,
+    }
+    values.update(overrides)
+    return PaperExecutionPersistenceRuntimeConfiguration(**values)  # type: ignore[arg-type]
+
+
+def test_local_persistence_configuration_is_immutable_and_valid(tmp_path: Path) -> None:
+    configured = persistence_configuration(tmp_path)
+    before = tuple(tmp_path.iterdir())
+
+    assert (
+        validate_paper_execution_persistence_runtime_configuration(configured)
+        is configured
+    )
+    assert tuple(tmp_path.iterdir()) == before
+    assert not configured.database_path.exists()
+    with pytest.raises(FrozenInstanceError):
+        configured.busy_timeout_ms = 100  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    "database_path",
+    [
+        Path("relative.sqlite"),
+        PROJECT_ROOT / "execution.sqlite",
+        Path("/tmp/missing-parent-slice4/execution.sqlite"),
+        Path("/tmp/execution.json"),
+        Path("/tmp/state/execution.sqlite"),
+        Path("/tmp/live/execution.sqlite"),
+        Path("/tmp/alpaca/execution.sqlite"),
+        Path("/tmp/live.sqlite"),
+        Path("/tmp/alpaca.sqlite"),
+        Path("/tmp/external-paper.sqlite"),
+        Path("/tmp/credentials.sqlite"),
+    ],
+)
+def test_invalid_persistence_paths_fail_closed(
+    tmp_path: Path, database_path: Path
+) -> None:
+    del tmp_path
+    with pytest.raises(ConfigurationError):
+        validate_paper_execution_persistence_runtime_configuration(
+            PaperExecutionPersistenceRuntimeConfiguration(
+                database_path=database_path,
+                application_version="4.1.0",
+                busy_timeout_ms=200,
+            )
+        )
+
+
+def test_symlinked_persistence_path_is_rejected(tmp_path: Path) -> None:
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(actual, target_is_directory=True)
+
+    with pytest.raises(ConfigurationError, match="symlink"):
+        validate_paper_execution_persistence_runtime_configuration(
+            persistence_configuration(
+                tmp_path, database_path=linked / "execution.sqlite"
+            )
+        )
+
+
+@pytest.mark.parametrize("busy_timeout_ms", [True, 0, -1, 60_001])
+def test_unsafe_persistence_timeouts_are_rejected(
+    tmp_path: Path, busy_timeout_ms: object
+) -> None:
+    with pytest.raises(ConfigurationError, match="timeout"):
+        validate_paper_execution_persistence_runtime_configuration(
+            persistence_configuration(tmp_path, busy_timeout_ms=busy_timeout_ms)
+        )
+
+
+@pytest.mark.parametrize(
+    "application_version",
+    ["", " ", "bad version", "4/1", "live", "4.1-alpaca", "secret-4.1"],
+)
+def test_malformed_or_external_persistence_versions_are_rejected(
+    tmp_path: Path, application_version: str
+) -> None:
+    with pytest.raises(ConfigurationError, match="version"):
+        validate_paper_execution_persistence_runtime_configuration(
+            persistence_configuration(tmp_path, application_version=application_version)
+        )
 
 
 def configuration(
