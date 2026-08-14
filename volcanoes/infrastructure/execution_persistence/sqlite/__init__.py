@@ -1,8 +1,7 @@
 """SQLite execution persistence schema and migration foundation.
 
-This package intentionally exposes schema, migration, connection bootstrap,
-validation, and integrity helpers only. It does not implement repositories,
-unit-of-work behavior, runtime composition, broker ports, or broker calls.
+This package exposes the durable foundation and its explicit unit-of-work
+factory. It does not compose runtime behavior or make broker calls.
 """
 
 from volcanoes.infrastructure.execution_persistence.sqlite.connection import (
@@ -38,6 +37,10 @@ from volcanoes.infrastructure.execution_persistence.sqlite.validation import (
     SchemaValidationResult,
     validate_sqlite_execution_schema,
 )
+from volcanoes.infrastructure.execution_persistence.sqlite.unit_of_work import (
+    SqliteExecutionPersistence,
+    SqliteExecutionUnitOfWork,
+)
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
@@ -54,6 +57,8 @@ __all__ = [
     "SchemaState",
     "SchemaValidationResult",
     "SqliteExecutionMigration",
+    "SqliteExecutionPersistence",
+    "SqliteExecutionUnitOfWork",
     "apply_pending_migrations",
     "check_aggregate_transition_revisions",
     "check_broker_reference_ownership",

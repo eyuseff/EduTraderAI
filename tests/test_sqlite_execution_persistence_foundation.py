@@ -60,6 +60,8 @@ EXPECTED_PUBLIC_EXPORTS = {
     "SchemaState",
     "SchemaValidationResult",
     "SqliteExecutionMigration",
+    "SqliteExecutionPersistence",
+    "SqliteExecutionUnitOfWork",
     "apply_pending_migrations",
     "check_aggregate_transition_revisions",
     "check_broker_reference_ownership",
@@ -75,6 +77,8 @@ EXPECTED_PUBLIC_EXPORTS = {
 
 AUTHORIZED_PHASE2_SLICE2_CLASSES = {
     ("unit_of_work.py", "_SqliteExecutionTransaction"),
+    ("unit_of_work.py", "SqliteExecutionPersistence"),
+    ("unit_of_work.py", "SqliteExecutionUnitOfWork"),
     ("repositories.py", "_RepositoryBase"),
     ("repositories.py", "SqliteExecutionAggregateRepository"),
     ("repositories.py", "SqliteExecutionCommandRepository"),
@@ -592,7 +596,7 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
         path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")
     )
 
-    assert EXPECTED_PUBLIC_EXPORTS.issubset(set(module.__all__))
+    assert EXPECTED_PUBLIC_EXPORTS == set(module.__all__)
     assert CURRENT_SCHEMA_VERSION == 3
     assert MINIMUM_SUPPORTED_SCHEMA_VERSION == 1
     assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 3
@@ -1072,9 +1076,10 @@ def test_sqlite_infrastructure_allows_only_private_phase2_slice1_behavior():
     assert "_RepositoryBase".startswith("_")
     import volcanoes.infrastructure.execution_persistence.sqlite as sqlite_package
 
-    assert all(
-        "Repository" not in name and "UnitOfWork" not in name
+    assert {
+        name
         for name in sqlite_package.__all__
-    )
+        if "UnitOfWork" in name or "Repository" in name
+    } == {"SqliteExecutionUnitOfWork"}
     assert "PaperBrokerOrderReference" not in sqlite_package.__all__
     assert offenders == []

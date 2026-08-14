@@ -1,4 +1,4 @@
-"""Private transaction kernel for the incomplete SQLite persistence adapter."""
+"""Explicit unit of work for caller-owned SQLite execution persistence."""
 
 from __future__ import annotations
 
@@ -6,8 +6,20 @@ import sqlite3
 from types import TracebackType
 from typing import Self
 
+from volcanoes.application.execution.identities import PaperExecutionRevision
 from volcanoes.application.execution.persistence.contracts import (
+    AggregateSaveResult,
+    CommandRegistrationResult,
+    ExecutionAggregateRecord,
+    ExecutionCommandRecord,
+    ExecutionFailureRecord,
+    ExecutionIdempotencyRecord,
     ExecutionPersistenceConflict,
+    ExecutionReceiptRecord,
+    ExecutionTransitionRecord,
+    IdempotencyReservationResult,
+    RecordLoadResult,
+    TransitionAppendResult,
     UnitOfWorkCommitResult,
 )
 from volcanoes.application.execution.persistence.enums import (
@@ -16,10 +28,31 @@ from volcanoes.application.execution.persistence.enums import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
     SqliteExecutionBusyError,
+    SqliteExecutionConfigurationError,
+    SqliteExecutionSchemaError,
     SqliteExecutionTransactionError,
+)
+from volcanoes.infrastructure.execution_persistence.sqlite.connection import (
+    DEFAULT_BUSY_TIMEOUT_MS,
+    MAX_BUSY_TIMEOUT_MS,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
     CURRENT_SCHEMA_VERSION,
+)
+from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
+    SqliteExecutionAggregateRepository,
+    SqliteExecutionApprovalRepository,
+    SqliteExecutionBrokerReferenceRepository,
+    SqliteExecutionCommandRepository,
+    SqliteExecutionFailureRepository,
+    SqliteExecutionIdempotencyRepository,
+    SqliteExecutionReceiptRepository,
+    SqliteExecutionReconciliationRepository,
+    SqliteExecutionRestartDiscoveryRepository,
+    SqliteExecutionTransitionJournal,
+)
+from volcanoes.infrastructure.execution_persistence.sqlite.validation import (
+    validate_sqlite_execution_schema,
 )
 
 
@@ -146,3 +179,138 @@ def _status_for_conflict(
     return statuses.get(
         conflict.kind, ExecutionPersistenceResultStatus.TRANSACTION_ABORTED
     )
+
+
+class SqliteExecutionUnitOfWork:
+    """One explicit transaction over all SQLite execution repositories."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._transaction = _SqliteExecutionTransaction(connection)
+        self.aggregates = SqliteExecutionAggregateRepository(self._transaction)
+        self.commands = SqliteExecutionCommandRepository(self._transaction)
+        self.idempotency = SqliteExecutionIdempotencyRepository(self._transaction)
+        self.transitions = SqliteExecutionTransitionJournal(self._transaction)
+        self.broker_references = SqliteExecutionBrokerReferenceRepository(
+            self._transaction
+        )
+        self.receipts = SqliteExecutionReceiptRepository(self._transaction)
+        self.failures = SqliteExecutionFailureRepository(self._transaction)
+        self.approvals = SqliteExecutionApprovalRepository(self._transaction)
+        self.reconciliations = SqliteExecutionReconciliationRepository(
+            self._transaction
+        )
+        self.restart_discovery = SqliteExecutionRestartDiscoveryRepository(
+            self._transaction
+        )
+
+    def __enter__(self) -> Self:
+        self._transaction.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self._transaction.__exit__(exc_type, exc, traceback)
+
+    def commit(self) -> UnitOfWorkCommitResult:
+        return self._transaction.commit()
+
+    def rollback(self) -> None:
+        self._transaction.rollback()
+
+    def register_command(
+        self, command: ExecutionCommandRecord
+    ) -> CommandRegistrationResult:
+        return self.commands.register(command)
+
+    def reserve_idempotency(
+        self, reservation: ExecutionIdempotencyRecord
+    ) -> IdempotencyReservationResult:
+        return self.idempotency.reserve(reservation)
+
+    def load_aggregate(self, aggregate: ExecutionAggregateRecord) -> RecordLoadResult:
+        return self.aggregates.get(aggregate.aggregate_id)
+
+    def append_transition(
+        self, transition: ExecutionTransitionRecord
+    ) -> TransitionAppendResult:
+        return self.transitions.append(transition)
+
+    def save_aggregate(
+        self,
+        aggregate: ExecutionAggregateRecord,
+        *,
+        expected_revision: PaperExecutionRevision,
+    ) -> AggregateSaveResult:
+        return self.aggregates.save(
+            aggregate,
+            expected_revision=expected_revision,
+        )
+
+    def record_receipt(self, receipt: ExecutionReceiptRecord) -> RecordLoadResult:
+        return self.receipts.record(receipt)
+
+    def record_failure(self, failure: ExecutionFailureRecord) -> RecordLoadResult:
+        return self.failures.record(failure)
+
+
+class SqliteExecutionPersistence:
+    """Validated factory bound to one caller-owned configured connection."""
+
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        busy_timeout_ms: int = DEFAULT_BUSY_TIMEOUT_MS,
+    ) -> None:
+        if not isinstance(connection, sqlite3.Connection):
+            raise SqliteExecutionConfigurationError(
+                "A SQLite connection must be supplied by the caller."
+            )
+        if busy_timeout_ms <= 0 or busy_timeout_ms > MAX_BUSY_TIMEOUT_MS:
+            raise SqliteExecutionConfigurationError(
+                "Busy timeout is outside safe bounds."
+            )
+        try:
+            if connection.in_transaction:
+                raise SqliteExecutionTransactionError(
+                    "Persistence cannot bind inside an active transaction."
+                )
+            if connection.row_factory is not sqlite3.Row:
+                raise SqliteExecutionConfigurationError(
+                    "SQLite row_factory must be sqlite3.Row."
+                )
+            validation = validate_sqlite_execution_schema(
+                connection,
+                expected_busy_timeout_ms=busy_timeout_ms,
+            )
+        except sqlite3.Error as exc:
+            raise SqliteExecutionConfigurationError(
+                "SQLite connection validation failed safely."
+            ) from exc
+        if validation.blocks_execution and any(
+            "pragma" in failure
+            or "busy_timeout" in failure
+            or "journal_mode" in failure
+            for failure in validation.failures
+        ):
+            raise SqliteExecutionConfigurationError(
+                "SQLite connection configuration is invalid."
+            )
+        if validation.blocks_execution:
+            raise SqliteExecutionSchemaError(
+                "SQLite execution schema or configuration is invalid."
+            )
+        self._connection = connection
+
+    def unit_of_work(self) -> SqliteExecutionUnitOfWork:
+        return SqliteExecutionUnitOfWork(self._connection)
+
+
+__all__ = [
+    "SqliteExecutionPersistence",
+    "SqliteExecutionUnitOfWork",
+]
