@@ -214,6 +214,15 @@ FORBIDDEN_TRANSACTIONAL_INTAKE_PREFIXES = FORBIDDEN_EXECUTION_PERSISTENCE_PREFIX
     "volcanoes.execution",
 )
 
+FORBIDDEN_CERTIFICATION_PREFIXES = FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES + (
+    "volcanoes.infrastructure",
+    "volcanoes.execution",
+    "volcanoes.application.execution.persistence",
+    "volcanoes.application.execution.intake",
+    "volcanoes.application.execution.pipeline",
+    "volcanoes.application.execution.runtime",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -2631,4 +2640,46 @@ def test_transactional_intake_is_brokerless_and_storage_neutral() -> None:
         for token in prohibited_tokens
         if token in path.read_text(encoding="utf-8")
     ]
+    assert offenders == []
+
+
+def test_paper_certification_package_is_offline_and_storage_neutral() -> None:
+    paths = _python_files("volcanoes/application/execution/certification")
+
+    assert _violations(paths, FORBIDDEN_CERTIFICATION_PREFIXES) == ()
+
+
+def test_paper_certification_package_exposes_no_effect_capabilities() -> None:
+    paths = _python_files("volcanoes/application/execution/certification")
+    prohibited_symbols = (
+        "def submit",
+        "def cancel",
+        "def replace",
+        "def query",
+        "def retry",
+        "def reconcile",
+        "submit(",
+        "cancel(",
+        "replace(",
+        "query(",
+        "retry(",
+        "reconcile(",
+        "transactionprovider",
+        "persistenceprovider",
+        "credentialprovider",
+        "runtimecomposition",
+        "executionpipeline",
+        "simulatorport",
+        "scannerport",
+        "supervisorport",
+    )
+    offenders = []
+    for path in paths:
+        source = path.read_text(encoding="utf-8").lower()
+        offenders.extend(
+            f"{path.relative_to(PROJECT_ROOT)} contains {symbol}"
+            for symbol in prohibited_symbols
+            if symbol in source
+        )
+
     assert offenders == []
