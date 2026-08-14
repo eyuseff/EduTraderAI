@@ -5,6 +5,37 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from pathlib import Path
+import re
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_SQLITE_SUFFIXES = frozenset({".db", ".sqlite", ".sqlite3"})
+_PROTECTED_PATH_PARTS = frozenset(
+    {
+        ".git",
+        "build",
+        "state",
+        "alpaca",
+        "live",
+        "external-paper",
+        "external_paper",
+        "credentials",
+        "credential",
+        "secrets",
+        "secret",
+    }
+)
+_PROHIBITED_DATABASE_NAMES = frozenset({"simulated_broker.json"})
+_APPLICATION_VERSION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}")
+_PROTECTED_PATH_TOKEN_PATTERN = re.compile(
+    r"(?:^|[._+-])(?:alpaca|credential|credentials|live|secret|secrets)(?:$|[._+-])"
+    r"|(?:^|[._+-])external[-_+]paper(?:$|[._+-])",
+    re.IGNORECASE,
+)
+_PROHIBITED_VERSION_TOKENS = re.compile(
+    r"(?:^|[._+-])(alpaca|credential|credentials|external|live|secret|secrets)(?:$|[._+-])",
+    re.IGNORECASE,
+)
 
 
 class ConfigurationError(ValueError):
@@ -23,6 +54,78 @@ class ScannerExecutionMode(StrEnum):
 
     SUPERVISED = "SUPERVISED"
     LEGACY_ROLLBACK = "LEGACY_ROLLBACK"
+
+
+@dataclass(frozen=True, slots=True)
+class PaperExecutionPersistenceRuntimeConfiguration:
+    """Explicit local SQLite persistence runtime configuration."""
+
+    database_path: Path
+    application_version: str
+    busy_timeout_ms: int
+
+
+def validate_paper_execution_persistence_runtime_configuration(
+    configuration: PaperExecutionPersistenceRuntimeConfiguration,
+) -> PaperExecutionPersistenceRuntimeConfiguration:
+    """Validate local persistence settings without changing the filesystem."""
+
+    if not isinstance(configuration, PaperExecutionPersistenceRuntimeConfiguration):
+        raise ConfigurationError(
+            "configuration must be PaperExecutionPersistenceRuntimeConfiguration."
+        )
+    _validate_persistence_database_path(configuration.database_path)
+    _validate_persistence_application_version(configuration.application_version)
+    if (
+        type(configuration.busy_timeout_ms) is not int
+        or configuration.busy_timeout_ms <= 0
+        or configuration.busy_timeout_ms > 60_000
+    ):
+        raise ConfigurationError("Persistence busy timeout is outside safe bounds.")
+    return configuration
+
+
+def _validate_persistence_database_path(database_path: Path) -> None:
+    if not isinstance(database_path, Path):
+        raise ConfigurationError("Persistence database path must be a Path.")
+    if not database_path.is_absolute():
+        raise ConfigurationError("Persistence database path must be absolute.")
+    if not database_path.name:
+        raise ConfigurationError("Persistence database path requires a file name.")
+    if database_path.name.lower() in _PROHIBITED_DATABASE_NAMES:
+        raise ConfigurationError("Persistence database name is protected.")
+    if database_path.suffix.lower() not in _SQLITE_SUFFIXES:
+        raise ConfigurationError("Persistence database path has an invalid suffix.")
+
+    for candidate in (database_path, *database_path.parents):
+        if candidate.exists() and candidate.is_symlink():
+            raise ConfigurationError("Persistence database path cannot use symlinks.")
+
+    resolved = database_path.resolve(strict=False)
+    parent = resolved.parent
+    if not parent.exists() or not parent.is_dir():
+        raise ConfigurationError(
+            "Persistence database parent must be an existing directory."
+        )
+    if resolved == _PROJECT_ROOT or resolved.is_relative_to(_PROJECT_ROOT):
+        raise ConfigurationError(
+            "Persistence database path cannot be inside the repository."
+        )
+    lowered_parts = {part.lower() for part in resolved.parts}
+    if lowered_parts.intersection(_PROTECTED_PATH_PARTS) or any(
+        _PROTECTED_PATH_TOKEN_PATTERN.search(part) is not None
+        for part in resolved.parts
+    ):
+        raise ConfigurationError("Persistence database path is protected.")
+
+
+def _validate_persistence_application_version(application_version: str) -> None:
+    if (
+        not isinstance(application_version, str)
+        or _APPLICATION_VERSION_PATTERN.fullmatch(application_version) is None
+        or _PROHIBITED_VERSION_TOKENS.search(application_version) is not None
+    ):
+        raise ConfigurationError("Persistence application version is malformed.")
 
 
 @dataclass(frozen=True, slots=True)
