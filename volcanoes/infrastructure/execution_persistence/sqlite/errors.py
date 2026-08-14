@@ -51,6 +51,12 @@ class SqliteExecutionBusyError(SqliteExecutionPersistenceError):
     safe_code = "SQLITE_EXECUTION_BUSY"
 
 
+class SqliteExecutionTransactionError(SqliteExecutionPersistenceError):
+    """A SQLite repository transaction could not complete safely."""
+
+    safe_code = "SQLITE_EXECUTION_TRANSACTION_ERROR"
+
+
 class SqliteExecutionPermissionError(SqliteExecutionPersistenceError):
     """Filesystem permissions are insufficient for safe operation."""
 
@@ -67,4 +73,5 @@ __all__ = [
     "SqliteExecutionPermissionError",
     "SqliteExecutionPersistenceError",
     "SqliteExecutionSchemaError",
+    "SqliteExecutionTransactionError",
 ]

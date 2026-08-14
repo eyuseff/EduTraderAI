@@ -73,6 +73,14 @@ EXPECTED_PUBLIC_EXPORTS = {
     "validate_sqlite_execution_schema",
 }
 
+AUTHORIZED_PHASE2_SLICE1_CLASSES = {
+    ("unit_of_work.py", "_SqliteExecutionTransaction"),
+    ("repositories.py", "_RepositoryBase"),
+    ("repositories.py", "SqliteExecutionAggregateRepository"),
+    ("repositories.py", "SqliteExecutionCommandRepository"),
+    ("repositories.py", "SqliteExecutionIdempotencyRepository"),
+}
+
 EXPECTED_TABLES = {
     "execution_aggregates",
     "execution_commands",
@@ -969,7 +977,7 @@ def test_pragma_verification_failure_and_stable_error_contracts(tmp_path):
     assert SqliteExecutionSchemaError.safe_code == "SQLITE_EXECUTION_SCHEMA_ERROR"
 
 
-def test_sqlite_infrastructure_has_no_later_slice_or_runtime_behavior():
+def test_sqlite_infrastructure_allows_only_private_phase2_slice1_behavior():
     root = Path("volcanoes/infrastructure/execution_persistence/sqlite")
     prohibited_tokens = (
         "state/simulated_broker.json",
@@ -994,18 +1002,72 @@ def test_sqlite_infrastructure_has_no_later_slice_or_runtime_behavior():
         "FastAPI",
         "flask",
     )
-    prohibited_class_fragments = ("Repository", "UnitOfWork", "Service")
     offenders: list[str] = []
+    discovered_phase2_classes: set[tuple[str, str]] = set()
     for path in sorted(root.rglob("*.py")):
         source = path.read_text(encoding="utf-8")
-        offenders.extend(
-            f"{path} contains {token}" for token in prohibited_tokens if token in source
-        )
+        relative_path = path.relative_to(root).as_posix()
         tree = ast.parse(source)
+        source_for_token_scan = source
+        if relative_path == "repositories.py":
+            broker_reference_imports = {
+                (node.module, alias.name, alias.asname)
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom)
+                and node.module == "volcanoes.application.execution.identities"
+                for alias in node.names
+                if alias.name == "PaperBrokerOrderReference"
+            }
+            broker_reference_names = {
+                node.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Name) and "PaperBroker" in node.id
+            }
+            runtime_broker_imports = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom)
+                and node.module is not None
+                and "broker" in node.module.lower()
+            }
+            assert broker_reference_imports == {
+                (
+                    "volcanoes.application.execution.identities",
+                    "PaperBrokerOrderReference",
+                    None,
+                )
+            }
+            assert broker_reference_names == {"PaperBrokerOrderReference"}
+            assert runtime_broker_imports == set()
+            source_for_token_scan = source.replace("PaperBrokerOrderReference", "")
+        offenders.extend(
+            f"{path} contains {token}"
+            for token in prohibited_tokens
+            if token in source_for_token_scan
+        )
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef) and any(
-                fragment in node.name for fragment in prohibited_class_fragments
+            if not isinstance(node, ast.ClassDef):
+                continue
+            class_identity = (relative_path, node.name)
+            if relative_path in {"repositories.py", "unit_of_work.py"}:
+                discovered_phase2_classes.add(class_identity)
+            if (
+                any(
+                    fragment in node.name
+                    for fragment in ("Repository", "UnitOfWork", "Service")
+                )
+                and class_identity not in AUTHORIZED_PHASE2_SLICE1_CLASSES
             ):
                 offenders.append(f"{path} defines {node.name}")
 
+    assert discovered_phase2_classes == AUTHORIZED_PHASE2_SLICE1_CLASSES
+    assert ("repositories.py", "_RepositoryBase") in AUTHORIZED_PHASE2_SLICE1_CLASSES
+    assert "_RepositoryBase".startswith("_")
+    import volcanoes.infrastructure.execution_persistence.sqlite as sqlite_package
+
+    assert all(
+        "Repository" not in name and "UnitOfWork" not in name
+        for name in sqlite_package.__all__
+    )
+    assert "PaperBrokerOrderReference" not in sqlite_package.__all__
     assert offenders == []
