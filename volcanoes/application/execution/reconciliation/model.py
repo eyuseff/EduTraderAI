@@ -42,6 +42,9 @@ class ReconciliationFacts:
     broker_reference: str | None = None
     observation_conflict: bool = False
     ownership_conflict: bool = False
+    cancellation_ambiguous: bool = False
+    replacement_ambiguous: bool = False
+    revision_conflict: bool = False
     evidence_complete: bool = True
 
     def __post_init__(self) -> None:
@@ -75,6 +78,12 @@ def compare_reconciliation_facts(facts: ReconciliationFacts) -> ReconciliationDe
 
     if not facts.evidence_complete:
         return _unresolved("EVIDENCE_INCOMPLETE")
+    if facts.cancellation_ambiguous:
+        return _operator("CANCELLATION_AMBIGUITY")
+    if facts.replacement_ambiguous:
+        return _operator("REPLACEMENT_AMBIGUITY")
+    if facts.revision_conflict:
+        return _operator("REVISION_CONFLICT")
     if facts.observation_conflict or facts.ownership_conflict:
         return _operator("CONFLICTING_EVIDENCE")
     if not facts.local_present and not facts.broker_present:
