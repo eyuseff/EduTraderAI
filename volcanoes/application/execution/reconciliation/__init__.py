@@ -4,12 +4,12 @@ from .model import (
     RECOVERY_DESTINATIONS,
     ReconciliationDecision,
     ReconciliationFacts,
-    reconcile,
+    compare_reconciliation_facts,
 )
 
 __all__ = [
     "RECOVERY_DESTINATIONS",
     "ReconciliationDecision",
     "ReconciliationFacts",
-    "reconcile",
+    "compare_reconciliation_facts",
 ]
