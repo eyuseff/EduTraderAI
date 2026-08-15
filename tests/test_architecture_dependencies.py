@@ -223,6 +223,15 @@ FORBIDDEN_CERTIFICATION_PREFIXES = FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES + (
     "volcanoes.application.execution.runtime",
 )
 
+FORBIDDEN_CONTROLLED_SUBMISSION_PREFIXES = FORBIDDEN_EXECUTION_PERSISTENCE_PREFIXES + (
+    "volcanoes.infrastructure",
+    "volcanoes.execution",
+    "volcanoes.application.execution.intake",
+    "volcanoes.application.execution.pipeline",
+    "volcanoes.application.execution.runtime",
+    "volcanoes.application.services",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportReference:
@@ -339,7 +348,7 @@ def _violations(
             ):
                 relative = path.relative_to(PROJECT_ROOT)
                 violations.add(
-                    f"{relative}:{reference.line} imports " f"{reference.module}"
+                    f"{relative}:{reference.line} imports {reference.module}"
                 )
 
     return tuple(sorted(violations))
@@ -1923,7 +1932,6 @@ def test_in_memory_persistence_imports_no_infrastructure_or_runtime_modules() ->
             "subprocess",
             "os",
             "pathlib",
-            "datetime",
             "time",
             "random",
             "uuid",
@@ -2681,5 +2689,55 @@ def test_paper_certification_package_exposes_no_effect_capabilities() -> None:
             for symbol in prohibited_symbols
             if symbol in source
         )
+
+    assert offenders == []
+
+
+def test_controlled_submission_package_is_broker_neutral_and_uses_only_storage_neutral_ports() -> (
+    None
+):
+    paths = _python_files("volcanoes/application/execution/submission")
+
+    assert _violations(paths, FORBIDDEN_CONTROLLED_SUBMISSION_PREFIXES) == ()
+
+
+def test_controlled_submission_is_not_wired_into_existing_runtime_paths() -> None:
+    prohibited_module = "volcanoes.application.execution.submission"
+    paths = (
+        PROJECT_ROOT / "app.py",
+        PROJECT_ROOT / "adapters/paper_broker_execution.py",
+        PROJECT_ROOT / "adapters/paper_execution_persistence_runtime.py",
+        PROJECT_ROOT / "volcanoes/application/services/submit_trade.py",
+        PROJECT_ROOT / "volcanoes/application/supervisor/supervisor.py",
+    )
+
+    assert all(
+        prohibited_module not in path.read_text(encoding="utf-8") for path in paths
+    )
+
+
+def test_controlled_submission_defines_no_runtime_or_effect_implementation() -> None:
+    paths = _python_files("volcanoes/application/execution/submission")
+    prohibited_symbols = (
+        "sqlite3",
+        "requests",
+        "socket",
+        "getenv",
+        "environ",
+        "alpaca",
+        "tradingclient",
+        "paperbrokerexecutionadapter",
+        "executionpipeline",
+        "submittradeservice",
+        "retry_policy",
+        "reconcile",
+        "query_status",
+    )
+    offenders = [
+        f"{path.relative_to(PROJECT_ROOT)} contains {symbol}"
+        for path in paths
+        for symbol in prohibited_symbols
+        if symbol in path.read_text(encoding="utf-8").lower()
+    ]
 
     assert offenders == []

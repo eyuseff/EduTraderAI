@@ -154,15 +154,18 @@ def _apply_through_v002(connection: sqlite3.Connection) -> None:
         ).fetchall()
     )
     assert migration_ids == ("v001", "v002")
-    assert connection.execute(
-        "SELECT count(*) FROM schema_migrations WHERE migration_id = 'v003'"
-    ).fetchone()[0] == 0
+    assert (
+        connection.execute(
+            "SELECT count(*) FROM schema_migrations WHERE migration_id = 'v003'"
+        ).fetchone()[0]
+        == 0
+    )
 
 
 def _apply_current(connection: sqlite3.Connection) -> None:
     result = apply_pending_migrations(
         connection,
-        KNOWN_MIGRATIONS,
+        KNOWN_MIGRATIONS[:3],
         applied_at=NOW,
         application_version="f5e2c-v003-test",
     )
@@ -533,10 +536,13 @@ def test_fresh_database_applies_v001_v002_and_v003(tmp_path: Path) -> None:
         assert set(EXECUTION_TABLES).issubset(tables)
         assert not any(name.startswith("_v002_") for name in tables)
         assert "_v003_guard" not in tables
-        assert connection.execute(
-            "SELECT name FROM sqlite_temp_master "
-            "WHERE type = 'table' AND name = '_v003_guard'"
-        ).fetchall() == []
+        assert (
+            connection.execute(
+                "SELECT name FROM sqlite_temp_master "
+                "WHERE type = 'table' AND name = '_v003_guard'"
+            ).fetchall()
+            == []
+        )
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         connection.close()
@@ -563,8 +569,7 @@ def test_populated_v002_migrates_all_rows_without_non_version_data_change(
         }
         for table in EXECUTION_TABLES:
             version_index = tuple(
-                row["name"]
-                for row in connection.execute(f"PRAGMA table_info({table})")
+                row["name"] for row in connection.execute(f"PRAGMA table_info({table})")
             ).index("schema_version")
             for old, new in zip(before[table], after[table], strict=True):
                 assert old[:version_index] == new[:version_index]
@@ -589,10 +594,13 @@ def test_populated_v002_migrates_all_rows_without_non_version_data_change(
             ).fetchall()
         )
         assert not any(str(row[0]).startswith("_v002_") for row in objects)
-        assert connection.execute(
-            "SELECT name FROM sqlite_temp_master "
-            "WHERE type = 'table' AND name = '_v003_guard'"
-        ).fetchall() == []
+        assert (
+            connection.execute(
+                "SELECT name FROM sqlite_temp_master "
+                "WHERE type = 'table' AND name = '_v003_guard'"
+            ).fetchall()
+            == []
+        )
         assert len(before_schema["migrations"]) == 2
         assert tuple(
             row
@@ -782,15 +790,21 @@ def test_v003_preserves_foreign_keys_transition_uniqueness_and_deferrability(
                 idempotency_key="idem-constraints",
                 record_fingerprint="transition-record-id-only-fp",
             )
-        assert connection.execute(
-            "SELECT count(*) FROM execution_transitions"
-        ).fetchone()[0] == baseline_count
-        assert tuple(
-            connection.execute(
-                "SELECT * FROM execution_transitions "
-                "WHERE transition_record_id = 'transition-constraints'"
-            ).fetchone()
-        ) == baseline_transition
+        assert (
+            connection.execute("SELECT count(*) FROM execution_transitions").fetchone()[
+                0
+            ]
+            == baseline_count
+        )
+        assert (
+            tuple(
+                connection.execute(
+                    "SELECT * FROM execution_transitions "
+                    "WHERE transition_record_id = 'transition-constraints'"
+                ).fetchone()
+            )
+            == baseline_transition
+        )
         with pytest.raises(
             sqlite3.IntegrityError,
             match="execution_transitions.aggregate_id, "
@@ -809,15 +823,21 @@ def test_v003_preserves_foreign_keys_transition_uniqueness_and_deferrability(
                 idempotency_key="idem-constraints",
                 record_fingerprint="transition-next-revision-only-fp",
             )
-        assert connection.execute(
-            "SELECT count(*) FROM execution_transitions"
-        ).fetchone()[0] == baseline_count
-        assert tuple(
-            connection.execute(
-                "SELECT * FROM execution_transitions "
-                "WHERE transition_record_id = 'transition-constraints'"
-            ).fetchone()
-        ) == baseline_transition
+        assert (
+            connection.execute("SELECT count(*) FROM execution_transitions").fetchone()[
+                0
+            ]
+            == baseline_count
+        )
+        assert (
+            tuple(
+                connection.execute(
+                    "SELECT * FROM execution_transitions "
+                    "WHERE transition_record_id = 'transition-constraints'"
+                ).fetchone()
+            )
+            == baseline_transition
+        )
         with pytest.raises(
             sqlite3.IntegrityError,
             match="execution_transitions.aggregate_id, "
@@ -836,23 +856,28 @@ def test_v003_preserves_foreign_keys_transition_uniqueness_and_deferrability(
                 idempotency_key="idem-constraints",
                 record_fingerprint="transition-transition-id-only-fp",
             )
-        assert connection.execute(
-            "SELECT count(*) FROM execution_transitions"
-        ).fetchone()[0] == baseline_count
-        assert tuple(
-            connection.execute(
-                "SELECT * FROM execution_transitions "
-                "WHERE transition_record_id = 'transition-constraints'"
-            ).fetchone()
-        ) == baseline_transition
+        assert (
+            connection.execute("SELECT count(*) FROM execution_transitions").fetchone()[
+                0
+            ]
+            == baseline_count
+        )
+        assert (
+            tuple(
+                connection.execute(
+                    "SELECT * FROM execution_transitions "
+                    "WHERE transition_record_id = 'transition-constraints'"
+                ).fetchone()
+            )
+            == baseline_transition
+        )
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
                 "INSERT INTO execution_commands SELECT * FROM execution_commands"
             )
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
-                "INSERT INTO execution_idempotency "
-                "SELECT * FROM execution_idempotency"
+                "INSERT INTO execution_idempotency SELECT * FROM execution_idempotency"
             )
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
@@ -889,7 +914,7 @@ def test_v003_rerun_is_idempotent_for_metadata_rows_and_schema_objects(
         before_schema = _schema_snapshot(connection)
         result = apply_pending_migrations(
             connection,
-            KNOWN_MIGRATIONS,
+            KNOWN_MIGRATIONS[:3],
             applied_at=NOW,
             application_version="f5e2c-v003-test",
         )
@@ -897,9 +922,12 @@ def test_v003_rerun_is_idempotent_for_metadata_rows_and_schema_objects(
         assert result.applied_migration_ids == ()
         assert _row_snapshot(connection) == before_rows
         assert _schema_snapshot(connection) == before_schema
-        assert connection.execute(
-            "SELECT count(*) FROM schema_migrations WHERE migration_id = 'v003'"
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM schema_migrations WHERE migration_id = 'v003'"
+            ).fetchone()[0]
+            == 1
+        )
     finally:
         connection.close()
 
@@ -949,10 +977,13 @@ def test_v003_checksum_mismatch_rejects_without_schema_or_metadata_mutation(
             ).fetchall()
         )
         assert not any(str(row[0]).startswith("_v002_") for row in objects)
-        assert connection.execute(
-            "SELECT name FROM sqlite_temp_master "
-            "WHERE type = 'table' AND name = '_v003_guard'"
-        ).fetchall() == []
+        assert (
+            connection.execute(
+                "SELECT name FROM sqlite_temp_master "
+                "WHERE type = 'table' AND name = '_v003_guard'"
+            ).fetchall()
+            == []
+        )
         assert (
             inspect_schema_state(
                 connection,

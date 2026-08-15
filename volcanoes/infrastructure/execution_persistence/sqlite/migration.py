@@ -15,11 +15,12 @@ from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
     load_contract_alignment_schema_sql,
     load_initial_schema_sql,
     load_schema_version_text_sql,
+    load_durable_dispatch_claim_sql,
 )
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 MINIMUM_SUPPORTED_SCHEMA_VERSION = 1
-MAXIMUM_SUPPORTED_SCHEMA_VERSION = 3
+MAXIMUM_SUPPORTED_SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,14 +393,26 @@ SCHEMA_VERSION_TEXT_MIGRATION = SqliteExecutionMigration.create(
     ),
 )
 
+DURABLE_DISPATCH_CLAIM_MIGRATION = SqliteExecutionMigration.create(
+    migration_id="v004",
+    name="add durable Paper dispatch claim authority",
+    previous_version=3,
+    resulting_version=4,
+    sql_text=load_durable_dispatch_claim_sql(),
+    irreversible=True,
+    safe_description=("Add fail-closed dispatch control and immutable claim evidence."),
+)
+
 KNOWN_MIGRATIONS = (
     INITIAL_MIGRATION,
     CONTRACT_ALIGNMENT_MIGRATION,
     SCHEMA_VERSION_TEXT_MIGRATION,
+    DURABLE_DISPATCH_CLAIM_MIGRATION,
 )
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
+    "DURABLE_DISPATCH_CLAIM_MIGRATION",
     "CONTRACT_ALIGNMENT_MIGRATION",
     "INITIAL_MIGRATION",
     "KNOWN_MIGRATIONS",

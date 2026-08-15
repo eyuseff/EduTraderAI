@@ -9,6 +9,8 @@ from volcanoes.infrastructure.execution_persistence.sqlite.connection import (
     FULL_SYNCHRONOUS_VALUE,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
+    check_dispatch_claim_bindings,
+    check_dispatch_outcome_bindings,
     check_foreign_keys,
     run_quick_check,
 )
@@ -64,6 +66,18 @@ def validate_sqlite_execution_schema(
     foreign_key_check = check_foreign_keys(connection)
     if not foreign_key_check.passed:
         failures.append("foreign_key_check failed")
+
+    control = connection.execute(
+        "SELECT enabled, paper_mode, emergency_stop_active, legacy_authority_active, generation FROM execution_dispatch_controls WHERE control_id='PAPER_DISPATCH'"
+    ).fetchone()
+    if control is None or int(control[1]) != 1 or int(control[4]) < 1:
+        failures.append("dispatch control singleton is invalid")
+    claim_bindings = check_dispatch_claim_bindings(connection)
+    if not claim_bindings.passed:
+        failures.append("dispatch claim bindings are invalid")
+    outcome_bindings = check_dispatch_outcome_bindings(connection)
+    if not outcome_bindings.passed:
+        failures.append("dispatch outcome bindings are invalid")
 
     return SchemaValidationResult(passed=not failures, failures=tuple(failures))
 

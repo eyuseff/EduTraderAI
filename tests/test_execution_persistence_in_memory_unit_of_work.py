@@ -8,6 +8,26 @@ from volcanoes.application.execution import (
     InMemoryUnitOfWorkClosedError,
     PaperExecutionRevision,
 )
+from volcanoes.application.execution.persistence import RecordLoadResult
+from volcanoes.application.execution.persistence.in_memory.repositories import (
+    InMemoryExecutionAggregateRepository,
+    InMemoryExecutionBrokerReferenceRepository,
+    InMemoryExecutionDispatchResolutionRepository,
+    InMemoryExecutionReceiptRepository,
+    InMemoryExecutionTransitionJournal,
+)
+from volcanoes.application.execution.persistence.in_memory.unit_of_work import (
+    InMemoryExecutionUnitOfWork,
+)
+from volcanoes.application.execution.submission import (
+    ControlledPaperSubmissionService,
+    PaperDispatchObservation,
+)
+from volcanoes.application.execution import PaperBrokerOrderReference
+from test_sqlite_execution_persistence_unit_of_work import (
+    DISPATCH_NOW,
+    _seed_dispatch_authority,
+)
 from test_execution_persistence_in_memory_repositories import (
     aggregate_id,
     aggregate_record,
@@ -183,3 +203,64 @@ def test_failed_commit_closes_transaction_without_partial_state() -> None:
     ].execution_revision == PaperExecutionRevision(1)
     with pytest.raises(InMemoryUnitOfWorkClosedError):
         stale.aggregates.get(aggregate_id())
+
+
+@pytest.mark.parametrize(
+    ("target", "method", "raise_call"),
+    (
+        (InMemoryExecutionBrokerReferenceRepository, "register", 1),
+        (InMemoryExecutionReceiptRepository, "record", 1),
+        (InMemoryExecutionTransitionJournal, "append", 1),
+        (InMemoryExecutionTransitionJournal, "append", 2),
+        (InMemoryExecutionAggregateRepository, "_save_dispatch_outcome", 1),
+        (InMemoryExecutionDispatchResolutionRepository, "record", 1),
+    ),
+)
+def test_dispatch_outcome_exception_restores_every_stage_before_later_commit(
+    monkeypatch, target, method, raise_call
+) -> None:
+    store = InMemoryExecutionPersistence()
+    request = _seed_dispatch_authority(store)
+    captured = []
+
+    def capture(self, write_set):
+        captured.append(write_set)
+        return RecordLoadResult(ExecutionPersistenceResultStatus.CREATED, 4)
+
+    monkeypatch.setattr(InMemoryExecutionUnitOfWork, "record_dispatch_outcome", capture)
+    ControlledPaperSubmissionService(
+        store,
+        lambda order: PaperDispatchObservation(
+            request.submission_id,
+            PaperBrokerOrderReference("pbr-" + "5" * 64),
+            True,
+            "ACK",
+        ),
+        clock=lambda: DISPATCH_NOW,
+    ).apply_once(request)
+    assert len(captured) == 1
+    monkeypatch.undo()
+
+    original = getattr(target, method)
+    calls = 0
+
+    def injected(self, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == raise_call:
+            raise RuntimeError("injected coordinated-outcome failure")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(target, method, injected)
+    unit = store.unit_of_work()
+    with pytest.raises(RuntimeError, match="injected coordinated-outcome failure"):
+        unit.record_dispatch_outcome(captured[0])
+    assert unit.commit().committed
+    state = store.snapshot()
+    assert len(state._dispatch_claims) == 1
+    assert len(state._dispatch_authorizations) == 1
+    assert not state._broker_references
+    assert not state._receipts
+    assert not state._transitions_by_id
+    assert not state._dispatch_resolutions
+    assert state.aggregate_records()[0].lifecycle_state.value == "DISPATCH_PENDING"

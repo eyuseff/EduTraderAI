@@ -27,6 +27,11 @@ from volcanoes.application.execution.persistence.contracts import (
     ExecutionReceiptRecord,
     ExecutionReconciliationRecord,
     ExecutionTransitionRecord,
+    ExecutionDispatchAuthorizationRecord,
+    ExecutionDispatchClaimRecord,
+    ExecutionDispatchControlRecord,
+    ExecutionDispatchResolutionRecord,
+    fail_closed_dispatch_control,
 )
 
 
@@ -65,6 +70,18 @@ class InMemoryExecutionPersistenceState:
         default_factory=dict
     )
     _sequence: int = 0
+    _dispatch_control: ExecutionDispatchControlRecord | None = field(
+        default_factory=fail_closed_dispatch_control
+    )
+    _dispatch_claims: dict[str, ExecutionDispatchClaimRecord] = field(
+        default_factory=dict
+    )
+    _dispatch_authorizations: dict[str, ExecutionDispatchAuthorizationRecord] = field(
+        default_factory=dict
+    )
+    _dispatch_resolutions: dict[str, ExecutionDispatchResolutionRecord] = field(
+        default_factory=dict
+    )
 
     def snapshot(self) -> "InMemoryExecutionPersistenceState":
         """Return an isolated mutable snapshot of this process-local state."""
@@ -87,6 +104,10 @@ class InMemoryExecutionPersistenceState:
             _approvals=dict(self._approvals),
             _reconciliations=dict(self._reconciliations),
             _sequence=self._sequence,
+            _dispatch_control=self._dispatch_control,
+            _dispatch_claims=dict(self._dispatch_claims),
+            _dispatch_authorizations=dict(self._dispatch_authorizations),
+            _dispatch_resolutions=dict(self._dispatch_resolutions),
         )
 
     def replace_from(self, other: "InMemoryExecutionPersistenceState") -> None:
@@ -109,6 +130,10 @@ class InMemoryExecutionPersistenceState:
         self._approvals = dict(other._approvals)
         self._reconciliations = dict(other._reconciliations)
         self._sequence = other._sequence
+        self._dispatch_control = other._dispatch_control
+        self._dispatch_claims = dict(other._dispatch_claims)
+        self._dispatch_authorizations = dict(other._dispatch_authorizations)
+        self._dispatch_resolutions = dict(other._dispatch_resolutions)
 
     def aggregate_records(self) -> tuple[ExecutionAggregateRecord, ...]:
         """Return aggregate records in deterministic identity order."""
