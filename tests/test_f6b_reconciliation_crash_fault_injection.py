@@ -79,10 +79,12 @@ def test_conflicting_reconciliation_in_same_transaction_rolls_back_first_write(
         repository = SqliteExecutionReconciliationRepository(transaction)
         assert repository.record(record).status is ExecutionPersistenceResultStatus.CREATED
         conflict = repository.record(conflicting)
-        assert conflict.status is ExecutionPersistenceResultStatus.RECONCILIATION_CONFLICT
+        assert conflict.status is ExecutionPersistenceResultStatus.COMMAND_CONFLICT
+        assert conflict.conflict is not None
+        assert conflict.conflict.code == "RECONCILIATION_CONFLICT"
         assert (
             transaction.commit().status
-            is ExecutionPersistenceResultStatus.RECONCILIATION_CONFLICT
+            is ExecutionPersistenceResultStatus.COMMAND_CONFLICT
         )
     connection.close()
 
