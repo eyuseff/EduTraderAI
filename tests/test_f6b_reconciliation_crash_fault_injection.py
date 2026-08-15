@@ -84,7 +84,7 @@ def test_conflicting_reconciliation_in_same_transaction_rolls_back_first_write(
         assert conflict.conflict.code == "RECONCILIATION_CONFLICT"
         assert (
             transaction.commit().status
-            is ExecutionPersistenceResultStatus.COMMAND_CONFLICT
+            is ExecutionPersistenceResultStatus.TRANSACTION_ABORTED
         )
     connection.close()
 
