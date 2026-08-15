@@ -479,6 +479,24 @@ def _reconciliation_decision(
     }:
         spec = TRANSITION_BY_ID["PX-TRN-027"]
         destination = destination or State.PARTIALLY_FILLED
+    elif outcome is ReconciliationOutcome.OPERATOR_ACTION_REQUIRED:
+        if not (
+            context.approval_binding_valid
+            and context.approval_time_valid
+            and context.policy_compatible
+        ):
+            return _rejected(
+                current,
+                "OPERATOR_RECOVERY_APPROVAL_INVALID",
+                reconciliation_required=True,
+            )
+        if destination is None or destination is State.RECONCILIATION_REQUIRED:
+            return _rejected(
+                current,
+                "OPERATOR_RECOVERY_DESTINATION_REQUIRED",
+                reconciliation_required=True,
+            )
+        spec = TRANSITION_BY_ID["PX-TRN-027"]
     else:
         spec = TRANSITION_BY_ID["PX-TRN-028"]
         destination = State.RECONCILIATION_REQUIRED
