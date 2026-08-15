@@ -23,6 +23,10 @@ from volcanoes.application.execution.persistence.in_memory.repositories import (
     InMemoryExecutionReconciliationRepository,
     InMemoryExecutionRestartDiscoveryRepository,
     InMemoryExecutionTransitionJournal,
+    InMemoryExecutionDispatchAuthorizationRepository,
+    InMemoryExecutionDispatchClaimRepository,
+    InMemoryExecutionDispatchControlRepository,
+    InMemoryExecutionDispatchResolutionRepository,
 )
 from volcanoes.application.execution.persistence.in_memory.state import (
     InMemoryExecutionPersistenceState,
@@ -35,6 +39,10 @@ from volcanoes.application.execution.persistence.in_memory.unit_of_work import (
 __all__ = [
     "InMemoryCommitInvariantError",
     "InMemoryExecutionAggregateRepository",
+    "InMemoryExecutionDispatchAuthorizationRepository",
+    "InMemoryExecutionDispatchClaimRepository",
+    "InMemoryExecutionDispatchControlRepository",
+    "InMemoryExecutionDispatchResolutionRepository",
     "InMemoryExecutionApprovalRepository",
     "InMemoryExecutionBrokerReferenceRepository",
     "InMemoryExecutionCommandRepository",

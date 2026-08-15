@@ -340,7 +340,7 @@ def test_locked_database_surfaces_busy_without_retry(tmp_path: Path) -> None:
     owner.close()
 
 
-def test_existing_v003_migration_is_not_reapplied(tmp_path: Path) -> None:
+def test_existing_v004_migration_inventory_is_not_reapplied(tmp_path: Path) -> None:
     configured = configuration(tmp_path)
     connection = open_sqlite_execution_connection(configured.database_path)
     first = apply_pending_migrations(
@@ -355,5 +355,10 @@ def test_existing_v003_migration_is_not_reapplied(tmp_path: Path) -> None:
     state = inspect_schema_state(runtime._connection, known_migrations=KNOWN_MIGRATIONS)
 
     assert first.changed is True
-    assert len(state.applied_migrations) == 3
+    assert tuple(item.migration_id for item in state.applied_migrations) == (
+        "v001",
+        "v002",
+        "v003",
+        "v004",
+    )
     runtime.close()

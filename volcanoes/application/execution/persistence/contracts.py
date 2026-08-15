@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from datetime import UTC
 from decimal import Decimal
 from typing import Any
+import hashlib
+import hmac
+import secrets
 
 from volcanoes.application.execution._canonical import (
     canonical_json_text,
@@ -46,6 +50,9 @@ from volcanoes.application.execution.lifecycle import (
     PaperExecutionLifecycleState,
 )
 from volcanoes.application.execution.persistence.enums import (
+    DispatchClaimStatus,
+    DispatchEffectPhase,
+    DispatchResolutionStatus,
     ExecutionBrokerReferenceStatus,
     ExecutionCommandProcessingOutcome,
     ExecutionIdempotencyReservationStatus,
@@ -60,6 +67,855 @@ from volcanoes.application.execution.persistence.errors import (
 )
 
 PrimitiveSnapshot = tuple[tuple[str, object], ...]
+ExecutionTimestamp = datetime
+
+
+def fail_closed_dispatch_control() -> "ExecutionDispatchControlRecord":
+    """Build the adapter-independent V004 fail-closed singleton value."""
+
+    return ExecutionDispatchControlRecord(
+        enabled=False,
+        emergency_stop_active=True,
+        legacy_authority_active=True,
+        generation=1,
+        updated_at=datetime(1970, 1, 1, tzinfo=UTC),
+        schema_version=4,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchClaimAttempt:
+    """Caller-stable lookup identity; contains no payload or safety authority."""
+
+    submission_id: str
+    command_id: PaperExecutionCommandId
+    idempotency_key: PaperExecutionIdempotencyKey
+    attempt_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "submission_id", normalize_alias(self.submission_id, "submission_id")
+        )
+        object.__setattr__(
+            self, "attempt_fingerprint", _fingerprint("psq", self.to_primitive())
+        )
+
+    def to_primitive(self) -> dict[str, object]:
+        return {
+            "command_id": self.command_id,
+            "idempotency_key": self.idempotency_key,
+            "submission_id": self.submission_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchWinnerGrant:
+    """Opaque one-call capability returned only to the inserting transaction."""
+
+    claim_token: str
+    _capability: bytes = field(repr=False)
+    claim_fingerprint: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "claim_token", normalize_alias(self.claim_token, "claim_token")
+        )
+        if not isinstance(self._capability, bytes) or len(self._capability) != 32:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_WINNER_CAPABILITY", "Winner capability must be 256 bits."
+            )
+        object.__setattr__(
+            self,
+            "claim_fingerprint",
+            validate_fingerprint(self.claim_fingerprint, "pcl"),
+        )
+
+    def authenticates(self, claim: "ExecutionDispatchClaimRecord") -> bool:
+        return (
+            self.claim_token == claim.claim_token
+            and self.claim_fingerprint == claim.record_fingerprint
+            and hmac.compare_digest(
+                dispatch_capability_verifier(self._capability),
+                claim.capability_verifier,
+            )
+        )
+
+
+def new_dispatch_capability() -> bytes:
+    return secrets.token_bytes(32)
+
+
+def dispatch_capability_verifier(capability: bytes) -> str:
+    digest = hashlib.sha256(b"paper-dispatch-capability-v1\0" + capability).hexdigest()
+    return "pcv-" + digest
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchControlRecord:
+    enabled: bool
+    emergency_stop_active: bool
+    legacy_authority_active: bool
+    generation: int
+    updated_at: datetime
+    schema_version: int
+    mode: PaperExecutionMode = PaperExecutionMode.PAPER
+    record_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        _require_mode(self.mode)
+        _require_schema_version(self.schema_version)
+        _require_bool_fields(
+            self, ("enabled", "emergency_stop_active", "legacy_authority_active")
+        )
+        if isinstance(self.generation, bool) or self.generation < 1:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CONTROL_GENERATION", "Control generation must be positive."
+            )
+        object.__setattr__(
+            self, "updated_at", require_datetime(self.updated_at, "updated_at")
+        )
+        object.__setattr__(
+            self, "record_fingerprint", _fingerprint("pdc", self._primitive())
+        )
+
+    @property
+    def permits_dispatch(self) -> bool:
+        return (
+            self.enabled
+            and not self.emergency_stop_active
+            and not self.legacy_authority_active
+        )
+
+    def _primitive(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "emergency_stop_active": self.emergency_stop_active,
+            "generation": self.generation,
+            "legacy_authority_active": self.legacy_authority_active,
+            "mode": self.mode,
+            "schema_version": self.schema_version,
+            "updated_at": self.updated_at,
+        }
+
+    def to_primitive(self) -> dict[str, object]:
+        return {**self._primitive(), "record_fingerprint": self.record_fingerprint}
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchClaimRecord:
+    claim_token: str
+    submission_id: str
+    command_id: PaperExecutionCommandId
+    aggregate_id: PaperExecutionAggregateId
+    correlation_id: PaperExecutionCorrelationId
+    idempotency_key: PaperExecutionIdempotencyKey
+    expected_execution_revision: PaperExecutionRevision
+    request_fingerprint: str
+    command_record_fingerprint: str
+    canonical_payload_fingerprint: str
+    approval_fingerprint: str
+    policy_fingerprint: str
+    client_order_id: str
+    capability_verifier: str
+    canonical_order_json: str
+    control_generation: int
+    claimed_at: datetime
+    schema_version: int
+    mode: PaperExecutionMode = PaperExecutionMode.PAPER
+    record_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        _require_mode(self.mode)
+        _require_schema_version(self.schema_version)
+        for name in ("claim_token", "submission_id", "client_order_id"):
+            object.__setattr__(self, name, normalize_alias(getattr(self, name), name))
+        if len(self.client_order_id) != 48:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CLIENT_ORDER_ID",
+                "Client order identity must be 48 characters.",
+            )
+        for name, prefix in (
+            ("request_fingerprint", "psq"),
+            ("command_record_fingerprint", "pcm"),
+            ("canonical_payload_fingerprint", "pcf"),
+            ("approval_fingerprint", "pap"),
+            ("policy_fingerprint", "pps"),
+            ("capability_verifier", "pcv"),
+        ):
+            object.__setattr__(
+                self, name, validate_fingerprint(getattr(self, name), prefix)
+            )
+        object.__setattr__(
+            self,
+            "canonical_order_json",
+            _normalize_safe_json_text(self.canonical_order_json),
+        )
+        if isinstance(self.control_generation, bool) or self.control_generation < 1:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CONTROL_GENERATION", "Control generation must be positive."
+            )
+        object.__setattr__(
+            self, "claimed_at", require_datetime(self.claimed_at, "claimed_at")
+        )
+        object.__setattr__(
+            self, "record_fingerprint", _fingerprint("pcl", self._primitive())
+        )
+
+    def _primitive(self) -> dict[str, object]:
+        return {
+            name: getattr(self, name)
+            for name in (
+                "aggregate_id",
+                "approval_fingerprint",
+                "canonical_order_json",
+                "canonical_payload_fingerprint",
+                "claim_token",
+                "claimed_at",
+                "client_order_id",
+                "capability_verifier",
+                "command_id",
+                "command_record_fingerprint",
+                "control_generation",
+                "correlation_id",
+                "expected_execution_revision",
+                "idempotency_key",
+                "mode",
+                "policy_fingerprint",
+                "request_fingerprint",
+                "schema_version",
+                "submission_id",
+            )
+        }
+
+    def to_primitive(self) -> dict[str, object]:
+        return {**self._primitive(), "record_fingerprint": self.record_fingerprint}
+
+    def to_public(self) -> "ExecutionDispatchClaim":
+        return ExecutionDispatchClaim(
+            claim_token=self.claim_token,
+            submission_id=self.submission_id,
+            command_id=self.command_id,
+            aggregate_id=self.aggregate_id,
+            correlation_id=self.correlation_id,
+            idempotency_key=self.idempotency_key,
+            expected_execution_revision=self.expected_execution_revision,
+            request_fingerprint=self.request_fingerprint,
+            command_record_fingerprint=self.command_record_fingerprint,
+            canonical_payload_fingerprint=self.canonical_payload_fingerprint,
+            approval_fingerprint=self.approval_fingerprint,
+            policy_fingerprint=self.policy_fingerprint,
+            client_order_id=self.client_order_id,
+            canonical_order_json=self.canonical_order_json,
+            control_generation=self.control_generation,
+            claimed_at=self.claimed_at,
+            schema_version=self.schema_version,
+            record_fingerprint=self.record_fingerprint,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchClaim:
+    """Non-secret immutable claim projection for application callers."""
+
+    claim_token: str
+    submission_id: str
+    command_id: PaperExecutionCommandId
+    aggregate_id: PaperExecutionAggregateId
+    correlation_id: PaperExecutionCorrelationId
+    idempotency_key: PaperExecutionIdempotencyKey
+    expected_execution_revision: PaperExecutionRevision
+    request_fingerprint: str
+    command_record_fingerprint: str
+    canonical_payload_fingerprint: str
+    approval_fingerprint: str
+    policy_fingerprint: str
+    client_order_id: str
+    canonical_order_json: str = field(repr=False)
+    control_generation: int
+    claimed_at: datetime
+    schema_version: int
+    record_fingerprint: str
+
+    def __post_init__(self) -> None:
+        _require_schema_version(self.schema_version)
+        for name, identity_type in (
+            ("command_id", PaperExecutionCommandId),
+            ("aggregate_id", PaperExecutionAggregateId),
+            ("correlation_id", PaperExecutionCorrelationId),
+            ("idempotency_key", PaperExecutionIdempotencyKey),
+            ("expected_execution_revision", PaperExecutionRevision),
+        ):
+            value = getattr(self, name)
+            object.__setattr__(
+                self,
+                name,
+                value if isinstance(value, identity_type) else identity_type(value),
+            )
+        for name in ("claim_token", "submission_id", "client_order_id"):
+            object.__setattr__(self, name, normalize_alias(getattr(self, name), name))
+        if len(self.client_order_id) != 48:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CLIENT_ORDER_ID",
+                "Client order identity must be 48 characters.",
+            )
+        for name, prefix in (
+            ("request_fingerprint", "psq"),
+            ("command_record_fingerprint", "pcm"),
+            ("canonical_payload_fingerprint", "pcf"),
+            ("approval_fingerprint", "pap"),
+            ("policy_fingerprint", "pps"),
+            ("record_fingerprint", "pcl"),
+        ):
+            object.__setattr__(
+                self, name, validate_fingerprint(getattr(self, name), prefix)
+            )
+        object.__setattr__(
+            self,
+            "canonical_order_json",
+            _normalize_safe_json_text(self.canonical_order_json),
+        )
+        if isinstance(self.control_generation, bool) or self.control_generation < 1:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CONTROL_GENERATION", "Control generation must be positive."
+            )
+        object.__setattr__(
+            self, "claimed_at", require_datetime(self.claimed_at, "claimed_at")
+        )
+
+    def to_primitive(self) -> dict[str, object]:
+        return {
+            name: getattr(self, name)
+            for name in self.__dataclass_fields__
+            if name != "canonical_order_json"
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchAuthorizationRecord:
+    claim_token: str
+    control_generation: int
+    authorized_at: datetime
+    schema_version: int
+    authorization_fingerprint: str = field(init=False)
+    record_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        _require_schema_version(self.schema_version)
+        object.__setattr__(
+            self, "claim_token", normalize_alias(self.claim_token, "claim_token")
+        )
+        if isinstance(self.control_generation, bool) or self.control_generation < 1:
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CONTROL_GENERATION", "Control generation must be positive."
+            )
+        object.__setattr__(
+            self, "authorized_at", require_datetime(self.authorized_at, "authorized_at")
+        )
+        primitive = {
+            "authorized_at": self.authorized_at,
+            "claim_token": self.claim_token,
+            "control_generation": self.control_generation,
+            "schema_version": self.schema_version,
+        }
+        object.__setattr__(
+            self, "authorization_fingerprint", _fingerprint("pda", primitive)
+        )
+        object.__setattr__(self, "record_fingerprint", _fingerprint("par", primitive))
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionDispatchResolutionRecord:
+    claim_token: str
+    status: DispatchResolutionStatus
+    effect_phase: DispatchEffectPhase
+    resolved_at: datetime
+    result_fingerprint: str
+    evidence_fingerprint: str
+    evidence_record_fingerprint: str
+    safe_reason_code: str
+    reconciliation_required: bool
+    operator_action_required: bool
+    schema_version: int
+    broker_reference: str | None = None
+    observation_fingerprint: str | None = None
+    conflicting_owner_aggregate_id: PaperExecutionAggregateId | None = None
+    conflicting_owner_command_id: PaperExecutionCommandId | None = None
+    conflicting_owner_record_fingerprint: str | None = None
+    automatic_retry: bool = False
+    record_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        _require_schema_version(self.schema_version)
+        object.__setattr__(
+            self, "claim_token", normalize_alias(self.claim_token, "claim_token")
+        )
+        if not isinstance(self.status, DispatchResolutionStatus) or not isinstance(
+            self.effect_phase, DispatchEffectPhase
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_DISPATCH_RESOLUTION", "Dispatch resolution variant is invalid."
+            )
+        _require_bool_fields(
+            self,
+            ("reconciliation_required", "operator_action_required", "automatic_retry"),
+        )
+        if self.automatic_retry:
+            raise ExecutionPersistenceInvariantError(
+                "AUTOMATIC_RETRY_FORBIDDEN",
+                "Dispatch resolution cannot enable automatic retry.",
+            )
+        if (
+            self.status
+            in {
+                DispatchResolutionStatus.OUTCOME_UNKNOWN,
+                DispatchResolutionStatus.EVIDENCE_RECORDING_FAILED,
+                DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT,
+            }
+            and not self.reconciliation_required
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "RECONCILIATION_REQUIRED",
+                "Ambiguous dispatch resolution requires reconciliation.",
+            )
+        object.__setattr__(
+            self, "resolved_at", require_datetime(self.resolved_at, "resolved_at")
+        )
+        object.__setattr__(
+            self,
+            "result_fingerprint",
+            normalize_alias(self.result_fingerprint, "result_fingerprint"),
+        )
+        if self.status is DispatchResolutionStatus.PRE_EFFECT_BLOCKED:
+            evidence_prefix, record_prefix = "pfl", "pfr"
+        else:
+            evidence_prefix, record_prefix = "prc", "prr"
+        object.__setattr__(
+            self,
+            "evidence_fingerprint",
+            validate_fingerprint(self.evidence_fingerprint, evidence_prefix),
+        )
+        object.__setattr__(
+            self,
+            "evidence_record_fingerprint",
+            validate_fingerprint(self.evidence_record_fingerprint, record_prefix),
+        )
+        object.__setattr__(
+            self,
+            "safe_reason_code",
+            normalize_code(self.safe_reason_code, "safe_reason_code"),
+        )
+        _normalize_optional_alias(self, "broker_reference")
+        _normalize_optional_alias(self, "observation_fingerprint")
+        owner_values = (
+            self.conflicting_owner_aggregate_id,
+            self.conflicting_owner_command_id,
+            self.conflicting_owner_record_fingerprint,
+        )
+        ownership_conflict = (
+            self.status is DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT
+        )
+        if ownership_conflict:
+            if (
+                self.broker_reference is None
+                or not isinstance(
+                    self.conflicting_owner_aggregate_id, PaperExecutionAggregateId
+                )
+                or not isinstance(
+                    self.conflicting_owner_command_id, PaperExecutionCommandId
+                )
+                or self.conflicting_owner_record_fingerprint is None
+                or not self.operator_action_required
+            ):
+                raise ExecutionPersistenceInvariantError(
+                    "INCOMPLETE_CONFLICT_OWNER",
+                    "Broker conflict requires exact durable owner evidence.",
+                )
+            object.__setattr__(
+                self,
+                "conflicting_owner_record_fingerprint",
+                validate_fingerprint(self.conflicting_owner_record_fingerprint, "pbf"),
+            )
+        elif any(value is not None for value in owner_values):
+            raise ExecutionPersistenceInvariantError(
+                "UNEXPECTED_CONFLICT_OWNER",
+                "Non-conflict resolution cannot carry owner evidence.",
+            )
+        object.__setattr__(
+            self,
+            "record_fingerprint",
+            _fingerprint(
+                "pds",
+                {
+                    name: getattr(self, name)
+                    for name in (
+                        "automatic_retry",
+                        "broker_reference",
+                        "claim_token",
+                        "conflicting_owner_aggregate_id",
+                        "conflicting_owner_command_id",
+                        "conflicting_owner_record_fingerprint",
+                        "effect_phase",
+                        "evidence_fingerprint",
+                        "evidence_record_fingerprint",
+                        "observation_fingerprint",
+                        "operator_action_required",
+                        "reconciliation_required",
+                        "resolved_at",
+                        "result_fingerprint",
+                        "safe_reason_code",
+                        "schema_version",
+                        "status",
+                    )
+                },
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchClaimResult:
+    status: DispatchClaimStatus
+    claim: ExecutionDispatchClaim | None
+    schema_version: int
+    reason_code: str
+    authorized: bool = False
+    authorization: ExecutionDispatchAuthorizationRecord | None = None
+    aggregate: ExecutionAggregateRecord | None = None
+    result_fingerprint: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        _require_schema_version(self.schema_version)
+        if not isinstance(self.status, DispatchClaimStatus):
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_CLAIM_STATUS", "Claim status is invalid."
+            )
+        if (
+            self.status
+            in {
+                DispatchClaimStatus.ACQUIRED,
+                DispatchClaimStatus.EXACT_REPLAY,
+                DispatchClaimStatus.ALREADY_CLAIMED,
+            }
+            and self.claim is None
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "CLAIM_REQUIRED", "Claim result requires durable claim evidence."
+            )
+        if self.claim is not None and not isinstance(
+            self.claim, ExecutionDispatchClaim
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "PUBLIC_CLAIM_REQUIRED",
+                "Claim results may contain only the non-secret public projection.",
+            )
+        if not isinstance(self.authorized, bool):
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_AUTHORITY_RESULT", "Authorized must be boolean."
+            )
+        if self.authorized != (
+            self.status is DispatchClaimStatus.ACQUIRED
+            and self.authorization is not None
+            and self.aggregate is not None
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "INVALID_AUTHORITY_RESULT",
+                "Only an authorized new winner may carry authority facts.",
+            )
+        object.__setattr__(
+            self, "reason_code", normalize_code(self.reason_code, "reason_code")
+        )
+        object.__setattr__(
+            self,
+            "result_fingerprint",
+            _fingerprint(
+                "pcr",
+                {
+                    "claim_fingerprint": (
+                        None if self.claim is None else self.claim.record_fingerprint
+                    ),
+                    "authorization_fingerprint": (
+                        None
+                        if self.authorization is None
+                        else self.authorization.authorization_fingerprint
+                    ),
+                    "authorized": self.authorized,
+                    "reason_code": self.reason_code,
+                    "schema_version": self.schema_version,
+                    "status": self.status,
+                },
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchOutcomeWriteSet:
+    """Complete storage-neutral write set for one atomic dispatch outcome."""
+
+    claim: ExecutionDispatchClaim
+    authorization: ExecutionDispatchAuthorizationRecord
+    expected_revision: PaperExecutionRevision
+    evidence: ExecutionReceiptRecord | ExecutionFailureRecord
+    transitions: tuple[ExecutionTransitionRecord, ...]
+    aggregate: ExecutionAggregateRecord
+    resolution: ExecutionDispatchResolutionRecord
+    broker_reference: ExecutionBrokerReferenceRecord | None = None
+
+    def __post_init__(self) -> None:
+        if self.claim.client_order_id != _public_client_order_id(self.claim):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_CLIENT_ORDER_MISMATCH",
+                "Outcome claim client-order identity is invalid.",
+            )
+        if self.claim.claim_token != self.authorization.claim_token:
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_AUTHORITY_MISMATCH", "Authorization does not bind the claim."
+            )
+        if self.authorization.control_generation != self.claim.control_generation:
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_GENERATION_MISMATCH", "Authorization generation is invalid."
+            )
+        if self.resolution.claim_token != self.claim.claim_token:
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_RESOLUTION_MISMATCH", "Resolution does not bind the claim."
+            )
+        if (
+            self.aggregate.aggregate_id != self.claim.aggregate_id
+            or self.aggregate.correlation_id != self.claim.correlation_id
+            or not self.transitions
+            or self.transitions[-1].next_revision != self.aggregate.execution_revision
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_TRANSITION_MISMATCH",
+                "Outcome transitions do not bind the aggregate.",
+            )
+        if self.transitions[0].previous_revision != self.expected_revision:
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_REVISION_MISMATCH", "Outcome expected revision is invalid."
+            )
+        if (
+            self.expected_revision != self.claim.expected_execution_revision
+            or self.transitions[0].source_state
+            is not PaperExecutionLifecycleState.DISPATCH_PENDING
+            or len(self.transitions)
+            != int(self.aggregate.execution_revision) - int(self.expected_revision)
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_STARTING_STATE_MISMATCH",
+                "Outcome chain must begin at the claimed dispatch-pending revision.",
+            )
+        expected_edges = {
+            DispatchResolutionStatus.PRE_EFFECT_BLOCKED: (
+                (
+                    "PX-TRN-029",
+                    PaperExecutionLifecycleInputType.ABORT_BEFORE_DISPATCH,
+                    PaperExecutionLifecycleState.DISPATCH_PENDING,
+                    PaperExecutionLifecycleState.ABORTED_BEFORE_DISPATCH,
+                ),
+            ),
+            DispatchResolutionStatus.ACKNOWLEDGED: (
+                (
+                    "PX-TRN-009",
+                    PaperExecutionLifecycleInputType.RECORD_DISPATCH,
+                    PaperExecutionLifecycleState.DISPATCH_PENDING,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                ),
+                (
+                    "PX-TRN-010",
+                    PaperExecutionLifecycleInputType.OBSERVE_BROKER_ACKNOWLEDGEMENT,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                    PaperExecutionLifecycleState.BROKER_ACKNOWLEDGED,
+                ),
+            ),
+            DispatchResolutionStatus.BROKER_REJECTED: (
+                (
+                    "PX-TRN-009",
+                    PaperExecutionLifecycleInputType.RECORD_DISPATCH,
+                    PaperExecutionLifecycleState.DISPATCH_PENDING,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                ),
+                (
+                    "PX-TRN-011",
+                    PaperExecutionLifecycleInputType.OBSERVE_BROKER_REJECTION,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                    PaperExecutionLifecycleState.BROKER_REJECTED,
+                ),
+            ),
+            DispatchResolutionStatus.OUTCOME_UNKNOWN: (
+                (
+                    "PX-TRN-009",
+                    PaperExecutionLifecycleInputType.RECORD_DISPATCH,
+                    PaperExecutionLifecycleState.DISPATCH_PENDING,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                ),
+                (
+                    "PX-TRN-012",
+                    PaperExecutionLifecycleInputType.MARK_OUTCOME_UNKNOWN,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                    PaperExecutionLifecycleState.OUTCOME_UNKNOWN,
+                ),
+            ),
+            DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT: (
+                (
+                    "PX-TRN-009",
+                    PaperExecutionLifecycleInputType.RECORD_DISPATCH,
+                    PaperExecutionLifecycleState.DISPATCH_PENDING,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                ),
+                (
+                    "PX-TRN-012",
+                    PaperExecutionLifecycleInputType.MARK_OUTCOME_UNKNOWN,
+                    PaperExecutionLifecycleState.DISPATCHED,
+                    PaperExecutionLifecycleState.OUTCOME_UNKNOWN,
+                ),
+            ),
+        }[self.resolution.status]
+        if len(self.transitions) != len(expected_edges):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_TRANSITION_COUNT_MISMATCH",
+                "Outcome transition count is invalid.",
+            )
+        previous_state: PaperExecutionLifecycleState = self.transitions[0].source_state
+        previous_revision = self.expected_revision
+        seen_records: set[str] = set()
+        for transition, expected_edge in zip(
+            self.transitions, expected_edges, strict=True
+        ):
+            if (
+                transition.aggregate_id != self.claim.aggregate_id
+                or transition.command_id != self.claim.command_id
+                or transition.correlation_id != self.claim.correlation_id
+                or transition.idempotency_key != self.claim.idempotency_key
+                or transition.source_state is not previous_state
+                or transition.previous_revision != previous_revision
+                or (
+                    transition.transition_id,
+                    transition.lifecycle_input_kind,
+                    transition.source_state,
+                    transition.destination_state,
+                )
+                != expected_edge
+                or transition.transition_record_id
+                != f"{self.claim.claim_token}-{transition.transition_id}"
+                or transition.transition_record_id in seen_records
+            ):
+                raise ExecutionPersistenceInvariantError(
+                    "OUTCOME_IDENTITY_MISMATCH",
+                    "Outcome transition identity is invalid.",
+                )
+            seen_records.add(transition.transition_record_id)
+            previous_state = transition.destination_state
+            previous_revision = transition.next_revision
+        if self.aggregate.lifecycle_state is not previous_state:
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_AGGREGATE_MISMATCH", "Outcome aggregate state is invalid."
+            )
+        if isinstance(self.evidence, ExecutionReceiptRecord):
+            if self.resolution.status is DispatchResolutionStatus.PRE_EFFECT_BLOCKED:
+                raise ExecutionPersistenceInvariantError(
+                    "OUTCOME_EVIDENCE_MISMATCH",
+                    "Pre-effect outcome requires failure evidence.",
+                )
+            evidence_command: PaperExecutionCommandId | None = (
+                self.evidence.receipt.command_id
+            )
+            evidence_aggregate: PaperExecutionAggregateId | None = (
+                self.evidence.receipt.aggregate_id
+            )
+            evidence_correlation: PaperExecutionCorrelationId | None = (
+                self.evidence.receipt.correlation_id
+            )
+            identity = self.evidence.receipt.receipt_fingerprint
+            wrapper = self.evidence.record_fingerprint
+        else:
+            if (
+                self.resolution.status
+                is not DispatchResolutionStatus.PRE_EFFECT_BLOCKED
+            ):
+                raise ExecutionPersistenceInvariantError(
+                    "OUTCOME_EVIDENCE_MISMATCH",
+                    "Observed outcome requires receipt evidence.",
+                )
+            evidence_command = self.evidence.failure.command_id
+            evidence_aggregate = self.evidence.failure.aggregate_id
+            evidence_correlation = self.evidence.failure.correlation_id
+            identity = self.evidence.failure.failure_fingerprint
+            wrapper = self.evidence.record_fingerprint
+        if (
+            evidence_command != self.claim.command_id
+            or evidence_aggregate != self.claim.aggregate_id
+            or evidence_correlation != self.claim.correlation_id
+            or self.resolution.evidence_fingerprint != identity
+            or self.resolution.evidence_record_fingerprint != wrapper
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_EVIDENCE_MISMATCH", "Resolution evidence binding is invalid."
+            )
+        final = self.transitions[-1]
+        expected_receipt = (
+            identity if isinstance(self.evidence, ExecutionReceiptRecord) else None
+        )
+        expected_failure = (
+            identity if isinstance(self.evidence, ExecutionFailureRecord) else None
+        )
+        if (
+            any(
+                transition.receipt_fingerprint is not None
+                or transition.failure_fingerprint is not None
+                or transition.broker_observation_identity is not None
+                for transition in self.transitions[:-1]
+            )
+            or final.receipt_fingerprint != expected_receipt
+            or final.failure_fingerprint != expected_failure
+            or self.aggregate.last_receipt_fingerprint != expected_receipt
+            or self.aggregate.last_failure_fingerprint != expected_failure
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_EVIDENCE_MISMATCH", "Outcome evidence chain is invalid."
+            )
+        ownership_conflict = (
+            self.resolution.status is DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT
+        )
+        if ownership_conflict and (
+            self.resolution.broker_reference is None
+            or self.broker_reference is not None
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_BROKER_OWNERSHIP_MISMATCH",
+                "Broker conflict must preserve only the observed reference.",
+            )
+        if not ownership_conflict and (
+            (self.resolution.broker_reference is None)
+            != (self.broker_reference is None)
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_BROKER_OWNERSHIP_MISMATCH",
+                "Outcome broker ownership is incomplete.",
+            )
+        if self.broker_reference is not None and (
+            self.broker_reference.aggregate_id != self.claim.aggregate_id
+            or self.broker_reference.command_id != self.claim.command_id
+            or str(self.broker_reference.broker_reference)
+            != self.resolution.broker_reference
+        ):
+            raise ExecutionPersistenceInvariantError(
+                "OUTCOME_BROKER_OWNERSHIP_MISMATCH",
+                "Broker reference does not bind the outcome.",
+            )
+
+
+def _public_client_order_id(claim: ExecutionDispatchClaim) -> str:
+    digest = fingerprint_payload(
+        "pci",
+        {
+            "domain": "paper-client-order-v1",
+            "inputs": {
+                "canonical_payload_fingerprint": claim.canonical_payload_fingerprint,
+                "command_id": claim.command_id,
+                "idempotency_key": claim.idempotency_key,
+                "submission_id": claim.submission_id,
+            },
+        },
+    ).rsplit("-", 1)[-1]
+    return "paper-" + digest[:42]
 
 
 @dataclass(frozen=True, slots=True)

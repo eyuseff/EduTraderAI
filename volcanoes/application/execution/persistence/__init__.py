@@ -25,6 +25,11 @@ from volcanoes.application.execution.persistence.contracts import (
     TransitionAppendResult,
     UnitOfWorkCommitResult,
     canonical_payload_text,
+    DispatchClaimResult,
+    ExecutionDispatchClaimAttempt,
+    ExecutionDispatchAuthorizationRecord,
+    ExecutionDispatchControlRecord,
+    ExecutionDispatchResolutionRecord,
 )
 from volcanoes.application.execution.persistence.enums import (
     ExecutionBrokerReferenceStatus,
@@ -35,6 +40,9 @@ from volcanoes.application.execution.persistence.enums import (
     ExecutionPersistenceResultStatus,
     ExecutionReconciliationResultClassification,
     ExecutionReplayKind,
+    DispatchClaimStatus,
+    DispatchEffectPhase,
+    DispatchResolutionStatus,
 )
 from volcanoes.application.execution.persistence.in_memory import (
     InMemoryCommitInvariantError,
@@ -72,6 +80,10 @@ from volcanoes.application.execution.persistence.ports import (
     ExecutionReconciliationRepository,
     ExecutionRestartDiscoveryRepository,
     ExecutionTransitionJournal,
+    ExecutionDispatchAuthorizationRepository,
+    ExecutionDispatchClaimRepository,
+    ExecutionDispatchControlRepository,
+    ExecutionDispatchResolutionRepository,
 )
 from volcanoes.application.execution.persistence.unit_of_work import (
     ExecutionPersistenceSession,
@@ -80,6 +92,18 @@ from volcanoes.application.execution.persistence.unit_of_work import (
 
 __all__ = [
     "AggregateSaveResult",
+    "DispatchClaimResult",
+    "DispatchClaimStatus",
+    "DispatchEffectPhase",
+    "DispatchResolutionStatus",
+    "ExecutionDispatchAuthorizationRecord",
+    "ExecutionDispatchClaimAttempt",
+    "ExecutionDispatchAuthorizationRepository",
+    "ExecutionDispatchClaimRepository",
+    "ExecutionDispatchControlRecord",
+    "ExecutionDispatchControlRepository",
+    "ExecutionDispatchResolutionRecord",
+    "ExecutionDispatchResolutionRepository",
     "CommandRegistrationResult",
     "ExecutionAggregateRecord",
     "ExecutionAggregateRepository",

@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import json
 from typing import TYPE_CHECKING
 
-from volcanoes.application.execution.fingerprints import fingerprint_payload
+from volcanoes.application.execution.fingerprints import (
+    command_payload_fingerprint,
+    fingerprint_payload,
+)
+from volcanoes.application.execution._canonical import canonical_json_text
 
 from volcanoes.application.execution.identities import (
     PaperBrokerOrderReference,
@@ -28,17 +33,29 @@ from volcanoes.application.execution.persistence.contracts import (
     ExecutionReconciliationRecord,
     ExecutionRestartDiscoveryQuery,
     ExecutionTransitionRecord,
+    ExecutionTimestamp,
     IdempotencyReservationResult,
     RecordLoadResult,
     ReplayLookupResult,
     RestartDiscoveryResult,
     TransitionAppendResult,
+    DispatchClaimResult,
+    DispatchWinnerGrant,
+    new_dispatch_capability,
+    dispatch_capability_verifier,
+    ExecutionDispatchClaimAttempt,
+    ExecutionDispatchAuthorizationRecord,
+    ExecutionDispatchClaimRecord,
+    ExecutionDispatchClaim,
+    ExecutionDispatchControlRecord,
+    ExecutionDispatchResolutionRecord,
 )
 from volcanoes.application.execution.persistence.enums import (
     ExecutionPersistenceConflictKind,
     ExecutionPersistenceConflictSeverity,
     ExecutionPersistenceResultStatus,
     ExecutionReplayKind,
+    DispatchClaimStatus,
 )
 
 if TYPE_CHECKING:
@@ -46,7 +63,7 @@ if TYPE_CHECKING:
         InMemoryExecutionUnitOfWork,
     )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 4
 
 
 def _conflict(
@@ -127,6 +144,32 @@ class InMemoryExecutionAggregateRepository(_RepositoryBase):
                 record
             )
             self._unit_of_work.stage_aggregate_save(record, expected_revision)
+        return result
+
+    def _save_dispatch_outcome(
+        self,
+        record: ExecutionAggregateRecord,
+        *,
+        expected_revision: PaperExecutionRevision,
+        revision_increment: int,
+    ) -> AggregateSaveResult:
+        """Stage one final CAS for a previously validated transition chain."""
+        self._ensure_active()
+        existing = self._unit_of_work.transaction_state._aggregates.get(
+            record.aggregate_id
+        )
+        result = _dispatch_outcome_aggregate_save_result(
+            record, existing, expected_revision, revision_increment
+        )
+        if result.conflict is not None:
+            self._unit_of_work.stage_conflict(result.conflict)
+        elif result.status is ExecutionPersistenceResultStatus.SAVED:
+            self._unit_of_work.transaction_state._aggregates[record.aggregate_id] = (
+                record
+            )
+            self._unit_of_work.stage_aggregate_save(
+                record, expected_revision, revision_increment=revision_increment
+            )
         return result
 
     def records(self) -> tuple[ExecutionAggregateRecord, ...]:
@@ -521,6 +564,372 @@ class InMemoryExecutionRestartDiscoveryRepository(_RepositoryBase):
         )
 
 
+class InMemoryExecutionDispatchControlRepository(_RepositoryBase):
+    def get(self) -> ExecutionDispatchControlRecord:
+        self._ensure_active()
+        record = self._unit_of_work.transaction_state._dispatch_control
+        if record is None:
+            raise RuntimeError("Durable dispatch control is unavailable.")
+        return record
+
+    def save(
+        self, record: ExecutionDispatchControlRecord, *, expected_generation: int
+    ) -> RecordLoadResult:
+        self._ensure_active()
+        current = self._unit_of_work.transaction_state._dispatch_control
+        if current is not None and (
+            current.generation != expected_generation
+            or record.generation != expected_generation + 1
+        ):
+            return RecordLoadResult(
+                status=ExecutionPersistenceResultStatus.STALE_REVISION,
+                schema_version=record.schema_version,
+                record_fingerprint=current.record_fingerprint,
+            )
+        self._unit_of_work.stage_dispatch_control(record)
+        self._unit_of_work.transaction_state._dispatch_control = record
+        return RecordLoadResult(
+            status=ExecutionPersistenceResultStatus.SAVED,
+            schema_version=record.schema_version,
+            record_fingerprint=record.record_fingerprint,
+        )
+
+
+class InMemoryExecutionDispatchClaimRepository(_RepositoryBase):
+    def get(self, claim_token: str) -> ExecutionDispatchClaimRecord | None:
+        self._ensure_active()
+        return self._unit_of_work.transaction_state._dispatch_claims.get(claim_token)
+
+    def acquire(
+        self, attempt: ExecutionDispatchClaimAttempt, *, claimed_at: ExecutionTimestamp
+    ) -> DispatchClaimResult:
+        self._ensure_active()
+        state = self._unit_of_work.transaction_state
+        existing = next(
+            (
+                item
+                for item in state._dispatch_claims.values()
+                if item.command_id == attempt.command_id
+                or item.idempotency_key == attempt.idempotency_key
+                or item.submission_id == attempt.submission_id
+            ),
+            None,
+        )
+        if existing is not None:
+            exact = (
+                existing.request_fingerprint == attempt.attempt_fingerprint
+                and existing.submission_id == attempt.submission_id
+                and existing.command_id == attempt.command_id
+                and existing.idempotency_key == attempt.idempotency_key
+            )
+            return DispatchClaimResult(
+                (
+                    DispatchClaimStatus.EXACT_REPLAY
+                    if exact
+                    else DispatchClaimStatus.ALREADY_CLAIMED
+                ),
+                existing.to_public(),
+                SCHEMA_VERSION,
+                "EXACT_CLAIM_REPLAY" if exact else "CLAIM_ALREADY_OWNED",
+            )
+        control = state._dispatch_control
+        if control is None or not control.enabled or control.legacy_authority_active:
+            return DispatchClaimResult(
+                DispatchClaimStatus.GUARD_DISABLED,
+                None,
+                SCHEMA_VERSION,
+                "GUARD_DISABLED",
+            )
+        if control.emergency_stop_active:
+            return DispatchClaimResult(
+                DispatchClaimStatus.EMERGENCY_STOP,
+                None,
+                SCHEMA_VERSION,
+                "EMERGENCY_STOP",
+            )
+        command = state._commands.get(attempt.command_id)
+        reservation = state._idempotency.get(attempt.idempotency_key)
+        aggregate = (
+            None if command is None else state._aggregates.get(command.aggregate_id)
+        )
+        approval = (
+            None
+            if command is None
+            else state._approvals.get(command.approval_fingerprint)
+        )
+        if (
+            command is None
+            or reservation is None
+            or aggregate is None
+            or approval is None
+        ):
+            return DispatchClaimResult(
+                DispatchClaimStatus.BLOCKED,
+                None,
+                SCHEMA_VERSION,
+                "DURABLE_AUTHORITY_INCOMPLETE",
+            )
+        if aggregate.lifecycle_state.value != "DISPATCH_PENDING":
+            return DispatchClaimResult(
+                DispatchClaimStatus.BLOCKED,
+                None,
+                SCHEMA_VERSION,
+                "DISPATCH_PENDING_REQUIRED",
+            )
+        if (
+            command.operation.value != "SUBMIT"
+            or command.idempotency_key != attempt.idempotency_key
+            or reservation.command_id != attempt.command_id
+            or reservation.aggregate_id != command.aggregate_id
+            or command.correlation_id != aggregate.correlation_id
+            or approval.revocation_reference is not None
+            or approval.bound_fingerprint != command.canonical_payload_fingerprint
+            or (approval.expires_at is not None and approval.expires_at < claimed_at)
+        ):
+            return DispatchClaimResult(
+                DispatchClaimStatus.IDENTITY_CONFLICT,
+                None,
+                SCHEMA_VERSION,
+                "DURABLE_IDENTITY_CONFLICT",
+            )
+        try:
+            payload = json.loads(
+                command.canonical_command_json,
+                object_pairs_hook=_reject_duplicate_json_keys,
+            )
+        except (TypeError, ValueError):
+            return DispatchClaimResult(
+                DispatchClaimStatus.BLOCKED,
+                None,
+                SCHEMA_VERSION,
+                "INVALID_CANONICAL_COMMAND",
+            )
+        if (
+            not isinstance(payload, dict)
+            or canonical_json_text(payload) != command.canonical_command_json
+            or command_payload_fingerprint(payload)
+            != command.canonical_payload_fingerprint
+        ):
+            return DispatchClaimResult(
+                DispatchClaimStatus.BLOCKED,
+                None,
+                SCHEMA_VERSION,
+                "INVALID_CANONICAL_COMMAND",
+            )
+        digest = fingerprint_payload(
+            "pci",
+            {
+                "domain": "paper-client-order-v1",
+                "inputs": {
+                    "canonical_payload_fingerprint": command.canonical_payload_fingerprint,
+                    "command_id": attempt.command_id,
+                    "idempotency_key": attempt.idempotency_key,
+                    "submission_id": attempt.submission_id,
+                },
+            },
+        ).rsplit("-", 1)[-1]
+        token = (
+            "claim-"
+            + fingerprint_payload(
+                "pcl",
+                {"domain": "paper-dispatch-claim-v1", "inputs": attempt.to_primitive()},
+            ).rsplit("-", 1)[-1]
+        )
+        capability = new_dispatch_capability()
+        record = ExecutionDispatchClaimRecord(
+            claim_token=token,
+            submission_id=attempt.submission_id,
+            command_id=attempt.command_id,
+            aggregate_id=command.aggregate_id,
+            correlation_id=command.correlation_id,
+            idempotency_key=attempt.idempotency_key,
+            expected_execution_revision=aggregate.execution_revision,
+            request_fingerprint=attempt.attempt_fingerprint,
+            command_record_fingerprint=command.record_fingerprint,
+            canonical_payload_fingerprint=command.canonical_payload_fingerprint,
+            approval_fingerprint=command.approval_fingerprint,
+            policy_fingerprint=command.policy_fingerprint,
+            client_order_id="paper-" + digest[:42],
+            capability_verifier=dispatch_capability_verifier(capability),
+            canonical_order_json=command.canonical_command_json,
+            control_generation=control.generation,
+            claimed_at=claimed_at,
+            schema_version=SCHEMA_VERSION,
+        )
+        claims = self._unit_of_work.transaction_state._dispatch_claims.values()
+        existing = next(
+            (
+                item
+                for item in claims
+                if item.command_id == record.command_id
+                or item.idempotency_key == record.idempotency_key
+                or item.submission_id == record.submission_id
+            ),
+            None,
+        )
+        if existing is not None:
+            exact = (
+                existing.request_fingerprint == attempt.attempt_fingerprint
+                and existing.submission_id == attempt.submission_id
+                and existing.command_id == attempt.command_id
+                and existing.idempotency_key == attempt.idempotency_key
+            )
+            return DispatchClaimResult(
+                status=(
+                    DispatchClaimStatus.EXACT_REPLAY
+                    if exact
+                    else DispatchClaimStatus.ALREADY_CLAIMED
+                ),
+                claim=existing.to_public(),
+                schema_version=record.schema_version,
+                reason_code="EXACT_CLAIM_REPLAY" if exact else "CLAIM_ALREADY_OWNED",
+            )
+        self._unit_of_work.stage_dispatch_claim(record)
+        self._unit_of_work.transaction_state._dispatch_claims[record.claim_token] = (
+            record
+        )
+        grant = DispatchWinnerGrant(
+            record.claim_token,
+            capability,
+            record.record_fingerprint,
+        )
+        self._winner_grant = grant
+        return DispatchClaimResult(
+            status=DispatchClaimStatus.ACQUIRED,
+            claim=record.to_public(),
+            schema_version=record.schema_version,
+            reason_code="CLAIM_ACQUIRED",
+        )
+
+    def _take_winner_grant(self) -> DispatchWinnerGrant | None:
+        grant = getattr(self, "_winner_grant", None)
+        if hasattr(self, "_winner_grant"):
+            del self._winner_grant
+        return grant
+
+    def _authorize_private(
+        self,
+        claim: ExecutionDispatchClaim,
+        grant: DispatchWinnerGrant,
+        *,
+        authorized_at: ExecutionTimestamp,
+    ) -> ExecutionDispatchAuthorizationRecord | None:
+        state = self._unit_of_work.transaction_state
+        current = state._dispatch_claims.get(claim.claim_token)
+        control = state._dispatch_control
+        command = state._commands.get(claim.command_id)
+        aggregate = state._aggregates.get(claim.aggregate_id)
+        reservation = state._idempotency.get(claim.idempotency_key)
+        approval = state._approvals.get(claim.approval_fingerprint)
+        if (
+            current is None
+            or current.to_public() != claim
+            or not grant.authenticates(current)
+            or control is None
+            or not control.permits_dispatch
+            or control.generation != claim.control_generation
+            or command is None
+            or command.record_fingerprint != claim.command_record_fingerprint
+            or command.canonical_payload_fingerprint
+            != claim.canonical_payload_fingerprint
+            or command.canonical_command_json != claim.canonical_order_json
+            or command.approval_fingerprint != claim.approval_fingerprint
+            or command.policy_fingerprint != claim.policy_fingerprint
+            or aggregate is None
+            or aggregate.lifecycle_state.value != "DISPATCH_PENDING"
+            or aggregate.execution_revision != claim.expected_execution_revision
+            or reservation is None
+            or reservation.command_id != claim.command_id
+            or reservation.aggregate_id != claim.aggregate_id
+            or approval is None
+            or approval.bound_fingerprint != claim.canonical_payload_fingerprint
+            or approval.mode.value != "PAPER"
+            or approval.revocation_reference is not None
+            or (approval.expires_at is not None and approval.expires_at < authorized_at)
+        ):
+            return None
+        record = ExecutionDispatchAuthorizationRecord(
+            claim.claim_token, control.generation, authorized_at, SCHEMA_VERSION
+        )
+        saved = self._unit_of_work.dispatch_authorizations.record(record)
+        return (
+            record if saved.status is ExecutionPersistenceResultStatus.CREATED else None
+        )
+
+
+def _reject_duplicate_json_keys(items: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in items:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+class InMemoryExecutionDispatchAuthorizationRepository(_RepositoryBase):
+    def get(self, claim_token: str) -> ExecutionDispatchAuthorizationRecord | None:
+        self._ensure_active()
+        return self._unit_of_work.transaction_state._dispatch_authorizations.get(
+            claim_token
+        )
+
+    def record(self, record: ExecutionDispatchAuthorizationRecord) -> RecordLoadResult:
+        self._ensure_active()
+        existing = self.get(record.claim_token)
+        if existing is not None:
+            status = (
+                ExecutionPersistenceResultStatus.EXACT_REPLAY
+                if existing == record
+                else ExecutionPersistenceResultStatus.COMMAND_CONFLICT
+            )
+            return RecordLoadResult(
+                status=status,
+                schema_version=record.schema_version,
+                record_fingerprint=existing.record_fingerprint,
+            )
+        self._unit_of_work.stage_dispatch_authorization(record)
+        self._unit_of_work.transaction_state._dispatch_authorizations[
+            record.claim_token
+        ] = record
+        return RecordLoadResult(
+            status=ExecutionPersistenceResultStatus.CREATED,
+            schema_version=record.schema_version,
+            record_fingerprint=record.record_fingerprint,
+        )
+
+
+class InMemoryExecutionDispatchResolutionRepository(_RepositoryBase):
+    def get(self, claim_token: str) -> ExecutionDispatchResolutionRecord | None:
+        self._ensure_active()
+        return self._unit_of_work.transaction_state._dispatch_resolutions.get(
+            claim_token
+        )
+
+    def record(self, record: ExecutionDispatchResolutionRecord) -> RecordLoadResult:
+        self._ensure_active()
+        existing = self.get(record.claim_token)
+        if existing is not None:
+            status = (
+                ExecutionPersistenceResultStatus.EXACT_REPLAY
+                if existing == record
+                else ExecutionPersistenceResultStatus.COMMAND_CONFLICT
+            )
+            return RecordLoadResult(
+                status=status,
+                schema_version=record.schema_version,
+                record_fingerprint=existing.record_fingerprint,
+            )
+        self._unit_of_work.stage_dispatch_resolution(record)
+        self._unit_of_work.transaction_state._dispatch_resolutions[
+            record.claim_token
+        ] = record
+        return RecordLoadResult(
+            status=ExecutionPersistenceResultStatus.CREATED,
+            schema_version=record.schema_version,
+            record_fingerprint=record.record_fingerprint,
+        )
+
+
 def _aggregate_save_result(
     record: ExecutionAggregateRecord,
     existing: ExecutionAggregateRecord | None,
@@ -608,6 +1017,47 @@ def _aggregate_save_result(
             ),
             schema_version=SCHEMA_VERSION,
         )
+    return AggregateSaveResult(
+        status=ExecutionPersistenceResultStatus.SAVED,
+        aggregate_id=record.aggregate_id,
+        expected_revision=expected_revision,
+        current_revision=record.execution_revision,
+        aggregate_fingerprint=record.record_fingerprint,
+        schema_version=SCHEMA_VERSION,
+    )
+
+
+def _dispatch_outcome_aggregate_save_result(
+    record: ExecutionAggregateRecord,
+    existing: ExecutionAggregateRecord | None,
+    expected_revision: PaperExecutionRevision,
+    revision_increment: int,
+) -> AggregateSaveResult:
+    if (
+        existing is None
+        or existing.execution_revision != expected_revision
+        or revision_increment < 1
+        or int(record.execution_revision) != int(expected_revision) + revision_increment
+    ):
+        actual_revision = None if existing is None else existing.execution_revision
+        conflict = _conflict(
+            kind=ExecutionPersistenceConflictKind.STALE_REVISION,
+            code="DISPATCH_OUTCOME_AGGREGATE_REVISION_MISMATCH",
+            safe_message="Dispatch outcome aggregate revision chain is invalid.",
+            aggregate_id=record.aggregate_id,
+            expected_revision=expected_revision,
+            actual_revision=actual_revision,
+        )
+        return AggregateSaveResult(
+            status=ExecutionPersistenceResultStatus.STALE_REVISION,
+            aggregate_id=record.aggregate_id,
+            expected_revision=expected_revision,
+            current_revision=actual_revision,
+            conflict=conflict,
+            schema_version=SCHEMA_VERSION,
+        )
+    if existing.aggregate_terminal:
+        return _aggregate_save_result(record, existing, expected_revision)
     return AggregateSaveResult(
         status=ExecutionPersistenceResultStatus.SAVED,
         aggregate_id=record.aggregate_id,
@@ -802,6 +1252,22 @@ def _broker_reference_result(
     existing: ExecutionBrokerReferenceRecord | None,
     active_owner: ExecutionBrokerReferenceRecord | None,
 ) -> RecordLoadResult:
+    if (
+        existing is not None
+        and existing.record_fingerprint != record.record_fingerprint
+    ):
+        return RecordLoadResult(
+            status=ExecutionPersistenceResultStatus.DUPLICATE_BROKER_REFERENCE,
+            conflict=_conflict(
+                kind=ExecutionPersistenceConflictKind.BROKER_REFERENCE_CONFLICT,
+                code="BROKER_REFERENCE_CONFLICT",
+                safe_message="Broker reference is already bound to another record.",
+                aggregate_id=existing.aggregate_id,
+                command_id=existing.command_id,
+            ),
+            record_fingerprint=existing.record_fingerprint,
+            schema_version=SCHEMA_VERSION,
+        )
     identity_result = _record_result_for_unique_identity(
         record.record_fingerprint,
         existing.record_fingerprint if existing is not None else None,
@@ -935,6 +1401,10 @@ def _cursor_offset(
 
 
 __all__ = [
+    "InMemoryExecutionDispatchAuthorizationRepository",
+    "InMemoryExecutionDispatchClaimRepository",
+    "InMemoryExecutionDispatchControlRepository",
+    "InMemoryExecutionDispatchResolutionRepository",
     "InMemoryExecutionAggregateRepository",
     "InMemoryExecutionApprovalRepository",
     "InMemoryExecutionBrokerReferenceRepository",

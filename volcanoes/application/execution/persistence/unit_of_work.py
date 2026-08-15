@@ -18,6 +18,7 @@ from volcanoes.application.execution.persistence.contracts import (
     RecordLoadResult,
     TransitionAppendResult,
     UnitOfWorkCommitResult,
+    DispatchOutcomeWriteSet,
 )
 from volcanoes.application.execution.persistence.ports import (
     ExecutionAggregateRepository,
@@ -30,6 +31,10 @@ from volcanoes.application.execution.persistence.ports import (
     ExecutionReconciliationRepository,
     ExecutionRestartDiscoveryRepository,
     ExecutionTransitionJournal,
+    ExecutionDispatchAuthorizationRepository,
+    ExecutionDispatchClaimRepository,
+    ExecutionDispatchControlRepository,
+    ExecutionDispatchResolutionRepository,
 )
 from volcanoes.application.execution.identities import PaperExecutionRevision
 
@@ -48,6 +53,10 @@ class ExecutionUnitOfWork(Protocol):
     approvals: ExecutionApprovalRepository
     reconciliations: ExecutionReconciliationRepository
     restart_discovery: ExecutionRestartDiscoveryRepository
+    dispatch_control: ExecutionDispatchControlRepository
+    dispatch_claims: ExecutionDispatchClaimRepository
+    dispatch_authorizations: ExecutionDispatchAuthorizationRepository
+    dispatch_resolutions: ExecutionDispatchResolutionRepository
 
     def __enter__(self) -> Self:
         """Enter an explicit unit-of-work scope without committing."""
@@ -65,6 +74,11 @@ class ExecutionUnitOfWork(Protocol):
 
     def rollback(self) -> None:
         """Roll back explicit local transaction work."""
+
+    def record_dispatch_outcome(
+        self, write_set: DispatchOutcomeWriteSet
+    ) -> RecordLoadResult:
+        """Validate and stage one complete dispatch outcome write set."""
 
 
 @runtime_checkable

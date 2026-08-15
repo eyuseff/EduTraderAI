@@ -21,6 +21,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
     CONTRACT_ALIGNMENT_MIGRATION,
+    DURABLE_DISPATCH_CLAIM_MIGRATION,
     CURRENT_SCHEMA_VERSION,
     MAXIMUM_SUPPORTED_SCHEMA_VERSION,
     MINIMUM_SUPPORTED_SCHEMA_VERSION,
@@ -45,6 +46,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.unit_of_work import (
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "CONTRACT_ALIGNMENT_MIGRATION",
+    "DURABLE_DISPATCH_CLAIM_MIGRATION",
     "DEFAULT_BUSY_TIMEOUT_MS",
     "INITIAL_MIGRATION",
     "KNOWN_MIGRATIONS",

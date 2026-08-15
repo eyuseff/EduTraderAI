@@ -271,6 +271,7 @@ TRANSITION_SPECS: tuple[PaperExecutionTransitionSpecification, ...] = (
             State.APPROVAL_CONFIRMED,
             State.IDEMPOTENCY_RESERVED,
             State.READY_FOR_DISPATCH,
+            State.DISPATCH_PENDING,
         ),
         Input.ABORT_BEFORE_DISPATCH,
         State.ABORTED_BEFORE_DISPATCH,

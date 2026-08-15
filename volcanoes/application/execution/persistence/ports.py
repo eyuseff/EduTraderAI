@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from volcanoes.application.execution.identities import (
@@ -29,6 +30,12 @@ from volcanoes.application.execution.persistence.contracts import (
     ReplayLookupResult,
     RestartDiscoveryResult,
     TransitionAppendResult,
+    DispatchClaimResult,
+    ExecutionDispatchClaimAttempt,
+    ExecutionDispatchAuthorizationRecord,
+    ExecutionDispatchClaimRecord,
+    ExecutionDispatchControlRecord,
+    ExecutionDispatchResolutionRecord,
 )
 
 
@@ -38,6 +45,11 @@ class ExecutionAggregateRepository(Protocol):
 
     def get(self, aggregate_id: PaperExecutionAggregateId) -> RecordLoadResult:
         """Return a load result for one aggregate identity."""
+
+    def load_record(
+        self, aggregate_id: PaperExecutionAggregateId
+    ) -> ExecutionAggregateRecord | None:
+        """Load the immutable aggregate required for coordinated CAS updates."""
 
     def save(
         self,
@@ -155,3 +167,33 @@ class ExecutionRestartDiscoveryRepository(Protocol):
         query: ExecutionRestartDiscoveryQuery,
     ) -> RestartDiscoveryResult:
         """Return a page; invalid or cross-filter cursors restart at page one."""
+
+
+@runtime_checkable
+class ExecutionDispatchControlRepository(Protocol):
+    def get(self) -> ExecutionDispatchControlRecord: ...
+    def save(
+        self, record: ExecutionDispatchControlRecord, *, expected_generation: int
+    ) -> RecordLoadResult: ...
+
+
+@runtime_checkable
+class ExecutionDispatchClaimRepository(Protocol):
+    def get(self, claim_token: str) -> ExecutionDispatchClaimRecord | None: ...
+    def acquire(
+        self, attempt: ExecutionDispatchClaimAttempt, *, claimed_at: datetime
+    ) -> DispatchClaimResult: ...
+
+
+@runtime_checkable
+class ExecutionDispatchAuthorizationRepository(Protocol):
+    def get(self, claim_token: str) -> ExecutionDispatchAuthorizationRecord | None: ...
+    def record(
+        self, record: ExecutionDispatchAuthorizationRecord
+    ) -> RecordLoadResult: ...
+
+
+@runtime_checkable
+class ExecutionDispatchResolutionRepository(Protocol):
+    def get(self, claim_token: str) -> ExecutionDispatchResolutionRecord | None: ...
+    def record(self, record: ExecutionDispatchResolutionRecord) -> RecordLoadResult: ...

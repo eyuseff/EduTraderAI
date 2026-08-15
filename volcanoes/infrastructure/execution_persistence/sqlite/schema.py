@@ -10,6 +10,7 @@ SCHEMA_RESOURCE_PACKAGE = (
 INITIAL_SCHEMA_RESOURCE = "v001_initial_schema.sql"
 CONTRACT_ALIGNMENT_SCHEMA_RESOURCE = "v002_contract_alignment.sql"
 SCHEMA_VERSION_TEXT_RESOURCE = "v003_schema_version_text.sql"
+DURABLE_DISPATCH_CLAIM_RESOURCE = "v004_durable_dispatch_claim.sql"
 
 EXPECTED_TABLES: tuple[str, ...] = (
     "execution_aggregates",
@@ -22,6 +23,10 @@ EXPECTED_TABLES: tuple[str, ...] = (
     "execution_approvals",
     "execution_reconciliations",
     "schema_migrations",
+    "execution_dispatch_controls",
+    "execution_dispatch_claims",
+    "execution_dispatch_authorizations",
+    "execution_dispatch_resolutions",
 )
 
 EXPECTED_INDEXES: tuple[str, ...] = (
@@ -33,13 +38,18 @@ EXPECTED_INDEXES: tuple[str, ...] = (
     "idx_execution_idempotency_aggregate",
     "idx_execution_transitions_command",
     "idx_execution_broker_references_aggregate_active",
+    "idx_execution_broker_references_exact_owner",
     "idx_execution_receipts_command_aggregate",
     "idx_execution_failures_command_aggregate",
     "idx_execution_reconciliations_aggregate_unresolved",
     "idx_schema_migrations_resulting_version",
+    "idx_execution_dispatch_claims_aggregate_revision",
+    "idx_execution_dispatch_claims_command_request",
+    "idx_execution_dispatch_claims_idempotency_payload",
 )
 
 EXPECTED_TRIGGERS: tuple[str, ...] = (
+    "trg_execution_dispatch_controls_generation",
     "trg_execution_commands_no_update",
     "trg_execution_commands_no_delete",
     "trg_execution_transitions_no_update",
@@ -54,9 +64,76 @@ EXPECTED_TRIGGERS: tuple[str, ...] = (
     "trg_execution_reconciliations_no_delete",
     "trg_schema_migrations_no_update",
     "trg_schema_migrations_no_delete",
+    "trg_execution_dispatch_claims_no_update",
+    "trg_execution_dispatch_claims_no_delete",
+    "trg_execution_dispatch_authorizations_no_update",
+    "trg_execution_dispatch_authorizations_no_delete",
+    "trg_execution_dispatch_resolutions_no_update",
+    "trg_execution_dispatch_resolutions_no_delete",
 )
 
 EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "execution_dispatch_controls": (
+        "control_id",
+        "enabled",
+        "paper_mode",
+        "emergency_stop_active",
+        "legacy_authority_active",
+        "generation",
+        "updated_at",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_claims": (
+        "claim_token",
+        "submission_id",
+        "command_id",
+        "aggregate_id",
+        "correlation_id",
+        "idempotency_key",
+        "expected_execution_revision",
+        "request_fingerprint",
+        "command_record_fingerprint",
+        "canonical_payload_fingerprint",
+        "approval_fingerprint",
+        "policy_fingerprint",
+        "client_order_id",
+        "capability_verifier",
+        "canonical_order_json",
+        "control_generation",
+        "claimed_at",
+        "mode",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_authorizations": (
+        "claim_token",
+        "authorization_fingerprint",
+        "control_generation",
+        "authorized_at",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_resolutions": (
+        "claim_token",
+        "resolution_status",
+        "effect_phase",
+        "resolved_at",
+        "broker_reference",
+        "observation_fingerprint",
+        "conflicting_owner_aggregate_id",
+        "conflicting_owner_command_id",
+        "conflicting_owner_record_fingerprint",
+        "result_fingerprint",
+        "evidence_fingerprint",
+        "evidence_record_fingerprint",
+        "safe_reason_code",
+        "reconciliation_required",
+        "operator_action_required",
+        "automatic_retry",
+        "schema_version",
+        "record_fingerprint",
+    ),
     "execution_aggregates": (
         "aggregate_id",
         "correlation_id",
@@ -274,9 +351,18 @@ def load_schema_version_text_sql() -> str:
     )
 
 
+def load_durable_dispatch_claim_sql() -> str:
+    return (
+        resources.files(SCHEMA_RESOURCE_PACKAGE)
+        .joinpath(DURABLE_DISPATCH_CLAIM_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
+
+
 __all__ = [
     "AGGREGATE_CAS_UPDATE_SQL",
     "CONTRACT_ALIGNMENT_SCHEMA_RESOURCE",
+    "DURABLE_DISPATCH_CLAIM_RESOURCE",
     "EXPECTED_COLUMNS",
     "EXPECTED_INDEXES",
     "EXPECTED_TABLES",
@@ -286,5 +372,6 @@ __all__ = [
     "SCHEMA_VERSION_TEXT_RESOURCE",
     "load_initial_schema_sql",
     "load_contract_alignment_schema_sql",
+    "load_durable_dispatch_claim_sql",
     "load_schema_version_text_sql",
 ]

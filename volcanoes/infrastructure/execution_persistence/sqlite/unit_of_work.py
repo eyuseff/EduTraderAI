@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
+from datetime import datetime
 from types import TracebackType
 from typing import Self
 
@@ -21,8 +23,14 @@ from volcanoes.application.execution.persistence.contracts import (
     RecordLoadResult,
     TransitionAppendResult,
     UnitOfWorkCommitResult,
+    DispatchClaimResult,
+    ExecutionDispatchClaimAttempt,
+    DispatchOutcomeWriteSet,
+    ExecutionDispatchClaim,
 )
 from volcanoes.application.execution.persistence.enums import (
+    DispatchClaimStatus,
+    DispatchResolutionStatus,
     ExecutionPersistenceConflictKind,
     ExecutionPersistenceResultStatus,
 )
@@ -50,6 +58,10 @@ from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
     SqliteExecutionReconciliationRepository,
     SqliteExecutionRestartDiscoveryRepository,
     SqliteExecutionTransitionJournal,
+    SqliteExecutionDispatchAuthorizationRepository,
+    SqliteExecutionDispatchClaimRepository,
+    SqliteExecutionDispatchControlRepository,
+    SqliteExecutionDispatchResolutionRepository,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.validation import (
     validate_sqlite_execution_schema,
@@ -202,6 +214,16 @@ class SqliteExecutionUnitOfWork:
         self.restart_discovery = SqliteExecutionRestartDiscoveryRepository(
             self._transaction
         )
+        self.dispatch_control = SqliteExecutionDispatchControlRepository(
+            self._transaction
+        )
+        self.dispatch_claims = SqliteExecutionDispatchClaimRepository(self._transaction)
+        self.dispatch_authorizations = SqliteExecutionDispatchAuthorizationRepository(
+            self._transaction
+        )
+        self.dispatch_resolutions = SqliteExecutionDispatchResolutionRepository(
+            self._transaction
+        )
 
     def __enter__(self) -> Self:
         self._transaction.__enter__()
@@ -256,6 +278,179 @@ class SqliteExecutionUnitOfWork:
     def record_failure(self, failure: ExecutionFailureRecord) -> RecordLoadResult:
         return self.failures.record(failure)
 
+    def record_dispatch_outcome(
+        self, write_set: DispatchOutcomeWriteSet
+    ) -> RecordLoadResult:
+        self._transaction.execute("SAVEPOINT dispatch_outcome")
+        try:
+            claim = self.dispatch_claims.get(write_set.claim.claim_token)
+            authorization = self.dispatch_authorizations.get(
+                write_set.claim.claim_token
+            )
+            if (
+                claim is None
+                or claim.to_public() != write_set.claim
+                or authorization != write_set.authorization
+                or write_set.claim.client_order_id
+                != _dispatch_client_order_id(write_set.claim)
+                or not self._authoritative_outcome_start_is_valid(write_set)
+            ):
+                return self._abort_dispatch_outcome(
+                    RecordLoadResult(
+                        ExecutionPersistenceResultStatus.COMMAND_CONFLICT,
+                        CURRENT_SCHEMA_VERSION,
+                    )
+                )
+            if write_set.broker_reference is not None:
+                owned = self.broker_references.register(write_set.broker_reference)
+                if owned.status is not ExecutionPersistenceResultStatus.CREATED:
+                    return self._abort_dispatch_outcome(owned)
+            evidence_result = (
+                self.receipts.record(write_set.evidence)
+                if isinstance(write_set.evidence, ExecutionReceiptRecord)
+                else self.failures.record(write_set.evidence)
+            )
+            if evidence_result.status is not ExecutionPersistenceResultStatus.CREATED:
+                return self._abort_dispatch_outcome(evidence_result)
+            for transition in write_set.transitions:
+                appended = self.transitions.append(transition)
+                if appended.status is not ExecutionPersistenceResultStatus.APPENDED:
+                    return self._abort_dispatch_outcome(
+                        RecordLoadResult(appended.status, CURRENT_SCHEMA_VERSION)
+                    )
+            aggregate = self.aggregates._save_dispatch_outcome(
+                write_set.aggregate,
+                expected_revision=write_set.expected_revision,
+                revision_increment=len(write_set.transitions),
+            )
+            if aggregate.status is not ExecutionPersistenceResultStatus.SAVED:
+                return self._abort_dispatch_outcome(
+                    RecordLoadResult(aggregate.status, CURRENT_SCHEMA_VERSION)
+                )
+            if not self._conflict_owner_is_current(write_set):
+                return self._abort_dispatch_outcome(
+                    RecordLoadResult(
+                        ExecutionPersistenceResultStatus.COMMAND_CONFLICT,
+                        CURRENT_SCHEMA_VERSION,
+                    )
+                )
+            resolution = self.dispatch_resolutions.record(write_set.resolution)
+            if resolution.status is not ExecutionPersistenceResultStatus.CREATED:
+                return self._abort_dispatch_outcome(resolution)
+            self._transaction.execute("RELEASE SAVEPOINT dispatch_outcome")
+            return resolution
+        except Exception:
+            self._transaction.execute("ROLLBACK TO SAVEPOINT dispatch_outcome")
+            self._transaction.execute("RELEASE SAVEPOINT dispatch_outcome")
+            raise
+
+    def _authoritative_outcome_start_is_valid(
+        self, write_set: DispatchOutcomeWriteSet
+    ) -> bool:
+        row = self._transaction.execute(
+            """
+            SELECT c.claim_token
+            FROM execution_dispatch_claims AS c
+            JOIN execution_commands AS m ON m.command_id = c.command_id
+            JOIN execution_idempotency AS i ON i.idempotency_key = c.idempotency_key
+            JOIN execution_approvals AS p
+              ON p.approval_fingerprint = c.approval_fingerprint
+            JOIN execution_aggregates AS a ON a.aggregate_id = c.aggregate_id
+            JOIN execution_dispatch_authorizations AS z
+              ON z.claim_token = c.claim_token
+            JOIN execution_dispatch_controls AS d
+              ON d.control_id = 'PAPER_DISPATCH'
+            LEFT JOIN execution_dispatch_resolutions AS r
+              ON r.claim_token = c.claim_token
+            WHERE c.claim_token = ?
+              AND m.aggregate_id = c.aggregate_id
+              AND m.correlation_id = c.correlation_id
+              AND m.idempotency_key = c.idempotency_key
+              AND m.record_fingerprint = c.command_record_fingerprint
+              AND m.canonical_payload_fingerprint = c.canonical_payload_fingerprint
+              AND m.canonical_command_json = c.canonical_order_json
+              AND m.approval_fingerprint = c.approval_fingerprint
+              AND m.policy_fingerprint = c.policy_fingerprint
+              AND m.mode = 'PAPER'
+              AND i.command_id = c.command_id AND i.aggregate_id = c.aggregate_id
+              AND p.bound_fingerprint = c.canonical_payload_fingerprint
+              AND p.mode = 'PAPER' AND p.revocation_reference IS NULL
+              AND (p.expires_at IS NULL OR p.expires_at >= ?)
+              AND z.control_generation = c.control_generation
+              AND d.generation = c.control_generation
+              AND d.enabled = 1 AND d.emergency_stop_active = 0
+              AND d.legacy_authority_active = 0
+              AND a.execution_revision = ?
+              AND a.lifecycle_state = ?
+              AND a.lifecycle_state = 'DISPATCH_PENDING'
+              AND r.claim_token IS NULL
+            """,
+            (
+                write_set.claim.claim_token,
+                write_set.resolution.resolved_at.isoformat(
+                    timespec="microseconds"
+                ).replace("+00:00", "Z"),
+                int(write_set.expected_revision),
+                write_set.transitions[0].source_state.value,
+            ),
+        ).fetchone()
+        if row is None:
+            return False
+        if (
+            write_set.resolution.status
+            is DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT
+        ):
+            return self._conflict_owner_is_current(write_set)
+        return True
+
+    def _conflict_owner_is_current(self, write_set: DispatchOutcomeWriteSet) -> bool:
+        resolution = write_set.resolution
+        if resolution.status is not DispatchResolutionStatus.BROKER_REFERENCE_CONFLICT:
+            return True
+        observed = resolution.broker_reference
+        if observed is None:
+            return False
+        owner = self._transaction.execute(
+            """
+            SELECT aggregate_id, command_id, record_fingerprint
+            FROM execution_broker_references
+            WHERE broker_reference = ?
+            """,
+            (observed,),
+        ).fetchone()
+        return bool(
+            owner is not None
+            and owner["aggregate_id"] == str(resolution.conflicting_owner_aggregate_id)
+            and owner["command_id"] == str(resolution.conflicting_owner_command_id)
+            and owner["record_fingerprint"]
+            == resolution.conflicting_owner_record_fingerprint
+            and owner["aggregate_id"] != str(write_set.claim.aggregate_id)
+            and owner["command_id"] != str(write_set.claim.command_id)
+        )
+
+    def _abort_dispatch_outcome(self, result: RecordLoadResult) -> RecordLoadResult:
+        self._transaction.execute("ROLLBACK TO SAVEPOINT dispatch_outcome")
+        self._transaction.execute("RELEASE SAVEPOINT dispatch_outcome")
+        return result
+
+
+def _dispatch_client_order_id(claim: ExecutionDispatchClaim) -> str:
+    from volcanoes.application.execution.fingerprints import fingerprint_payload
+
+    digest = fingerprint_payload(
+        "pci",
+        {
+            "domain": "paper-client-order-v1",
+            "inputs": {
+                "canonical_payload_fingerprint": claim.canonical_payload_fingerprint,
+                "command_id": claim.command_id,
+                "idempotency_key": claim.idempotency_key,
+                "submission_id": claim.submission_id,
+            },
+        },
+    ).rsplit("-", 1)[-1]
+    return "paper-" + digest[:42]
+
 
 class SqliteExecutionPersistence:
     """Validated factory bound to one caller-owned configured connection."""
@@ -308,6 +503,50 @@ class SqliteExecutionPersistence:
 
     def unit_of_work(self) -> SqliteExecutionUnitOfWork:
         return SqliteExecutionUnitOfWork(self._connection)
+
+    def acquire_and_authorize_dispatch(
+        self,
+        attempt: ExecutionDispatchClaimAttempt,
+        *,
+        claimed_at: datetime,
+        authorized_at: datetime,
+    ) -> DispatchClaimResult:
+        with self.unit_of_work() as first:
+            result = first.dispatch_claims.acquire(attempt, claimed_at=claimed_at)
+            grant = first.dispatch_claims._take_winner_grant()
+            if result.status is not DispatchClaimStatus.ACQUIRED:
+                first.rollback()
+                return result
+            if grant is None or not first.commit().committed or result.claim is None:
+                return DispatchClaimResult(
+                    DispatchClaimStatus.BLOCKED,
+                    None,
+                    CURRENT_SCHEMA_VERSION,
+                    "CLAIM_COMMIT_FAILED",
+                )
+        with self.unit_of_work() as second:
+            authorization = second.dispatch_claims._authorize_private(
+                result.claim, grant, authorized_at=authorized_at
+            )
+            aggregate = second.aggregates.load_record(result.claim.aggregate_id)
+            if (
+                authorization is None
+                or aggregate is None
+                or not second.commit().committed
+            ):
+                return DispatchClaimResult(
+                    DispatchClaimStatus.BLOCKED,
+                    result.claim,
+                    CURRENT_SCHEMA_VERSION,
+                    "FINAL_GUARD_BLOCKED",
+                )
+            return replace(
+                result,
+                reason_code="AUTHORIZED_WINNER",
+                authorized=True,
+                authorization=authorization,
+                aggregate=aggregate,
+            )
 
 
 __all__ = [

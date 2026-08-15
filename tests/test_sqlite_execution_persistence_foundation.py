@@ -14,6 +14,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite import (
     CURRENT_SCHEMA_VERSION,
     CONTRACT_ALIGNMENT_MIGRATION,
     DEFAULT_BUSY_TIMEOUT_MS,
+    DURABLE_DISPATCH_CLAIM_MIGRATION,
     INITIAL_MIGRATION,
     KNOWN_MIGRATIONS,
     MAXIMUM_SUPPORTED_SCHEMA_VERSION,
@@ -49,6 +50,7 @@ EXPECTED_PUBLIC_EXPORTS = {
     "CURRENT_SCHEMA_VERSION",
     "CONTRACT_ALIGNMENT_MIGRATION",
     "DEFAULT_BUSY_TIMEOUT_MS",
+    "DURABLE_DISPATCH_CLAIM_MIGRATION",
     "INITIAL_MIGRATION",
     "KNOWN_MIGRATIONS",
     "SCHEMA_VERSION_TEXT_MIGRATION",
@@ -90,6 +92,10 @@ AUTHORIZED_PHASE2_SLICE2_CLASSES = {
     ("repositories.py", "SqliteExecutionApprovalRepository"),
     ("repositories.py", "SqliteExecutionReconciliationRepository"),
     ("repositories.py", "SqliteExecutionRestartDiscoveryRepository"),
+    ("repositories.py", "SqliteExecutionDispatchControlRepository"),
+    ("repositories.py", "SqliteExecutionDispatchClaimRepository"),
+    ("repositories.py", "SqliteExecutionDispatchAuthorizationRepository"),
+    ("repositories.py", "SqliteExecutionDispatchResolutionRepository"),
 }
 
 EXPECTED_TABLES = {
@@ -103,6 +109,10 @@ EXPECTED_TABLES = {
     "execution_approvals",
     "execution_reconciliations",
     "schema_migrations",
+    "execution_dispatch_controls",
+    "execution_dispatch_claims",
+    "execution_dispatch_authorizations",
+    "execution_dispatch_resolutions",
 }
 
 EXPECTED_INDEXES = {
@@ -114,13 +124,18 @@ EXPECTED_INDEXES = {
     "idx_execution_idempotency_aggregate",
     "idx_execution_transitions_command",
     "idx_execution_broker_references_aggregate_active",
+    "idx_execution_broker_references_exact_owner",
     "idx_execution_receipts_command_aggregate",
     "idx_execution_failures_command_aggregate",
     "idx_execution_reconciliations_aggregate_unresolved",
     "idx_schema_migrations_resulting_version",
+    "idx_execution_dispatch_claims_aggregate_revision",
+    "idx_execution_dispatch_claims_command_request",
+    "idx_execution_dispatch_claims_idempotency_payload",
 }
 
 EXPECTED_TRIGGERS = {
+    "trg_execution_dispatch_controls_generation",
     "trg_execution_commands_no_update",
     "trg_execution_commands_no_delete",
     "trg_execution_transitions_no_update",
@@ -135,9 +150,76 @@ EXPECTED_TRIGGERS = {
     "trg_execution_reconciliations_no_delete",
     "trg_schema_migrations_no_update",
     "trg_schema_migrations_no_delete",
+    "trg_execution_dispatch_claims_no_update",
+    "trg_execution_dispatch_claims_no_delete",
+    "trg_execution_dispatch_authorizations_no_update",
+    "trg_execution_dispatch_authorizations_no_delete",
+    "trg_execution_dispatch_resolutions_no_update",
+    "trg_execution_dispatch_resolutions_no_delete",
 }
 
 EXPECTED_COLUMNS = {
+    "execution_dispatch_controls": (
+        "control_id",
+        "enabled",
+        "paper_mode",
+        "emergency_stop_active",
+        "legacy_authority_active",
+        "generation",
+        "updated_at",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_claims": (
+        "claim_token",
+        "submission_id",
+        "command_id",
+        "aggregate_id",
+        "correlation_id",
+        "idempotency_key",
+        "expected_execution_revision",
+        "request_fingerprint",
+        "command_record_fingerprint",
+        "canonical_payload_fingerprint",
+        "approval_fingerprint",
+        "policy_fingerprint",
+        "client_order_id",
+        "capability_verifier",
+        "canonical_order_json",
+        "control_generation",
+        "claimed_at",
+        "mode",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_authorizations": (
+        "claim_token",
+        "authorization_fingerprint",
+        "control_generation",
+        "authorized_at",
+        "schema_version",
+        "record_fingerprint",
+    ),
+    "execution_dispatch_resolutions": (
+        "claim_token",
+        "resolution_status",
+        "effect_phase",
+        "resolved_at",
+        "broker_reference",
+        "observation_fingerprint",
+        "conflicting_owner_aggregate_id",
+        "conflicting_owner_command_id",
+        "conflicting_owner_record_fingerprint",
+        "result_fingerprint",
+        "evidence_fingerprint",
+        "evidence_record_fingerprint",
+        "safe_reason_code",
+        "reconciliation_required",
+        "operator_action_required",
+        "automatic_retry",
+        "schema_version",
+        "record_fingerprint",
+    ),
     "execution_aggregates": (
         "aggregate_id",
         "correlation_id",
@@ -597,9 +679,9 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
     )
 
     assert EXPECTED_PUBLIC_EXPORTS == set(module.__all__)
-    assert CURRENT_SCHEMA_VERSION == 3
+    assert CURRENT_SCHEMA_VERSION == 4
     assert MINIMUM_SUPPORTED_SCHEMA_VERSION == 1
-    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 3
+    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 4
     assert INITIAL_MIGRATION.migration_id == "v001"
     assert INITIAL_MIGRATION.previous_version == 0
     assert INITIAL_MIGRATION.resulting_version == 1
@@ -609,10 +691,12 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
     assert SCHEMA_VERSION_TEXT_MIGRATION.migration_id == "v003"
     assert SCHEMA_VERSION_TEXT_MIGRATION.previous_version == 2
     assert SCHEMA_VERSION_TEXT_MIGRATION.resulting_version == 3
+    assert DURABLE_DISPATCH_CLAIM_MIGRATION.migration_id == "v004"
     assert tuple(item.migration_id for item in KNOWN_MIGRATIONS) == (
         "v001",
         "v002",
         "v003",
+        "v004",
     )
     assert after == before
 
@@ -623,8 +707,8 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         result = apply_initial_schema(connection)
 
         assert result.changed is True
-        assert result.applied_migration_ids == ("v001", "v002", "v003")
-        assert result.schema_state.current_version == 3
+        assert result.applied_migration_ids == ("v001", "v002", "v003", "v004")
+        assert result.schema_state.current_version == 4
         assert sqlite_objects(connection, "table") == EXPECTED_TABLES
         assert EXPECTED_INDEXES.issubset(sqlite_objects(connection, "index"))
         assert sqlite_objects(connection, "trigger") == EXPECTED_TRIGGERS
@@ -663,6 +747,9 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         assert dict(migration_rows[2])["migration_id"] == "v003"
         assert dict(migration_rows[2])["previous_schema_version"] == 2
         assert dict(migration_rows[2])["resulting_schema_version"] == 3
+        assert dict(migration_rows[3])["migration_id"] == "v004"
+        assert dict(migration_rows[3])["previous_schema_version"] == 3
+        assert dict(migration_rows[3])["resulting_schema_version"] == 4
         assert int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) == 1
         assert (
             str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
@@ -689,6 +776,96 @@ def test_schema_constraints_foreign_keys_and_uniqueness_are_enforced(tmp_path):
         assert aggregate_columns["aggregate_id"]["pk"] == 1
         assert aggregate_columns["execution_revision"]["type"] == "INTEGER"
         assert aggregate_columns["record_fingerprint"]["notnull"] == 1
+        claim_columns = table_columns(connection, "execution_dispatch_claims")
+        assert claim_columns["capability_verifier"]["type"] == "TEXT"
+        assert claim_columns["capability_verifier"]["notnull"] == 1
+        claim_unique_columns = {
+            tuple(
+                str(column["name"])
+                for column in connection.execute(f"PRAGMA index_info({index['name']})")
+            )
+            for index in connection.execute(
+                "PRAGMA index_list(execution_dispatch_claims)"
+            )
+            if int(index["unique"]) == 1
+        }
+        assert ("capability_verifier",) in claim_unique_columns
+        resolution_columns = table_columns(connection, "execution_dispatch_resolutions")
+        for name in (
+            "conflicting_owner_aggregate_id",
+            "conflicting_owner_command_id",
+            "conflicting_owner_record_fingerprint",
+        ):
+            assert resolution_columns[name]["type"] == "TEXT"
+            assert resolution_columns[name]["notnull"] == 0
+        resolution_schema_sql = str(
+            connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' "
+                "AND name='execution_dispatch_resolutions'"
+            ).fetchone()[0]
+        )
+        assert (
+            "resolution_status = 'BROKER_REFERENCE_CONFLICT'" in resolution_schema_sql
+        )
+        assert "conflicting_owner_aggregate_id IS NOT NULL" in resolution_schema_sql
+        assert "conflicting_owner_command_id IS NOT NULL" in resolution_schema_sql
+        assert (
+            "conflicting_owner_record_fingerprint IS NOT NULL" in resolution_schema_sql
+        )
+        assert (
+            "resolution_status <> 'BROKER_REFERENCE_CONFLICT'" in resolution_schema_sql
+        )
+        assert "conflicting_owner_aggregate_id IS NULL" in resolution_schema_sql
+        assert "conflicting_owner_command_id IS NULL" in resolution_schema_sql
+        assert "conflicting_owner_record_fingerprint IS NULL" in resolution_schema_sql
+        owner_indexes = {
+            str(index["name"]): tuple(
+                str(column["name"])
+                for column in connection.execute(f"PRAGMA index_info({index['name']})")
+            )
+            for index in connection.execute(
+                "PRAGMA index_list(execution_broker_references)"
+            )
+            if int(index["unique"]) == 1
+        }
+        assert owner_indexes["idx_execution_broker_references_exact_owner"] == (
+            "broker_reference",
+            "aggregate_id",
+            "command_id",
+            "record_fingerprint",
+        )
+        owner_foreign_key = sorted(
+            (
+                int(row["seq"]),
+                str(row["from"]),
+                str(row["to"]),
+            )
+            for row in connection.execute(
+                "PRAGMA foreign_key_list(execution_dispatch_resolutions)"
+            )
+            if str(row["table"]) == "execution_broker_references"
+        )
+        assert owner_foreign_key == [
+            (0, "broker_reference", "broker_reference"),
+            (1, "conflicting_owner_aggregate_id", "aggregate_id"),
+            (2, "conflicting_owner_command_id", "command_id"),
+            (
+                3,
+                "conflicting_owner_record_fingerprint",
+                "record_fingerprint",
+            ),
+        ]
+        claim_schema_sql = str(
+            connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='execution_dispatch_claims'"
+            ).fetchone()[0]
+        )
+        assert (
+            "capability_verifier TEXT NOT NULL UNIQUE "
+            "CHECK (length(capability_verifier) = 68 AND "
+            "substr(capability_verifier,1,4) = 'pcv-' AND "
+            "substr(capability_verifier,5) NOT GLOB '*[^0-9a-f]*')"
+        ) in claim_schema_sql
         assert ("aggregate_id", "execution_aggregates") in foreign_key_edges(
             connection,
             "execution_commands",
@@ -781,7 +958,12 @@ def test_migration_replay_checksum_mismatch_and_future_schema_rejection(tmp_path
         with pytest.raises(SqliteExecutionMigrationError):
             apply_pending_migrations(
                 connection,
-                (tampered, CONTRACT_ALIGNMENT_MIGRATION, SCHEMA_VERSION_TEXT_MIGRATION),
+                (
+                    tampered,
+                    CONTRACT_ALIGNMENT_MIGRATION,
+                    SCHEMA_VERSION_TEXT_MIGRATION,
+                    DURABLE_DISPATCH_CLAIM_MIGRATION,
+                ),
                 applied_at=UTC_NOW,
                 application_version="f5e2b-durable-test",
             )
