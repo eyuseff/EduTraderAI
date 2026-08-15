@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 
 from volcanoes.application.execution.enums import PaperExecutionMode
 from volcanoes.application.execution.identities import (
@@ -194,7 +195,7 @@ def _validate_reconciliation_record_fingerprints(
                 operator_action_required=bool(row["operator_action_required"]),
                 unresolved=bool(row["unresolved"]),
                 safe_reason_code=str(row["safe_reason_code"]),
-                recorded_at=__import__("datetime").datetime.fromisoformat(
+                recorded_at=datetime.fromisoformat(
                     str(row["recorded_at"]).replace("Z", "+00:00")
                 ),
                 schema_version=int(str(row["schema_version"])),
