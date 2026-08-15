@@ -70,7 +70,7 @@ class ReconciliationDecision:
             raise ValueError("reconciliation decision requires a reason")
 
 
-def reconcile(facts: ReconciliationFacts) -> ReconciliationDecision:
+def compare_reconciliation_facts(facts: ReconciliationFacts) -> ReconciliationDecision:
     """Compare local and broker evidence without mutating either side."""
 
     if not facts.evidence_complete:
