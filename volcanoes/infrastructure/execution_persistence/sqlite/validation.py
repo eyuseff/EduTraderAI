@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 
+from volcanoes.application.execution.enums import PaperExecutionMode
+from volcanoes.application.execution.identities import (
+    PaperExecutionAggregateId,
+    PaperExecutionRevision,
+)
+from volcanoes.application.execution.lifecycle import PaperExecutionLifecycleState
+from volcanoes.application.execution.persistence.contracts import (
+    ExecutionReconciliationRecord,
+)
+from volcanoes.application.execution.persistence.enums import (
+    ExecutionReconciliationResultClassification,
+)
 from volcanoes.infrastructure.execution_persistence.sqlite.connection import (
     FULL_SYNCHRONOUS_VALUE,
 )
@@ -78,6 +91,7 @@ def validate_sqlite_execution_schema(
     outcome_bindings = check_dispatch_outcome_bindings(connection)
     if not outcome_bindings.passed:
         failures.append("dispatch outcome bindings are invalid")
+    _validate_reconciliation_record_fingerprints(connection, failures=failures)
 
     return SchemaValidationResult(passed=not failures, failures=tuple(failures))
 
@@ -150,6 +164,53 @@ def _validate_migrations(
     for applied in state.applied_migrations:
         if expected_checksums.get(applied.migration_id) != applied.checksum:
             failures.append("known migration checksum changed")
+
+
+def _validate_reconciliation_record_fingerprints(
+    connection: sqlite3.Connection,
+    *,
+    failures: list[str],
+) -> None:
+    """Fail closed if immutable reconciliation content no longer matches its fingerprint."""
+
+    rows = connection.execute("SELECT * FROM execution_reconciliations").fetchall()
+    for row in rows:
+        try:
+            record = ExecutionReconciliationRecord(
+                reconciliation_id=str(row["reconciliation_id"]),
+                aggregate_id=PaperExecutionAggregateId(str(row["aggregate_id"])),
+                starting_local_revision=PaperExecutionRevision(
+                    int(row["starting_local_revision"])
+                ),
+                starting_lifecycle_state=PaperExecutionLifecycleState(
+                    str(row["starting_lifecycle_state"])
+                ),
+                broker_observation_references=tuple(
+                    json.loads(str(row["broker_observation_references_json"]))
+                ),
+                result_classification=ExecutionReconciliationResultClassification(
+                    str(row["result_classification"])
+                ),
+                operator_action_required=bool(row["operator_action_required"]),
+                unresolved=bool(row["unresolved"]),
+                safe_reason_code=str(row["safe_reason_code"]),
+                recorded_at=__import__("datetime").datetime.fromisoformat(
+                    str(row["recorded_at"]).replace("Z", "+00:00")
+                ),
+                schema_version=int(str(row["schema_version"])),
+                resulting_transition_id=row["resulting_transition_id"],
+                resulting_revision=(
+                    None
+                    if row["resulting_revision"] is None
+                    else PaperExecutionRevision(int(row["resulting_revision"]))
+                ),
+                mode=PaperExecutionMode(str(row["mode"])),
+            )
+        except (TypeError, ValueError):
+            failures.append("reconciliation record content is invalid")
+            continue
+        if str(row["record_fingerprint"]) != record.record_fingerprint:
+            failures.append("reconciliation record fingerprint mismatch")
 
 
 def _sqlite_objects(connection: sqlite3.Connection, object_type: str) -> frozenset[str]:
