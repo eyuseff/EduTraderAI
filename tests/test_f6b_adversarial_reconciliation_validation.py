@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -88,9 +89,17 @@ def _reconciliation(reason: str = "BROKER_ORDER_MISSING_LOCALLY") -> ExecutionRe
 
 
 def _seed_aggregate(connection) -> None:
+    initial = replace(
+        _aggregate(),
+        lifecycle_state=PaperExecutionLifecycleState.CREATED,
+        execution_revision=PaperExecutionRevision.initial(),
+        outcome_unknown=False,
+        reconciliation_required=False,
+        last_transition_id="f6b-transition-0",
+    )
     with _SqliteExecutionTransaction(connection) as transaction:
         saved = SqliteExecutionAggregateRepository(transaction).save(
-            _aggregate(),
+            initial,
             expected_revision=PaperExecutionRevision.initial(),
         )
         assert saved.status is ExecutionPersistenceResultStatus.CREATED
