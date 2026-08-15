@@ -19,7 +19,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
     load_schema_version_text_sql,
 )
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 4
 MINIMUM_SUPPORTED_SCHEMA_VERSION = 1
 MAXIMUM_SUPPORTED_SCHEMA_VERSION = 5
 
