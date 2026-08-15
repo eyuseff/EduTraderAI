@@ -17,6 +17,7 @@ class PaperExecutionOperation(StrEnum):
     SUBMIT = "SUBMIT"
     CANCEL = "CANCEL"
     REPLACE = "REPLACE"
+    RECONCILE = "RECONCILE"
 
 
 class PaperExecutionSide(StrEnum):
