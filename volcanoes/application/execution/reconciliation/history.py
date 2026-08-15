@@ -92,13 +92,15 @@ def build_reconciliation_history_record(
         evidence_fingerprint,
     )
     references = tuple(
-        value
-        for value in (
-            evidence_fingerprint,
-            facts.local_broker_reference,
-            facts.broker_reference,
+        dict.fromkeys(
+            value
+            for value in (
+                evidence_fingerprint,
+                facts.local_broker_reference,
+                facts.broker_reference,
+            )
+            if value is not None
         )
-        if value is not None
     )
     return ExecutionReconciliationRecord(
         reconciliation_id=reconciliation_id,
