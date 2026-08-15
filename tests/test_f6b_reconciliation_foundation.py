@@ -9,7 +9,7 @@ from volcanoes.application.execution.lifecycle.enums import (
 from volcanoes.application.execution.reconciliation import (
     RECOVERY_DESTINATIONS,
     ReconciliationFacts,
-    reconcile,
+    compare_reconciliation_facts,
 )
 
 
@@ -25,7 +25,7 @@ def test_exact_match_is_consistent_and_non_mutating_proposal() -> None:
         broker_reference="paper-123",
     )
 
-    decision = reconcile(facts)
+    decision = compare_reconciliation_facts(facts)
 
     assert decision.outcome is Outcome.CONSISTENT
     assert decision.proposed_state is State.FILLED
@@ -33,7 +33,7 @@ def test_exact_match_is_consistent_and_non_mutating_proposal() -> None:
 
 
 def test_outcome_unknown_can_propose_proven_broker_state() -> None:
-    decision = reconcile(
+    decision = compare_reconciliation_facts(
         ReconciliationFacts(
             local_present=True,
             broker_present=True,
@@ -69,7 +69,7 @@ def test_outcome_unknown_can_propose_proven_broker_state() -> None:
 def test_missing_order_gaps_never_invent_state(
     facts: ReconciliationFacts, expected: Outcome
 ) -> None:
-    decision = reconcile(facts)
+    decision = compare_reconciliation_facts(facts)
 
     assert decision.outcome is expected
     assert decision.proposed_state is State.RECONCILIATION_REQUIRED
@@ -77,7 +77,7 @@ def test_missing_order_gaps_never_invent_state(
 
 
 def test_reference_conflict_requires_operator_action() -> None:
-    decision = reconcile(
+    decision = compare_reconciliation_facts(
         ReconciliationFacts(
             local_present=True,
             broker_present=True,
@@ -93,7 +93,7 @@ def test_reference_conflict_requires_operator_action() -> None:
 
 
 def test_fill_quantity_conflict_requires_operator_action() -> None:
-    decision = reconcile(
+    decision = compare_reconciliation_facts(
         ReconciliationFacts(
             local_present=True,
             broker_present=True,
@@ -109,14 +109,14 @@ def test_fill_quantity_conflict_requires_operator_action() -> None:
 
 
 def test_incomplete_or_explicitly_conflicting_evidence_fails_closed() -> None:
-    incomplete = reconcile(
+    incomplete = compare_reconciliation_facts(
         ReconciliationFacts(
             local_present=True,
             broker_present=True,
             evidence_complete=False,
         )
     )
-    conflicting = reconcile(
+    conflicting = compare_reconciliation_facts(
         ReconciliationFacts(
             local_present=True,
             broker_present=True,
