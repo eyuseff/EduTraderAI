@@ -40,6 +40,7 @@ def reconciliation_evidence_fingerprint(
             "broker_present": facts.broker_present,
             "broker_reference": facts.broker_reference,
             "broker_state": facts.broker_state,
+            "cancellation_ambiguous": facts.cancellation_ambiguous,
             "decision_operator_action_required": decision.operator_action_required,
             "decision_outcome": decision.outcome,
             "decision_proposed_state": decision.proposed_state,
@@ -51,6 +52,8 @@ def reconciliation_evidence_fingerprint(
             "local_state": facts.local_state,
             "observation_conflict": facts.observation_conflict,
             "ownership_conflict": facts.ownership_conflict,
+            "replacement_ambiguous": facts.replacement_ambiguous,
+            "revision_conflict": facts.revision_conflict,
         },
     )
 
