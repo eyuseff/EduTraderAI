@@ -19,6 +19,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
     _command_from_row,
     _idempotency_from_row,
     _reconciliation_from_row,
+    _transition_from_row,
 )
 
 
@@ -126,6 +127,25 @@ def check_reconcile_authority_bindings(
             violations.append(
                 f"{row[0]} has invalid reconcile aggregate record fingerprint"
             )
+
+        transitions = connection.execute(
+            "SELECT * FROM execution_transitions WHERE command_id = ?",
+            (row[0],),
+        ).fetchall()
+        for transition_row in transitions:
+            transition_record_valid = False
+            try:
+                reconstructed_transition = _transition_from_row(transition_row)
+                transition_record_valid = (
+                    reconstructed_transition.record_fingerprint
+                    == transition_row["record_fingerprint"]
+                )
+            except (TypeError, ValueError, json.JSONDecodeError):
+                transition_record_valid = False
+            if not transition_record_valid:
+                violations.append(
+                    f"{row[0]} has invalid reconcile transition record fingerprint"
+                )
 
         reconciliation_id = payload.get("reconciliation_id")
         reconciliation_fingerprint = payload.get("reconciliation_record_fingerprint")
