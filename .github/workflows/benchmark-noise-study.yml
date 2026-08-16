@@ -36,6 +36,12 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements-dev.txt
 
+      - name: Validate noise-study tooling
+        run: |
+          black --check scripts/benchmark_noise_study.py tests/test_benchmark_noise_study.py
+          ruff check scripts/benchmark_noise_study.py tests/test_benchmark_noise_study.py
+          python -m pytest -q tests/test_benchmark_noise_study.py
+
       - name: Run benchmark noise study
         run: |
           python scripts/benchmark_noise_study.py \
