@@ -41,8 +41,8 @@ def test_runtime_startup_blocks_tampered_reconcile_idempotency_binding(tmp_path)
         assert command is not None
 
         # Simulate isolated offline corruption of the logical reservation
-        # binding. The dedicated checker must reject a fingerprint that no
-        # longer represents the RECONCILE destination/reconciliation tuple.
+        # binding. The dedicated checker must reject both the operation binding
+        # and the resulting durable record-fingerprint inconsistency.
         updated = connection.execute(
             "UPDATE execution_idempotency SET logical_operation_fingerprint=? "
             "WHERE idempotency_key=?",
@@ -54,8 +54,10 @@ def test_runtime_startup_blocks_tampered_reconcile_idempotency_binding(tmp_path)
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
         assert after.blocks_execution is True
-        assert len(after.violations) == 1
-        assert "idempotency bindings" in after.violations[0]
+        assert any("idempotency bindings" in value for value in after.violations)
+        assert any(
+            "idempotency record fingerprint" in value for value in after.violations
+        )
     finally:
         connection.close()
 
