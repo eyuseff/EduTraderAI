@@ -123,8 +123,10 @@ def _insert_parent_and_child(connection) -> None:
     connection.commit()
 
 
-def test_v005_is_current_and_broadens_only_command_operation_vocabulary(tmp_path) -> None:
-    assert CURRENT_SCHEMA_VERSION == 5
+def test_v005_is_current_database_migration_and_broadens_only_command_operation_vocabulary(
+    tmp_path,
+) -> None:
+    assert CURRENT_SCHEMA_VERSION == 4
     assert RECONCILE_COMMAND_MIGRATION.previous_version == 4
     assert RECONCILE_COMMAND_MIGRATION.resulting_version == 5
     assert RECONCILE_COMMAND_MIGRATION.requires_foreign_keys_off is True
@@ -219,7 +221,7 @@ def test_operator_recovery_command_persists_through_authoritative_sqlite_reposit
     correlation_id = PaperExecutionCorrelationId.from_seed("f6b", "v005-recovery")
     command_id = PaperExecutionCommandId.from_seed("f6b", "v005-recovery")
     idempotency_key = PaperExecutionIdempotencyKey.from_seed("f6b", "v005-recovery")
-    revision = PaperExecutionRevision(11)
+    revision = PaperExecutionRevision(0)
     aggregate = ExecutionAggregateRecord(
         aggregate_id=aggregate_id,
         correlation_id=correlation_id,
