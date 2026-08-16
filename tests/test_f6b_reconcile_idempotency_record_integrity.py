@@ -21,7 +21,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.reconcile_integrity i
 )
 
 
-def test_runtime_startup_blocks_tampered_reconcile_idempotency_binding(tmp_path) -> None:
+def test_runtime_startup_blocks_tampered_reconcile_idempotency_record(tmp_path) -> None:
     run_prepared_recovery_runtime_restart(tmp_path)
 
     database_path = (tmp_path / "paper-e2e-restart.sqlite").resolve()
@@ -33,20 +33,16 @@ def test_runtime_startup_blocks_tampered_reconcile_idempotency_binding(tmp_path)
         assert before.blocks_execution is False
         assert before.violations == ()
 
-        command = connection.execute(
-            "SELECT idempotency_key FROM execution_commands "
-            "WHERE aggregate_id=? AND operation='RECONCILE'",
-            (str(request.aggregate.aggregate_id),),
-        ).fetchone()
-        assert command is not None
-
-        # Simulate isolated offline corruption of the logical reservation
-        # binding. The dedicated checker must reject both the operation binding
-        # and the resulting durable record-fingerprint inconsistency.
         updated = connection.execute(
-            "UPDATE execution_idempotency SET logical_operation_fingerprint=? "
-            "WHERE idempotency_key=?",
-            ("plo-" + "0" * 64, command[0]),
+            "UPDATE execution_idempotency SET created_at=? "
+            "WHERE idempotency_key=("
+            "SELECT idempotency_key FROM execution_commands "
+            "WHERE aggregate_id=? AND operation='RECONCILE'"
+            ")",
+            (
+                "2099-01-01T00:00:00.000000Z",
+                str(request.aggregate.aggregate_id),
+            ),
         )
         assert updated.rowcount == 1
         connection.commit()
@@ -54,16 +50,14 @@ def test_runtime_startup_blocks_tampered_reconcile_idempotency_binding(tmp_path)
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
         assert after.blocks_execution is True
-        assert any("idempotency bindings" in value for value in after.violations)
-        assert any(
-            "idempotency record fingerprint" in value for value in after.violations
-        )
+        assert len(after.violations) == 1
+        assert "idempotency record fingerprint" in after.violations[0]
     finally:
         connection.close()
 
     configuration = PaperExecutionPersistenceRuntimeConfiguration(
         database_path=database_path,
-        application_version="f6b-reconcile-idempotency-binding-startup-integrity",
+        application_version="f6b-reconcile-idempotency-record-integrity",
         busy_timeout_ms=5_000,
     )
     with pytest.raises(SqliteExecutionIntegrityError):

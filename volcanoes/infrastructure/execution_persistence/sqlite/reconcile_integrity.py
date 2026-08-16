@@ -16,6 +16,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
 from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
     _approval_from_row,
     _command_from_row,
+    _idempotency_from_row,
     _reconciliation_from_row,
 )
 
@@ -150,11 +151,7 @@ def check_reconcile_authority_bindings(
             )
 
         idempotency = connection.execute(
-            """
-            SELECT logical_operation_fingerprint, command_id, aggregate_id, mode
-            FROM execution_idempotency
-            WHERE idempotency_key = ?
-            """,
+            "SELECT * FROM execution_idempotency WHERE idempotency_key = ?",
             (row[5],),
         ).fetchone()
         idempotency_valid = False
@@ -171,14 +168,29 @@ def check_reconcile_authority_bindings(
                 },
             )
             idempotency_valid = bool(
-                idempotency[0] == expected_logical_fingerprint
-                and idempotency[1] == row[0]
-                and idempotency[2] == row[1]
-                and idempotency[3] == "PAPER"
+                idempotency["logical_operation_fingerprint"]
+                == expected_logical_fingerprint
+                and idempotency["command_id"] == row[0]
+                and idempotency["aggregate_id"] == row[1]
+                and idempotency["mode"] == "PAPER"
             )
         if not idempotency_valid:
             violations.append(
                 f"{row[0]} has invalid reconcile idempotency bindings"
+            )
+        idempotency_record_valid = False
+        if idempotency is not None:
+            try:
+                reconstructed_idempotency = _idempotency_from_row(idempotency)
+                idempotency_record_valid = (
+                    reconstructed_idempotency.record_fingerprint
+                    == idempotency["record_fingerprint"]
+                )
+            except (TypeError, ValueError):
+                idempotency_record_valid = False
+        if not idempotency_record_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile idempotency record fingerprint"
             )
 
         approval = connection.execute(
