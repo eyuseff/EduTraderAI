@@ -27,6 +27,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite import (
     check_broker_reference_ownership,
     check_foreign_keys,
     check_idempotency_bindings,
+    check_reconcile_authority_bindings,
     open_sqlite_execution_connection,
     run_integrity_check,
     validate_sqlite_execution_schema,
@@ -181,6 +182,7 @@ def _validate_started_connection(
         check_aggregate_transition_revisions(connection),
         check_idempotency_bindings(connection),
         check_broker_reference_ownership(connection),
+        check_reconcile_authority_bindings(connection),
     )
     if any(check.blocks_execution for check in checks):
         raise SqliteExecutionIntegrityError(
