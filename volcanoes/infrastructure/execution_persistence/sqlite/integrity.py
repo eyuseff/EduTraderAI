@@ -300,6 +300,12 @@ def check_dispatch_outcome_bindings(
             ("PX-TRN-012", "MARK_OUTCOME_UNKNOWN", "DISPATCHED", "OUTCOME_UNKNOWN"),
         ),
     }
+    protocol_transition_ids = {
+        edge[0] for outcome_edges in expected_edges.values() for edge in outcome_edges
+    }
+    protocol_input_kinds = {
+        edge[1] for outcome_edges in expected_edges.values() for edge in outcome_edges
+    }
     outcomes = connection.execute("""
         SELECT c.claim_token, c.aggregate_id, c.command_id, c.correlation_id,
                c.idempotency_key, c.expected_execution_revision,
@@ -326,11 +332,32 @@ def check_dispatch_outcome_bindings(
             """,
             (outcome[1], outcome[5], resolution_end_revision),
         ).fetchall()
+        later_dispatch_transitions = connection.execute(
+            """
+            SELECT transition_id, lifecycle_input_kind
+            FROM execution_transitions
+            WHERE aggregate_id = ? AND next_revision > ?
+              AND command_id = ? AND correlation_id = ? AND idempotency_key = ?
+            """,
+            (
+                outcome[1],
+                resolution_end_revision,
+                outcome[2],
+                outcome[3],
+                outcome[4],
+            ),
+        ).fetchall()
+        has_surplus_dispatch_protocol = any(
+            transition[0] in protocol_transition_ids
+            or transition[1] in protocol_input_kinds
+            for transition in later_dispatch_transitions
+        )
         valid = bool(
             edges
             and outcome[8] >= resolution_end_revision
             and len(edges) == len(transitions)
             and transitions
+            and not has_surplus_dispatch_protocol
         )
         prior_time = None
         for index, transition in enumerate(transitions):
