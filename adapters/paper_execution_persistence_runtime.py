@@ -27,10 +27,12 @@ from volcanoes.infrastructure.execution_persistence.sqlite import (
     check_broker_reference_ownership,
     check_foreign_keys,
     check_idempotency_bindings,
-    check_reconcile_authority_bindings,
     open_sqlite_execution_connection,
     run_integrity_check,
     validate_sqlite_execution_schema,
+)
+from volcanoes.infrastructure.execution_persistence.sqlite.reconcile_integrity import (
+    check_reconcile_authority_bindings,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
     SqliteExecutionBusyError,
