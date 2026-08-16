@@ -81,7 +81,9 @@ def build_release_summary(
     if set(verification) != _REQUIRED_VERIFICATION_FIELDS:
         missing = sorted(_REQUIRED_VERIFICATION_FIELDS - set(verification))
         extra = sorted(set(verification) - _REQUIRED_VERIFICATION_FIELDS)
-        raise ValueError(f"verification schema mismatch; missing={missing}, extra={extra}")
+        raise ValueError(
+            f"verification schema mismatch; missing={missing}, extra={extra}"
+        )
 
     status = verification["status"]
     command = verification["command"]
