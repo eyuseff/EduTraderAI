@@ -14,6 +14,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     InvariantCheckResult,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
+    _aggregate_from_row,
     _approval_from_row,
     _command_from_row,
     _idempotency_from_row,
@@ -105,6 +106,25 @@ def check_reconcile_authority_bindings(
         if not command_record_valid:
             violations.append(
                 f"{row[0]} has invalid reconcile command record fingerprint"
+            )
+
+        aggregate = connection.execute(
+            "SELECT * FROM execution_aggregates WHERE aggregate_id = ?",
+            (row[1],),
+        ).fetchone()
+        aggregate_record_valid = False
+        if aggregate is not None:
+            try:
+                reconstructed_aggregate = _aggregate_from_row(aggregate)
+                aggregate_record_valid = (
+                    reconstructed_aggregate.record_fingerprint
+                    == aggregate["record_fingerprint"]
+                )
+            except (TypeError, ValueError):
+                aggregate_record_valid = False
+        if not aggregate_record_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile aggregate record fingerprint"
             )
 
         reconciliation_id = payload.get("reconciliation_id")
