@@ -10,6 +10,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.generate_release_summary import write_release_summary
 
 SUPPORTED_PYTHON_TARGETS = (
     "app.py",
@@ -31,6 +35,7 @@ SUPPORTED_PYTHON_TARGETS = (
     "tests/test_operational_metrics.py",
     "tests/test_v4_release_acceptance.py",
     "scripts/benchmark_release.py",
+    "scripts/generate_release_summary.py",
     "scripts/verify_release.py",
 )
 
@@ -181,6 +186,14 @@ def verify(*, coverage: bool) -> None:
     write_verification_metadata(test_count=test_count, coverage=coverage)
     print(f"Collected test count: {test_count}", flush=True)
 
+    print("\n==> Release verification summary", flush=True)
+    write_release_summary(
+        PROJECT_ROOT / "build/verification.json",
+        json_path=PROJECT_ROOT / "build/release_summary.json",
+        markdown_path=PROJECT_ROOT / "build/release_summary.md",
+    )
+    print("Generated build/release_summary.json and build/release_summary.md", flush=True)
+
     print("\nEduTraderAI v4.0.0-rc1 verification passed.", flush=True)
 
 
@@ -194,7 +207,7 @@ def main() -> int:
     arguments = parser.parse_args()
     try:
         verify(coverage=arguments.coverage)
-    except (OSError, subprocess.CalledProcessError) as error:
+    except (OSError, subprocess.CalledProcessError, ValueError, TypeError) as error:
         print(f"\nRELEASE VERIFICATION FAILED: {error}", file=sys.stderr)
         return 1
     return 0
