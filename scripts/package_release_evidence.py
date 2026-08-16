@@ -105,7 +105,9 @@ def build_evidence_pack(
         try:
             resolved.relative_to(root)
         except ValueError as error:
-            raise ValueError(f"evidence file escapes project root: {relative}") from error
+            raise ValueError(
+                f"evidence file escapes project root: {relative}"
+            ) from error
         if not source.is_file():
             raise ValueError(f"required evidence file is missing: {relative}")
         data = source.read_bytes()
@@ -192,7 +194,9 @@ def verify_evidence_pack(bundle_path: Path) -> None:
                 expected_names.add(path)
                 expected_sum_lines.append(f"{digest}  {path}\n")
             if set(names) != expected_names:
-                raise ValueError("evidence bundle contains unexpected or missing entries")
+                raise ValueError(
+                    "evidence bundle contains unexpected or missing entries"
+                )
             if sums != "".join(expected_sum_lines):
                 raise ValueError("SHA256SUMS does not match resolved evidence manifest")
     except (KeyError, zipfile.BadZipFile, json.JSONDecodeError) as error:
