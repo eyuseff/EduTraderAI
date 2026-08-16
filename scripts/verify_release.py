@@ -57,7 +57,11 @@ def run_step(label: str, command: tuple[str, ...]) -> None:
 
     print(f"\n==> {label}", flush=True)
     print(" ".join(command), flush=True)
-    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    try:
+        subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    except subprocess.CalledProcessError:
+        print(f"::error title=Release gate failed::{label}", flush=True)
+        raise
 
 
 def collect_test_count() -> int:
