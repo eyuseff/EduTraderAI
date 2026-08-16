@@ -27,8 +27,8 @@ def migrated(tmp_path):
     return connection
 
 
-def test_v004_remains_registered_and_v005_is_current() -> None:
-    assert CURRENT_SCHEMA_VERSION == 5
+def test_v004_record_schema_remains_current_while_v005_migration_is_registered() -> None:
+    assert CURRENT_SCHEMA_VERSION == 4
     assert tuple(item.migration_id for item in KNOWN_MIGRATIONS) == (
         "v001",
         "v002",
