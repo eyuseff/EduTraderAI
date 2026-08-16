@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from generate_release_summary import write_release_summary
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 SUPPORTED_PYTHON_TARGETS = (
@@ -31,6 +33,7 @@ SUPPORTED_PYTHON_TARGETS = (
     "tests/test_operational_metrics.py",
     "tests/test_v4_release_acceptance.py",
     "scripts/benchmark_release.py",
+    "scripts/generate_release_summary.py",
     "scripts/verify_release.py",
 )
 
@@ -54,7 +57,42 @@ def run_step(label: str, command: tuple[str, ...]) -> None:
 
     print(f"\n==> {label}", flush=True)
     print(" ".join(command), flush=True)
-    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    try:
+        subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    except subprocess.CalledProcessError:
+        print(f"::error title=Release gate failed::{label}", flush=True)
+        raise
+
+
+def run_black_check() -> None:
+    """Run Black and expose any would-reformat paths as CI annotations."""
+
+    command = ("black", "--check", *SUPPORTED_PYTHON_TARGETS)
+    print("\n==> Black formatting check", flush=True)
+    print(" ".join(command), flush=True)
+    result = subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout:
+        print(result.stdout, end="", flush=True)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr, flush=True)
+    if result.returncode:
+        details = [
+            line.strip()
+            for line in (result.stdout + result.stderr).splitlines()
+            if "would reformat" in line
+        ]
+        for detail in details:
+            print(
+                f"::error title=Black formatting required::{detail}",
+                flush=True,
+            )
+        print("::error title=Release gate failed::Black formatting check", flush=True)
+        raise subprocess.CalledProcessError(result.returncode, command)
 
 
 def collect_test_count() -> int:
@@ -108,7 +146,7 @@ def write_verification_metadata(*, test_count: int, coverage: bool) -> None:
 def verify(*, coverage: bool) -> None:
     """Execute all supported release-candidate gates."""
 
-    run_step("Black formatting check", ("black", "--check", *SUPPORTED_PYTHON_TARGETS))
+    run_black_check()
     run_step("Ruff static analysis", ("ruff", "check", *SUPPORTED_PYTHON_TARGETS))
     run_step(
         "MyPy deterministic boundary",
@@ -181,6 +219,17 @@ def verify(*, coverage: bool) -> None:
     write_verification_metadata(test_count=test_count, coverage=coverage)
     print(f"Collected test count: {test_count}", flush=True)
 
+    print("\n==> Release verification summary", flush=True)
+    write_release_summary(
+        PROJECT_ROOT / "build/verification.json",
+        json_path=PROJECT_ROOT / "build/release_summary.json",
+        markdown_path=PROJECT_ROOT / "build/release_summary.md",
+    )
+    print(
+        "Generated build/release_summary.json and build/release_summary.md",
+        flush=True,
+    )
+
     print("\nEduTraderAI v4.0.0-rc1 verification passed.", flush=True)
 
 
@@ -194,7 +243,7 @@ def main() -> int:
     arguments = parser.parse_args()
     try:
         verify(coverage=arguments.coverage)
-    except (OSError, subprocess.CalledProcessError) as error:
+    except (OSError, subprocess.CalledProcessError, ValueError, TypeError) as error:
         print(f"\nRELEASE VERIFICATION FAILED: {error}", file=sys.stderr)
         return 1
     return 0
