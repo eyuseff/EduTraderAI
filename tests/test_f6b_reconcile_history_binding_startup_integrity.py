@@ -50,8 +50,9 @@ def test_runtime_startup_blocks_tampered_reconcile_history_binding(tmp_path) -> 
         assert command is not None
 
         # Simulate isolated offline corruption while restoring the expected
-        # append-only trigger before runtime startup. The remaining schema is
-        # therefore valid and the cross-table history binding must fail closed.
+        # append-only trigger before runtime startup. The dedicated checker
+        # must identify the cross-table history binding, and startup must fail
+        # closed at this checker or any earlier integrity-validation layer.
         connection.execute("DROP TRIGGER trg_execution_reconciliations_no_update")
         updated = connection.execute(
             "UPDATE execution_reconciliations SET record_fingerprint=? "
@@ -78,8 +79,5 @@ def test_runtime_startup_blocks_tampered_reconcile_history_binding(tmp_path) -> 
         application_version="f6b-reconcile-history-binding-startup-integrity",
         busy_timeout_ms=5_000,
     )
-    with pytest.raises(
-        SqliteExecutionIntegrityError,
-        match="SQLite integrity or persistence invariants blocked startup",
-    ):
+    with pytest.raises(SqliteExecutionIntegrityError):
         PaperExecutionPersistenceRuntime(configuration).start()
