@@ -15,6 +15,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
     _approval_from_row,
+    _command_from_row,
     _reconciliation_from_row,
 )
 
@@ -85,6 +86,25 @@ def check_reconcile_authority_bindings(
                 f"{row[0]} has invalid reconcile canonical command bindings"
             )
             continue
+
+        command = connection.execute(
+            "SELECT * FROM execution_commands WHERE command_id = ?",
+            (row[0],),
+        ).fetchone()
+        command_record_valid = False
+        if command is not None:
+            try:
+                reconstructed_command = _command_from_row(command)
+                command_record_valid = (
+                    reconstructed_command.record_fingerprint
+                    == command["record_fingerprint"]
+                )
+            except (TypeError, ValueError):
+                command_record_valid = False
+        if not command_record_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile command record fingerprint"
+            )
 
         reconciliation_id = payload.get("reconciliation_id")
         reconciliation_fingerprint = payload.get("reconciliation_record_fingerprint")
