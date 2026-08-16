@@ -51,8 +51,8 @@ def test_runtime_startup_blocks_tampered_reconcile_history_binding(tmp_path) -> 
 
         # Simulate isolated offline corruption while restoring the expected
         # append-only trigger before runtime startup. The dedicated checker
-        # must identify the cross-table history binding, and startup must fail
-        # closed at this checker or any earlier integrity-validation layer.
+        # must identify both the cross-table history binding and the durable
+        # history record fingerprint inconsistency.
         connection.execute("DROP TRIGGER trg_execution_reconciliations_no_update")
         updated = connection.execute(
             "UPDATE execution_reconciliations SET record_fingerprint=? "
@@ -69,8 +69,10 @@ def test_runtime_startup_blocks_tampered_reconcile_history_binding(tmp_path) -> 
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
         assert after.blocks_execution is True
-        assert len(after.violations) == 1
-        assert "history bindings" in after.violations[0]
+        assert any("history bindings" in value for value in after.violations)
+        assert any(
+            "history record fingerprint" in value for value in after.violations
+        )
     finally:
         connection.close()
 
