@@ -177,7 +177,7 @@ def test_prepared_recovery_survives_runtime_restart_without_auto_execution(tmp_p
         assert durable.execution_revision == PaperExecutionRevision(8)
         assert durable.reconciliation_required is True
         assert command_replay.status is ExecutionPersistenceResultStatus.EXACT_REPLAY
-        assert idempotency_replay.status is ExecutionPersistenceResultStatus.EXACT_REPLAY
+        assert idempotency_replay.status is ExecutionPersistenceResultStatus.LOGICAL_REPLAY
         assert approval_replay.status is ExecutionPersistenceResultStatus.EXACT_REPLAY
         assert discovered.aggregates == (durable,)
         assert discovered.complete is True
