@@ -1,0 +1,10 @@
+{
+  "required_files": [
+    "build/coverage.json",
+    "build/release_summary.json",
+    "build/release_summary.md",
+    "build/verification.json"
+  ],
+  "review_status": "HUMAN_REVIEW_REQUIRED",
+  "schema_version": 1
+}
