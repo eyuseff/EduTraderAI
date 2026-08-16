@@ -256,7 +256,13 @@ def check_dispatch_outcome_bindings(
                  WHERE t.aggregate_id = c.aggregate_id
                    AND t.transition_id = a.last_transition_id
                    AND t.next_revision = a.execution_revision
-                   AND t.destination_state = a.lifecycle_state
+                   AND t.destination_state = a.lifecycle_state))
+           OR (r.claim_token IS NOT NULL AND NOT EXISTS (
+                 SELECT 1 FROM execution_transitions AS t
+                 WHERE t.aggregate_id = c.aggregate_id
+                   AND t.command_id = c.command_id
+                   AND t.correlation_id = c.correlation_id
+                   AND t.idempotency_key = c.idempotency_key
                    AND ((r.resolution_status = 'PRE_EFFECT_BLOCKED'
                          AND t.failure_fingerprint = r.evidence_fingerprint)
                         OR (r.resolution_status <> 'PRE_EFFECT_BLOCKED'
@@ -304,6 +310,8 @@ def check_dispatch_outcome_bindings(
         JOIN execution_aggregates AS a ON a.aggregate_id = c.aggregate_id
         """).fetchall()
     for outcome in outcomes:
+        edges = expected_edges.get(outcome[6], ())
+        resolution_end_revision = outcome[5] + len(edges)
         transitions = connection.execute(
             """
             SELECT transition_record_id, transition_id, source_state,
@@ -316,13 +324,13 @@ def check_dispatch_outcome_bindings(
               AND next_revision <= ?
             ORDER BY next_revision
             """,
-            (outcome[1], outcome[5], outcome[8]),
+            (outcome[1], outcome[5], resolution_end_revision),
         ).fetchall()
-        edges = expected_edges.get(outcome[6], ())
-        valid = (
-            outcome[9] == (edges[-1][3] if edges else None)
-            and outcome[8] - outcome[5] == len(edges) == len(transitions)
-            and bool(transitions)
+        valid = bool(
+            edges
+            and outcome[8] >= resolution_end_revision
+            and len(edges) == len(transitions)
+            and transitions
         )
         prior_time = None
         for index, transition in enumerate(transitions):
@@ -347,8 +355,12 @@ def check_dispatch_outcome_bindings(
                 and (prior_time is None or transition[13] >= prior_time)
             )
             prior_time = transition[13]
-        if not transitions or transitions[-1][1] != outcome[10]:
+        if not transitions or transitions[-1][1] != edges[-1][0]:
             valid = False
+        if outcome[8] == resolution_end_revision:
+            valid = valid and bool(
+                outcome[9] == edges[-1][3] and outcome[10] == transitions[-1][1]
+            )
         if not valid:
             violations.append(f"{outcome[0]} has invalid outcome transition chain")
     normalized = tuple(dict.fromkeys(violations))
