@@ -266,19 +266,6 @@ def test_competing_recovery_authority_cannot_survive_losing_terminal_race(tmp_pa
             last_idempotency_key=winner_recovery.idempotency_key,
             updated_at=NOW + timedelta(minutes=7),
         )
-        loser_final = replace(
-            local,
-            lifecycle_state=loser_decision.next_state,
-            execution_revision=loser_decision.next_revision,
-            outcome_unknown=loser_decision.outcome_unknown,
-            reconciliation_required=loser_decision.reconciliation_required,
-            command_terminal=loser_decision.command_terminal,
-            aggregate_terminal=loser_decision.aggregate_terminal,
-            last_transition_id=loser_decision.transition_id,
-            last_command_id=loser_recovery.command_id,
-            last_idempotency_key=loser_recovery.idempotency_key,
-            updated_at=NOW + timedelta(minutes=7, seconds=1),
-        )
 
         with winner.unit_of_work() as unit:
             assert unit.commands.register(winner_recovery).status is ExecutionPersistenceResultStatus.EXACT_REPLAY
@@ -295,12 +282,8 @@ def test_competing_recovery_authority_cannot_survive_losing_terminal_race(tmp_pa
             assert unit.commands.register(loser_recovery).status is ExecutionPersistenceResultStatus.CREATED
             assert unit.idempotency.reserve(loser_idempotency).status is ExecutionPersistenceResultStatus.CREATED
             assert unit.approvals.record(loser_approval).status is ExecutionPersistenceResultStatus.CREATED
-            assert unit.transitions.append(loser_transition).status is ExecutionPersistenceResultStatus.APPENDED
-            losing_save = unit.aggregates.save(
-                loser_final,
-                expected_revision=local.execution_revision,
-            )
-            assert losing_save.status is ExecutionPersistenceResultStatus.ALREADY_TERMINAL
+            conflict = unit.transitions.append(loser_transition)
+            assert conflict.status is ExecutionPersistenceResultStatus.COMMAND_CONFLICT
             unit.rollback()
 
         with winner.unit_of_work() as unit:
