@@ -15,6 +15,7 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
     _approval_from_row,
+    _reconciliation_from_row,
 )
 
 
@@ -93,31 +94,39 @@ def check_reconcile_authority_bindings(
         history = None
         if isinstance(reconciliation_id, str):
             history = connection.execute(
-                """
-                SELECT aggregate_id, starting_local_revision, record_fingerprint,
-                       operator_action_required, unresolved, resulting_transition_id,
-                       resulting_revision, mode
-                FROM execution_reconciliations
-                WHERE reconciliation_id = ?
-                """,
+                "SELECT * FROM execution_reconciliations WHERE reconciliation_id = ?",
                 (reconciliation_id,),
             ).fetchone()
         history_valid = bool(
             history is not None
             and payload_aggregate_id == row[1]
             and starting_revision == row[2]
-            and history[0] == row[1]
-            and history[1] == row[2]
-            and reconciliation_fingerprint == history[2]
-            and history[3] == 1
-            and history[4] == 1
-            and history[5] is None
-            and history[6] is None
-            and history[7] == "PAPER"
+            and history["aggregate_id"] == row[1]
+            and history["starting_local_revision"] == row[2]
+            and reconciliation_fingerprint == history["record_fingerprint"]
+            and history["operator_action_required"] == 1
+            and history["unresolved"] == 1
+            and history["resulting_transition_id"] is None
+            and history["resulting_revision"] is None
+            and history["mode"] == "PAPER"
         )
         if not history_valid:
             violations.append(
                 f"{row[0]} has invalid reconcile history bindings"
+            )
+        history_record_valid = False
+        if history is not None:
+            try:
+                reconstructed_history = _reconciliation_from_row(history)
+                history_record_valid = (
+                    reconstructed_history.record_fingerprint
+                    == history["record_fingerprint"]
+                )
+            except (TypeError, ValueError):
+                history_record_valid = False
+        if not history_record_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile history record fingerprint"
             )
 
         idempotency = connection.execute(
