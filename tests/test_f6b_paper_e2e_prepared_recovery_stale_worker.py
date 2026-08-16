@@ -225,7 +225,7 @@ def test_stale_recovery_worker_cannot_create_second_durable_recovery(tmp_path) -
                 final_aggregate,
                 expected_revision=stale_local.execution_revision,
             )
-            assert stale_save.status is ExecutionPersistenceResultStatus.STALE_REVISION
+            assert stale_save.status is ExecutionPersistenceResultStatus.ALREADY_TERMINAL
             unit.rollback()
 
         with winner.unit_of_work() as unit:
