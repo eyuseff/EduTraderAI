@@ -14,7 +14,6 @@ class PaperQualificationState(str, Enum):
     ACKNOWLEDGED = "ACKNOWLEDGED"
     STATUS_VERIFIED = "STATUS_VERIFIED"
     CANCELLED = "CANCELLED"
-    CLEANUP_CONFIRMED = "CLEANUP_CONFIRMED"
     PASSED = "PASSED"
     FAILED = "FAILED"
     BLOCKED = "BLOCKED"
@@ -95,10 +94,6 @@ _TRANSITIONS: dict[
     (
         PaperQualificationState.CANCELLED,
         PaperQualificationEvent.CLEANUP_CONFIRMED,
-    ): PaperQualificationState.CLEANUP_CONFIRMED,
-    (
-        PaperQualificationState.CLEANUP_CONFIRMED,
-        PaperQualificationEvent.CLEANUP_CONFIRMED,
     ): PaperQualificationState.PASSED,
 }
 
@@ -127,19 +122,6 @@ def transition_paper_qualification(
             reason_code="QUALIFICATION_FAILED",
         )
 
-    if event is PaperQualificationEvent.GUARDS_BLOCKED:
-        return PaperQualificationDecision(
-            previous_state=state,
-            next_state=PaperQualificationState.BLOCKED,
-            event=event,
-            accepted=state is PaperQualificationState.CREATED,
-            reason_code=(
-                "QUALIFICATION_BLOCKED"
-                if state is PaperQualificationState.CREATED
-                else "INVALID_QUALIFICATION_TRANSITION"
-            ),
-        )
-
     next_state = _TRANSITIONS.get((state, event))
     if next_state is None:
         return PaperQualificationDecision(
@@ -155,5 +137,9 @@ def transition_paper_qualification(
         next_state=next_state,
         event=event,
         accepted=True,
-        reason_code="QUALIFICATION_TRANSITION_ACCEPTED",
+        reason_code=(
+            "QUALIFICATION_BLOCKED"
+            if next_state is PaperQualificationState.BLOCKED
+            else "QUALIFICATION_TRANSITION_ACCEPTED"
+        ),
     )
