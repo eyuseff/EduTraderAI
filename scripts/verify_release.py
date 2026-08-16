@@ -64,6 +64,37 @@ def run_step(label: str, command: tuple[str, ...]) -> None:
         raise
 
 
+def run_black_check() -> None:
+    """Run Black and expose any would-reformat paths as CI annotations."""
+
+    command = ("black", "--check", *SUPPORTED_PYTHON_TARGETS)
+    print("\n==> Black formatting check", flush=True)
+    print(" ".join(command), flush=True)
+    result = subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout:
+        print(result.stdout, end="", flush=True)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr, flush=True)
+    if result.returncode:
+        details = [
+            line.strip()
+            for line in (result.stdout + result.stderr).splitlines()
+            if "would reformat" in line
+        ]
+        for detail in details:
+            print(
+                f"::error title=Black formatting required::{detail}",
+                flush=True,
+            )
+        print("::error title=Release gate failed::Black formatting check", flush=True)
+        raise subprocess.CalledProcessError(result.returncode, command)
+
+
 def collect_test_count() -> int:
     """Count collected tests for the sanitized verification artifact."""
 
@@ -115,7 +146,7 @@ def write_verification_metadata(*, test_count: int, coverage: bool) -> None:
 def verify(*, coverage: bool) -> None:
     """Execute all supported release-candidate gates."""
 
-    run_step("Black formatting check", ("black", "--check", *SUPPORTED_PYTHON_TARGETS))
+    run_black_check()
     run_step("Ruff static analysis", ("ruff", "check", *SUPPORTED_PYTHON_TARGETS))
     run_step(
         "MyPy deterministic boundary",
