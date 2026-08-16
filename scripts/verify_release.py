@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from generate_release_summary import write_release_summary
+from package_release_evidence import build_evidence_pack
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,6 +35,7 @@ SUPPORTED_PYTHON_TARGETS = (
     "tests/test_v4_release_acceptance.py",
     "scripts/benchmark_release.py",
     "scripts/generate_release_summary.py",
+    "scripts/package_release_evidence.py",
     "scripts/verify_release.py",
 )
 
@@ -229,6 +231,18 @@ def verify(*, coverage: bool) -> None:
         "Generated build/release_summary.json and build/release_summary.md",
         flush=True,
     )
+
+    if coverage:
+        print("\n==> Release evidence pack", flush=True)
+        build_evidence_pack(
+            PROJECT_ROOT,
+            PROJECT_ROOT / "docs/releases/release-evidence-manifest-v4.1.json",
+            PROJECT_ROOT / "build/release_evidence.zip",
+        )
+        print(
+            "Generated verified build/release_evidence.zip and SHA-256 sidecar",
+            flush=True,
+        )
 
     print("\nEduTraderAI v4.0.0-rc1 verification passed.", flush=True)
 
