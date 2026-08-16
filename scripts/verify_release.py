@@ -225,7 +225,10 @@ def verify(*, coverage: bool) -> None:
         json_path=PROJECT_ROOT / "build/release_summary.json",
         markdown_path=PROJECT_ROOT / "build/release_summary.md",
     )
-    print("Generated build/release_summary.json and build/release_summary.md", flush=True)
+    print(
+        "Generated build/release_summary.json and build/release_summary.md",
+        flush=True,
+    )
 
     print("\nEduTraderAI v4.0.0-rc1 verification passed.", flush=True)
 
