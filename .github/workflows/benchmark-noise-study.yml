@@ -1,0 +1,52 @@
+name: Benchmark noise study
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/benchmark_release.py"
+      - "scripts/benchmark_noise_study.py"
+      - "tests/test_benchmark_noise_study.py"
+      - ".github/workflows/benchmark-noise-study.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ALPACA_API_KEY: ""
+      ALPACA_SECRET_KEY: ""
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run benchmark noise study
+        run: |
+          python scripts/benchmark_noise_study.py \
+            --repeats 7 \
+            --iterations 300 \
+            --warmup 30 \
+            --output build/benchmark_noise_study.json
+
+      - name: Upload noise evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-noise-study-${{ github.sha }}
+          path: build/benchmark_noise_study.json
+          if-no-files-found: error
