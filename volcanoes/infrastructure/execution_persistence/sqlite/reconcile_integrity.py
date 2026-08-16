@@ -13,6 +13,9 @@ from volcanoes.application.execution.fingerprints import (
 from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     InvariantCheckResult,
 )
+from volcanoes.infrastructure.execution_persistence.sqlite.repositories import (
+    _approval_from_row,
+)
 
 
 def _reject_duplicate_json_keys(items: list[tuple[str, object]]) -> dict[str, object]:
@@ -58,7 +61,7 @@ def check_reconcile_authority_bindings(
     for row in connection.execute("""
         SELECT command_id, aggregate_id, expected_execution_revision,
                canonical_payload_fingerprint, canonical_command_json,
-               idempotency_key
+               idempotency_key, approval_fingerprint
         FROM execution_commands
         WHERE operation = 'RECONCILE'
         """):
@@ -147,6 +150,24 @@ def check_reconcile_authority_bindings(
         if not idempotency_valid:
             violations.append(
                 f"{row[0]} has invalid reconcile idempotency bindings"
+            )
+
+        approval = connection.execute(
+            "SELECT * FROM execution_approvals WHERE approval_fingerprint = ?",
+            (row[6],),
+        ).fetchone()
+        approval_valid = False
+        if approval is not None:
+            try:
+                reconstructed = _approval_from_row(approval)
+                approval_valid = (
+                    reconstructed.record_fingerprint == approval["record_fingerprint"]
+                )
+            except (TypeError, ValueError):
+                approval_valid = False
+        if not approval_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile approval record fingerprint"
             )
     normalized = tuple(dict.fromkeys(violations))
     return InvariantCheckResult(

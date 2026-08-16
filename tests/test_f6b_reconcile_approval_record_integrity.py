@@ -30,7 +30,9 @@ END
 """
 
 
-def test_runtime_startup_blocks_revoked_reconcile_approval(tmp_path) -> None:
+def test_runtime_startup_blocks_tampered_reconcile_approval_record_fingerprint(
+    tmp_path,
+) -> None:
     run_prepared_recovery_runtime_restart(tmp_path)
 
     database_path = (tmp_path / "paper-e2e-restart.sqlite").resolve()
@@ -44,13 +46,13 @@ def test_runtime_startup_blocks_revoked_reconcile_approval(tmp_path) -> None:
 
         connection.execute("DROP TRIGGER trg_execution_approvals_no_update")
         updated = connection.execute(
-            "UPDATE execution_approvals SET revocation_reference=? "
+            "UPDATE execution_approvals SET record_fingerprint=? "
             "WHERE approval_fingerprint=("
             "SELECT approval_fingerprint FROM execution_commands "
             "WHERE aggregate_id=? AND operation='RECONCILE'"
             ")",
             (
-                "revoked-offline-integrity-test",
+                "pav-" + "0" * 64,
                 str(request.aggregate.aggregate_id),
             ),
         )
@@ -61,16 +63,14 @@ def test_runtime_startup_blocks_revoked_reconcile_approval(tmp_path) -> None:
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
         assert after.blocks_execution is True
-        assert any("authority bindings" in value for value in after.violations)
-        assert any(
-            "approval record fingerprint" in value for value in after.violations
-        )
+        assert len(after.violations) == 1
+        assert "approval record fingerprint" in after.violations[0]
     finally:
         connection.close()
 
     configuration = PaperExecutionPersistenceRuntimeConfiguration(
         database_path=database_path,
-        application_version="f6b-reconcile-approval-temporal-integrity",
+        application_version="f6b-reconcile-approval-record-integrity",
         busy_timeout_ms=5_000,
     )
     with pytest.raises(SqliteExecutionIntegrityError):
