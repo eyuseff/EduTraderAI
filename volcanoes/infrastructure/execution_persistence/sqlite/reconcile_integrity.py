@@ -24,7 +24,7 @@ def _reject_duplicate_json_keys(items: list[tuple[str, object]]) -> dict[str, ob
 def check_reconcile_authority_bindings(
     connection: sqlite3.Connection,
 ) -> InvariantCheckResult:
-    """Validate immutable RECONCILE command, idempotency, and approval bindings."""
+    """Validate immutable RECONCILE command, history, idempotency, and approval bindings."""
 
     rows = connection.execute("""
         SELECT m.command_id
@@ -49,24 +49,63 @@ def check_reconcile_authority_bindings(
         f"{row[0]} has invalid reconcile authority bindings" for row in rows
     ]
     for row in connection.execute("""
-        SELECT command_id, canonical_payload_fingerprint, canonical_command_json
+        SELECT command_id, aggregate_id, expected_execution_revision,
+               canonical_payload_fingerprint, canonical_command_json
         FROM execution_commands
         WHERE operation = 'RECONCILE'
         """):
+        payload: dict[str, object] | None = None
         try:
-            payload = json.loads(
-                row[2], object_pairs_hook=_reject_duplicate_json_keys
+            parsed = json.loads(
+                row[4], object_pairs_hook=_reject_duplicate_json_keys
             )
             valid = (
-                isinstance(payload, dict)
-                and canonical_json_text(payload) == row[2]
-                and command_payload_fingerprint(payload) == row[1]
+                isinstance(parsed, dict)
+                and canonical_json_text(parsed) == row[4]
+                and command_payload_fingerprint(parsed) == row[3]
             )
+            if valid:
+                payload = parsed
         except (TypeError, ValueError, json.JSONDecodeError):
             valid = False
-        if not valid:
+        if not valid or payload is None:
             violations.append(
                 f"{row[0]} has invalid reconcile canonical command bindings"
+            )
+            continue
+
+        reconciliation_id = payload.get("reconciliation_id")
+        reconciliation_fingerprint = payload.get("reconciliation_record_fingerprint")
+        payload_aggregate_id = payload.get("aggregate_id")
+        starting_revision = payload.get("starting_local_revision")
+        history = None
+        if isinstance(reconciliation_id, str):
+            history = connection.execute(
+                """
+                SELECT aggregate_id, starting_local_revision, record_fingerprint,
+                       operator_action_required, unresolved, resulting_transition_id,
+                       resulting_revision, mode
+                FROM execution_reconciliations
+                WHERE reconciliation_id = ?
+                """,
+                (reconciliation_id,),
+            ).fetchone()
+        history_valid = bool(
+            history is not None
+            and payload_aggregate_id == row[1]
+            and starting_revision == row[2]
+            and history[0] == row[1]
+            and history[1] == row[2]
+            and reconciliation_fingerprint == history[2]
+            and history[3] == 1
+            and history[4] == 1
+            and history[5] is None
+            and history[6] is None
+            and history[7] == "PAPER"
+        )
+        if not history_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile history bindings"
             )
     normalized = tuple(dict.fromkeys(violations))
     return InvariantCheckResult(
