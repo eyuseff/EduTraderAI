@@ -11,12 +11,23 @@ from volcanoes.application.platform.configuration import (
     PaperExecutionPersistenceRuntimeConfiguration,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite import (
-    check_reconcile_authority_bindings,
     open_sqlite_execution_connection,
+)
+from volcanoes.infrastructure.execution_persistence.sqlite.reconcile_integrity import (
+    check_reconcile_authority_bindings,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
     SqliteExecutionIntegrityError,
 )
+
+
+_APPROVAL_IMMUTABILITY_TRIGGER = """
+CREATE TRIGGER trg_execution_approvals_no_update
+BEFORE UPDATE ON execution_approvals
+BEGIN
+    SELECT RAISE(ABORT, 'execution_approvals is immutable');
+END
+"""
 
 
 def test_runtime_startup_blocks_tampered_prepared_reconcile_approval_binding(tmp_path) -> None:
@@ -31,6 +42,11 @@ def test_runtime_startup_blocks_tampered_prepared_reconcile_approval_binding(tmp
         assert before.blocks_execution is False
         assert before.violations == ()
 
+        # Simulate offline file tampering in the isolated temporary database only.
+        # Restore the canonical immutability trigger before exercising startup so
+        # schema validation remains valid and the new authority invariant is the
+        # reason startup fails closed.
+        connection.execute("DROP TRIGGER trg_execution_approvals_no_update")
         updated = connection.execute(
             "UPDATE execution_approvals SET bound_fingerprint=? "
             "WHERE approval_fingerprint=("
@@ -43,7 +59,14 @@ def test_runtime_startup_blocks_tampered_prepared_reconcile_approval_binding(tmp
             ),
         )
         assert updated.rowcount == 1
+        connection.execute(_APPROVAL_IMMUTABILITY_TRIGGER)
         connection.commit()
+
+        trigger = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND name=?",
+            ("trg_execution_approvals_no_update",),
+        ).fetchone()
+        assert trigger is not None
 
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
