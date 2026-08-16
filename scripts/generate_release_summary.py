@@ -91,7 +91,11 @@ def build_release_summary(
         raise ValueError("verification status must be PASS or FAIL")
     if command != "make verify":
         raise ValueError("verification command must be 'make verify'")
-    if isinstance(test_count, bool) or not isinstance(test_count, int) or test_count < 0:
+    if (
+        isinstance(test_count, bool)
+        or not isinstance(test_count, int)
+        or test_count < 0
+    ):
         raise ValueError("test_count must be a non-negative integer")
     if not isinstance(verified_at, str) or not verified_at.strip():
         raise ValueError("verified_at must be a non-empty string")
@@ -167,7 +171,9 @@ def _normalize_optional_sha(value: str | None) -> str | None:
     if not isinstance(value, str):
         raise TypeError("source_commit_sha must be a string or None")
     normalized = value.strip().lower()
-    if len(normalized) != 40 or any(character not in "0123456789abcdef" for character in normalized):
+    if len(normalized) != 40 or any(
+        character not in "0123456789abcdef" for character in normalized
+    ):
         raise ValueError("source_commit_sha must be a 40-character hexadecimal SHA")
     return normalized
 
