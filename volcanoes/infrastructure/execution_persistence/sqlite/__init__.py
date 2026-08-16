@@ -19,6 +19,9 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     run_integrity_check,
     run_quick_check,
 )
+from volcanoes.infrastructure.execution_persistence.sqlite.reconcile_integrity import (
+    check_reconcile_authority_bindings,
+)
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
     CONTRACT_ALIGNMENT_MIGRATION,
     DURABLE_DISPATCH_CLAIM_MIGRATION,
@@ -66,6 +69,7 @@ __all__ = [
     "check_broker_reference_ownership",
     "check_foreign_keys",
     "check_idempotency_bindings",
+    "check_reconcile_authority_bindings",
     "inspect_schema_state",
     "open_sqlite_execution_connection",
     "run_integrity_check",
