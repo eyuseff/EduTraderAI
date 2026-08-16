@@ -61,8 +61,10 @@ def test_runtime_startup_blocks_revoked_reconcile_approval(tmp_path) -> None:
         after = check_reconcile_authority_bindings(connection)
         assert after.passed is False
         assert after.blocks_execution is True
-        assert len(after.violations) == 1
-        assert "authority bindings" in after.violations[0]
+        assert any("authority bindings" in value for value in after.violations)
+        assert any(
+            "approval record fingerprint" in value for value in after.violations
+        )
     finally:
         connection.close()
 
