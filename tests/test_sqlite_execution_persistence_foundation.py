@@ -681,7 +681,7 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
     assert EXPECTED_PUBLIC_EXPORTS == set(module.__all__)
     assert CURRENT_SCHEMA_VERSION == 4
     assert MINIMUM_SUPPORTED_SCHEMA_VERSION == 1
-    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 4
+    assert MAXIMUM_SUPPORTED_SCHEMA_VERSION == 5
     assert INITIAL_MIGRATION.migration_id == "v001"
     assert INITIAL_MIGRATION.previous_version == 0
     assert INITIAL_MIGRATION.resulting_version == 1
@@ -697,6 +697,7 @@ def test_public_exports_versions_and_import_have_no_filesystem_side_effects(tmp_
         "v002",
         "v003",
         "v004",
+        "v005",
     )
     assert after == before
 
@@ -707,8 +708,14 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         result = apply_initial_schema(connection)
 
         assert result.changed is True
-        assert result.applied_migration_ids == ("v001", "v002", "v003", "v004")
-        assert result.schema_state.current_version == 4
+        assert result.applied_migration_ids == (
+            "v001",
+            "v002",
+            "v003",
+            "v004",
+            "v005",
+        )
+        assert result.schema_state.current_version == 5
         assert sqlite_objects(connection, "table") == EXPECTED_TABLES
         assert EXPECTED_INDEXES.issubset(sqlite_objects(connection, "index"))
         assert sqlite_objects(connection, "trigger") == EXPECTED_TRIGGERS
@@ -750,6 +757,9 @@ def test_initial_migration_bootstraps_exact_schema_metadata_and_pragmas(tmp_path
         assert dict(migration_rows[3])["migration_id"] == "v004"
         assert dict(migration_rows[3])["previous_schema_version"] == 3
         assert dict(migration_rows[3])["resulting_schema_version"] == 4
+        assert dict(migration_rows[4])["migration_id"] == "v005"
+        assert dict(migration_rows[4])["previous_schema_version"] == 4
+        assert dict(migration_rows[4])["resulting_schema_version"] == 5
         assert int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) == 1
         assert (
             str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
@@ -963,6 +973,7 @@ def test_migration_replay_checksum_mismatch_and_future_schema_rejection(tmp_path
                     CONTRACT_ALIGNMENT_MIGRATION,
                     SCHEMA_VERSION_TEXT_MIGRATION,
                     DURABLE_DISPATCH_CLAIM_MIGRATION,
+                    KNOWN_MIGRATIONS[-1],
                 ),
                 applied_at=UTC_NOW,
                 application_version="f5e2b-durable-test",

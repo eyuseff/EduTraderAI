@@ -6,6 +6,7 @@ import hashlib
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib import resources
 
 from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
     SqliteExecutionMigrationError,
@@ -13,14 +14,14 @@ from volcanoes.infrastructure.execution_persistence.sqlite.errors import (
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.schema import (
     load_contract_alignment_schema_sql,
+    load_durable_dispatch_claim_sql,
     load_initial_schema_sql,
     load_schema_version_text_sql,
-    load_durable_dispatch_claim_sql,
 )
 
 CURRENT_SCHEMA_VERSION = 4
 MINIMUM_SUPPORTED_SCHEMA_VERSION = 1
-MAXIMUM_SUPPORTED_SCHEMA_VERSION = 4
+MAXIMUM_SUPPORTED_SCHEMA_VERSION = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +36,7 @@ class SqliteExecutionMigration:
     checksum: str
     irreversible: bool
     safe_description: str
+    requires_foreign_keys_off: bool = False
 
     @classmethod
     def create(
@@ -47,6 +49,7 @@ class SqliteExecutionMigration:
         sql_text: str,
         irreversible: bool,
         safe_description: str,
+        requires_foreign_keys_off: bool = False,
     ) -> "SqliteExecutionMigration":
         return cls(
             migration_id=migration_id,
@@ -57,6 +60,7 @@ class SqliteExecutionMigration:
             checksum=checksum_sql(sql_text),
             irreversible=irreversible,
             safe_description=safe_description,
+            requires_foreign_keys_off=requires_foreign_keys_off,
         )
 
 
@@ -276,6 +280,24 @@ def _apply_one_migration(
             ");",
         )
     )
+
+    foreign_keys_temporarily_disabled = migration.requires_foreign_keys_off
+    if foreign_keys_temporarily_disabled:
+        if int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+            raise SqliteExecutionMigrationError(
+                "Migration requires foreign-key enforcement before controlled rebuild."
+            )
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+        except sqlite3.Error as exc:
+            raise SqliteExecutionMigrationError(
+                "SQLite could not enter the controlled migration boundary."
+            ) from exc
+        if int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 0:
+            raise SqliteExecutionMigrationError(
+                "SQLite could not disable foreign keys for controlled rebuild."
+            )
+
     statements = (
         "BEGIN IMMEDIATE;",
         *migration_statements,
@@ -285,9 +307,25 @@ def _apply_one_migration(
     migration_started = False
     try:
         for statement in statements:
+            if (
+                foreign_keys_temporarily_disabled
+                and statement == metadata_statement
+                and connection.execute("PRAGMA foreign_key_check").fetchone()
+                is not None
+            ):
+                raise SqliteExecutionMigrationError(
+                    "Controlled schema rebuild produced a foreign-key violation."
+                )
             connection.execute(statement)
             if statement.lstrip().upper().startswith("BEGIN"):
                 migration_started = True
+    except SqliteExecutionMigrationError:
+        if migration_started and connection.in_transaction:
+            try:
+                connection.rollback()
+            except sqlite3.Error:
+                pass
+        raise
     except sqlite3.Error as exc:
         if migration_started and connection.in_transaction:
             try:
@@ -295,6 +333,23 @@ def _apply_one_migration(
             except sqlite3.Error:
                 pass
         raise SqliteExecutionMigrationError("SQLite migration failed.") from exc
+    finally:
+        if foreign_keys_temporarily_disabled:
+            if connection.in_transaction:
+                try:
+                    connection.rollback()
+                except sqlite3.Error:
+                    pass
+            try:
+                connection.execute("PRAGMA foreign_keys = ON")
+            except sqlite3.Error as exc:
+                raise SqliteExecutionMigrationError(
+                    "SQLite could not restore foreign-key enforcement."
+                ) from exc
+            if int(connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+                raise SqliteExecutionMigrationError(
+                    "Foreign-key enforcement was not restored after migration."
+                )
 
 
 def _complete_sql_statements(script: str) -> tuple[str, ...]:
@@ -358,6 +413,16 @@ def _sql_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _load_reconcile_command_sql() -> str:
+    return (
+        resources.files(
+            "volcanoes.infrastructure.execution_persistence.sqlite.migrations"
+        )
+        .joinpath("v005_reconcile_command.sql")
+        .read_text(encoding="utf-8")
+    )
+
+
 INITIAL_MIGRATION = SqliteExecutionMigration.create(
     migration_id="v001",
     name="initial execution persistence schema",
@@ -403,16 +468,31 @@ DURABLE_DISPATCH_CLAIM_MIGRATION = SqliteExecutionMigration.create(
     safe_description=("Add fail-closed dispatch control and immutable claim evidence."),
 )
 
+RECONCILE_COMMAND_MIGRATION = SqliteExecutionMigration.create(
+    migration_id="v005",
+    name="allow durable Paper reconciliation commands",
+    previous_version=4,
+    resulting_version=5,
+    sql_text=_load_reconcile_command_sql(),
+    irreversible=True,
+    safe_description=(
+        "Broaden the immutable execution command operation constraint to RECONCILE."
+    ),
+    requires_foreign_keys_off=True,
+)
+
 KNOWN_MIGRATIONS = (
     INITIAL_MIGRATION,
     CONTRACT_ALIGNMENT_MIGRATION,
     SCHEMA_VERSION_TEXT_MIGRATION,
     DURABLE_DISPATCH_CLAIM_MIGRATION,
+    RECONCILE_COMMAND_MIGRATION,
 )
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "DURABLE_DISPATCH_CLAIM_MIGRATION",
+    "RECONCILE_COMMAND_MIGRATION",
     "CONTRACT_ALIGNMENT_MIGRATION",
     "INITIAL_MIGRATION",
     "KNOWN_MIGRATIONS",

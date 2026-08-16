@@ -91,14 +91,16 @@ def test_import_and_construction_have_no_persistence_side_effects(
         runtime.discover_restart_candidates(query())
 
 
-def test_empty_database_start_migrates_through_v003_and_builds_units(
+def test_empty_database_start_migrates_to_latest_database_version_and_builds_units(
     tmp_path: Path,
 ) -> None:
     configured = configuration(tmp_path)
     runtime = PaperExecutionPersistenceRuntime(configured).start()
 
     state = inspect_schema_state(runtime._connection, known_migrations=KNOWN_MIGRATIONS)
-    assert state.current_version == CURRENT_SCHEMA_VERSION
+    assert state.current_version == max(
+        migration.resulting_version for migration in KNOWN_MIGRATIONS
+    )
     assert {
         migration.application_version for migration in state.applied_migrations
     } == {configured.application_version}
@@ -340,7 +342,7 @@ def test_locked_database_surfaces_busy_without_retry(tmp_path: Path) -> None:
     owner.close()
 
 
-def test_existing_v004_migration_inventory_is_not_reapplied(tmp_path: Path) -> None:
+def test_existing_v005_migration_inventory_is_not_reapplied(tmp_path: Path) -> None:
     configured = configuration(tmp_path)
     connection = open_sqlite_execution_connection(configured.database_path)
     first = apply_pending_migrations(
@@ -360,5 +362,6 @@ def test_existing_v004_migration_inventory_is_not_reapplied(tmp_path: Path) -> N
         "v002",
         "v003",
         "v004",
+        "v005",
     )
     runtime.close()

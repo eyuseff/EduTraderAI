@@ -27,13 +27,14 @@ def migrated(tmp_path):
     return connection
 
 
-def test_v004_is_current_and_known_migration_order_is_exact() -> None:
+def test_v004_record_schema_remains_current_while_v005_migration_is_registered() -> None:
     assert CURRENT_SCHEMA_VERSION == 4
     assert tuple(item.migration_id for item in KNOWN_MIGRATIONS) == (
         "v001",
         "v002",
         "v003",
         "v004",
+        "v005",
     )
     assert DURABLE_DISPATCH_CLAIM_MIGRATION.previous_version == 3
     assert DURABLE_DISPATCH_CLAIM_MIGRATION.resulting_version == 4

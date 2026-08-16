@@ -29,7 +29,6 @@ from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     run_quick_check,
 )
 from volcanoes.infrastructure.execution_persistence.sqlite.migration import (
-    CURRENT_SCHEMA_VERSION,
     KNOWN_MIGRATIONS,
     inspect_schema_state,
 )
@@ -157,7 +156,10 @@ def _validate_migrations(
     state = inspect_schema_state(connection, known_migrations=KNOWN_MIGRATIONS)
     if state.incompatible_reason:
         failures.append(state.incompatible_reason)
-    if state.current_version != CURRENT_SCHEMA_VERSION:
+    current_database_version = max(
+        migration.resulting_version for migration in KNOWN_MIGRATIONS
+    )
+    if state.current_version != current_database_version:
         failures.append("schema version is not current")
     expected_checksums = {
         migration.migration_id: migration.checksum for migration in KNOWN_MIGRATIONS
