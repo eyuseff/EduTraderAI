@@ -1,14 +1,9 @@
-name: Benchmark noise study
+name: Performance regression gate
 
 on:
   pull_request:
     branches:
       - main
-    paths:
-      - "scripts/benchmark_release.py"
-      - "scripts/benchmark_noise_study.py"
-      - "tests/test_benchmark_noise_study.py"
-      - ".github/workflows/benchmark-noise-study.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,14 +12,16 @@ permissions:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       ALPACA_API_KEY: ""
       ALPACA_SECRET_KEY: ""
 
     steps:
-      - name: Check out source
+      - name: Check out candidate source
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v7
@@ -36,23 +33,63 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements-dev.txt
 
-      - name: Validate noise-study tooling
+      - name: Validate performance tooling
         run: |
-          black --check scripts/benchmark_noise_study.py tests/test_benchmark_noise_study.py
-          ruff check scripts/benchmark_noise_study.py tests/test_benchmark_noise_study.py
-          python -m pytest -q tests/test_benchmark_noise_study.py
+          black --check \
+            scripts/benchmark_noise_study.py \
+            scripts/evaluate_benchmark_regression.py \
+            tests/test_benchmark_noise_study.py \
+            tests/test_benchmark_regression.py
+          ruff check \
+            scripts/benchmark_noise_study.py \
+            scripts/evaluate_benchmark_regression.py \
+            tests/test_benchmark_noise_study.py \
+            tests/test_benchmark_regression.py
+          python -m pytest -q \
+            tests/test_benchmark_noise_study.py \
+            tests/test_benchmark_regression.py
 
-      - name: Run benchmark noise study
+      - name: Run candidate benchmark noise study
         run: |
           python scripts/benchmark_noise_study.py \
             --repeats 7 \
             --iterations 300 \
             --warmup 30 \
-            --output build/benchmark_noise_study.json
+            --output build/benchmark_candidate.json
 
-      - name: Upload noise evidence
+      - name: Check out exact pull-request base
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: _benchmark_base
+          persist-credentials: false
+
+      - name: Run base benchmark noise study
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python _benchmark_base/scripts/benchmark_noise_study.py \
+            --repeats 7 \
+            --iterations 300 \
+            --warmup 30 \
+            --output build/benchmark_reference.json
+
+      - name: Evaluate paired performance regression
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python scripts/evaluate_benchmark_regression.py \
+            --reference build/benchmark_reference.json \
+            --candidate build/benchmark_candidate.json \
+            --noise-baseline docs/roadmap/V41_BENCHMARK_NOISE_BASELINE_2026-08-16.json \
+            --output build/benchmark_regression.json
+
+      - name: Upload performance evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-noise-study-${{ github.sha }}
-          path: build/benchmark_noise_study.json
-          if-no-files-found: error
+          name: performance-regression-${{ github.sha }}
+          path: |
+            build/benchmark_candidate.json
+            build/benchmark_reference.json
+            build/benchmark_regression.json
+          if-no-files-found: warn
