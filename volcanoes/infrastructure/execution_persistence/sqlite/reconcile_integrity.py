@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import json
 import sqlite3
 
@@ -10,6 +11,7 @@ from volcanoes.application.execution.fingerprints import (
     command_payload_fingerprint,
     fingerprint_payload,
 )
+from volcanoes.application.execution.persistence.contracts import ExecutionApprovalRecord
 from volcanoes.infrastructure.execution_persistence.sqlite.integrity import (
     InvariantCheckResult,
 )
@@ -22,6 +24,12 @@ def _reject_duplicate_json_keys(items: list[tuple[str, object]]) -> dict[str, ob
             raise ValueError("duplicate JSON key")
         result[key] = value
     return result
+
+
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def check_reconcile_authority_bindings(
@@ -58,7 +66,7 @@ def check_reconcile_authority_bindings(
     for row in connection.execute("""
         SELECT command_id, aggregate_id, expected_execution_revision,
                canonical_payload_fingerprint, canonical_command_json,
-               idempotency_key
+               idempotency_key, approval_fingerprint
         FROM execution_commands
         WHERE operation = 'RECONCILE'
         """):
@@ -147,6 +155,39 @@ def check_reconcile_authority_bindings(
         if not idempotency_valid:
             violations.append(
                 f"{row[0]} has invalid reconcile idempotency bindings"
+            )
+
+        approval = connection.execute(
+            """
+            SELECT approval_fingerprint, bound_fingerprint, approval_kind,
+                   approver_safe_reference, approved_at, recorded_at,
+                   schema_version, expires_at, revocation_reference,
+                   record_fingerprint
+            FROM execution_approvals
+            WHERE approval_fingerprint = ?
+            """,
+            (row[6],),
+        ).fetchone()
+        approval_valid = False
+        if approval is not None:
+            try:
+                reconstructed = ExecutionApprovalRecord(
+                    approval_fingerprint=approval[0],
+                    bound_fingerprint=approval[1],
+                    approval_kind=approval[2],
+                    approver_safe_reference=approval[3],
+                    approved_at=_parse_timestamp(approval[4]),
+                    recorded_at=_parse_timestamp(approval[5]),
+                    schema_version=approval[6],
+                    expires_at=_parse_timestamp(approval[7]),
+                    revocation_reference=approval[8],
+                )
+                approval_valid = reconstructed.record_fingerprint == approval[9]
+            except (TypeError, ValueError):
+                approval_valid = False
+        if not approval_valid:
+            violations.append(
+                f"{row[0]} has invalid reconcile approval record fingerprint"
             )
     normalized = tuple(dict.fromkeys(violations))
     return InvariantCheckResult(
