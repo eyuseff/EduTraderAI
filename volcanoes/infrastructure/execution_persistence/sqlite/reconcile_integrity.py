@@ -46,6 +46,10 @@ def check_reconcile_authority_bindings(
             OR i.mode <> m.mode
             OR p.mode <> m.mode
             OR p.bound_fingerprint <> m.canonical_payload_fingerprint
+            OR p.approval_kind <> 'OPERATOR_CONFIRMED'
+            OR p.revocation_reference IS NOT NULL
+            OR p.approved_at > m.received_at
+            OR (p.expires_at IS NOT NULL AND p.expires_at < m.received_at)
           )
         """).fetchall()
     violations = [
