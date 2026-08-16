@@ -8,7 +8,9 @@ from scripts.evaluate_benchmark_regression import (
 )
 
 
-def _study(*, median_value: float, p95_value: float, p99_value: float) -> dict[str, object]:
+def _study(
+    *, median_value: float, p95_value: float, p99_value: float
+) -> dict[str, object]:
     metric = lambda value: {"median": value}  # noqa: E731
     return {
         "fixture": "fixed",
