@@ -34,12 +34,15 @@ def test_runtime_startup_blocks_tampered_reconcile_idempotency_record(tmp_path) 
         assert before.violations == ()
 
         updated = connection.execute(
-            "UPDATE execution_idempotency SET reservation_status='UNKNOWN' "
+            "UPDATE execution_idempotency SET created_at=? "
             "WHERE idempotency_key=("
             "SELECT idempotency_key FROM execution_commands "
             "WHERE aggregate_id=? AND operation='RECONCILE'"
             ")",
-            (str(request.aggregate.aggregate_id),),
+            (
+                "2099-01-01T00:00:00.000000Z",
+                str(request.aggregate.aggregate_id),
+            ),
         )
         assert updated.rowcount == 1
         connection.commit()
