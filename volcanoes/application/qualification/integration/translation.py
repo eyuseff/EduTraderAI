@@ -28,6 +28,9 @@ from volcanoes.application.qualification.integration.errors import (
     UnsupportedRuntimeObservationError,
     UnsupportedRuntimeRequestError,
 )
+from volcanoes.application.qualification.integration.order_safety import (
+    require_one_share_order_intent,
+)
 from volcanoes.application.qualification.service import (
     QualificationApplicationCommand,
     QualificationExecutionPlan,
@@ -110,6 +113,7 @@ def runtime_request_to_qualification_command(
             safe_message="Runtime request is unsupported.",
         )
     require_paper_environment(request.environment)
+    require_one_share_order_intent(request.order_intent)
     try:
         event_type = _REQUEST_EVENT_MAP[request.request_kind]
     except KeyError as error:
