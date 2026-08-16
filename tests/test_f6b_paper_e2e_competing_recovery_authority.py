@@ -212,7 +212,7 @@ def test_competing_recovery_authority_cannot_survive_losing_terminal_race(tmp_pa
 
         winner_event, winner_decision = decision_for(winner_recovery)
         loser_event, loser_decision = decision_for(loser_recovery)
-        assert winner_decision.transition_id != loser_decision.transition_id
+        assert winner_decision.transition_id == loser_decision.transition_id
 
         def transition_record(recovery, event, decision, record_id):
             return ExecutionTransitionRecord(
