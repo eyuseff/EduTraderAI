@@ -33,6 +33,8 @@ def test_runtime_startup_blocks_tampered_reconcile_aggregate_record(tmp_path) ->
         assert before.blocks_execution is False
         assert before.violations == ()
 
+        # Change a schema-valid aggregate field that is included in the durable
+        # aggregate record fingerprint, but leave the stored fingerprint untouched.
         updated = connection.execute(
             "UPDATE execution_aggregates SET updated_at='2099-01-01T00:00:00.000000Z' "
             "WHERE aggregate_id=?",
