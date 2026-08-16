@@ -1,5 +1,7 @@
 """Measure repeated-run noise for the deterministic release benchmark."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
