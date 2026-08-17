@@ -2,11 +2,11 @@
 
 Date: 2026-08-16
 
-This snapshot reconciles the original backlog with repository evidence now merged into `main`. It does not replace the backlog's prioritization and does not convert external evidence or proposed architecture into completed work.
+This snapshot reconciles the original backlog with repository evidence now merged into `main`. It does not replace the backlog's prioritization and does not convert external evidence into completed work.
 
 ## Status vocabulary
 
-- **IMPLEMENTED** — repository implementation and offline CI evidence are present.
+- **IMPLEMENTED** — repository implementation and offline CI evidence are present, or an architecture/governance decision required by the backlog has been explicitly accepted.
 - **IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED** — the repository-side control exists, but connected Paper evidence is still required.
 - **PROPOSED / DECISION REQUIRED** — design work exists, but a consequential architecture or governance choice remains open.
 
@@ -30,7 +30,7 @@ The authoritative detailed audit is `V41_PAPER_QUALIFICATION_IMPLEMENTATION_AUDI
 |---|---|---|
 | V41-CC-001 Inventory locks/idempotency/state | IMPLEMENTED | PR #53 documents process-local versus durable coordination boundaries. |
 | V41-CC-002 Distributed requirements | IMPLEMENTED | PR #54 defines technology-neutral fencing, CAS, takeover, replay and recovery invariants. |
-| V41-CC-003 Select architecture | PROPOSED / DECISION REQUIRED | PR #55 adds ADR-012 as `Proposed`: extend the existing durable DB authority; keep SQLite only for validated current topology; prefer a transactional server DB before claiming multi-host support. Runtime migration is not approved merely by this status document. |
+| V41-CC-003 Select architecture | IMPLEMENTED | PR #55 proposed ADR-012 and PR #74 records owner acceptance for the current v4.1 topology: the durable execution database remains the sole consequential coordination authority, SQLite remains limited to the validated local durable topology, and no multi-host support is claimed. |
 
 ## Event publication — P1
 
@@ -38,7 +38,7 @@ The authoritative detailed audit is `V41_PAPER_QUALIFICATION_IMPLEMENTATION_AUDI
 |---|---|---|
 | V41-EP-001 Inventory NullEventPublisher | IMPLEMENTED | PR #56 documents verified production defaults and audit/recovery gaps. |
 | V41-EP-002 External publisher contract | IMPLEMENTED | PR #57 defines vendor-neutral identity, serialization, ordering, backpressure, retry and safety semantics. No transport vendor was selected. |
-| V41-EP-003 Delivery observability | IMPLEMENTED | PR #58 adds transport-neutral capability/status diagnostics and bounded event-only retry behavior without making events execution authority. |
+| V41-EP-003 Delivery observability | IMPLEMENTED | PR #58 adds transport-neutral capability/status diagnostics and bounded event-only retry behavior without making events execution authority. PR #74 explicitly defers concrete external transport selection and makes it non-blocking for v4.1 release qualification. |
 
 ## Performance — P2
 
@@ -59,13 +59,16 @@ The authoritative detailed audit is `V41_PAPER_QUALIFICATION_IMPLEMENTATION_AUDI
 - PR #63 upgraded `actions/checkout` and `actions/setup-python` to their Node-24-generation v7 majors.
 - PR #66 upgraded all active artifact uploads to `actions/upload-artifact@v7` after verifying the official v7.0.1 release.
 - PR #67 closes the remaining known `RECONCILE` record-fingerprint gap by validating durable transition records through the canonical SQLite mapper and failing startup closed on tampering.
+- PR #70 makes protected-path change detection fail closed by using complete Git history and refusing to mask unresolved diff ranges.
+- PR #72 disables persisted checkout credentials in the established verification workflows and adds regression coverage for that boundary.
+- PR #73 pins the established verification workflow actions to reviewed exact commit SHAs and adds allowlist regression coverage against mutable action-tag drift.
 
-## Remaining non-automatic boundaries
+## Remaining non-automatic boundary
 
-The remaining work is not accurately represented as generic missing implementation:
+The repository-side v4.1 backlog and governance choices are otherwise reconciled. The remaining gate tracked by issue #69 is:
 
-1. **Connected Paper qualification evidence** — verified Paper endpoint/configuration, approved secret path, fresh price reference, explicit consequential-action confirmation, controlled one-share lifecycle, and final redacted immutable evidence.
-2. **Coordination architecture acceptance** — ADR-012 remains Proposed. A server-database migration or multi-host topology claim must not be inferred from offline documentation.
-3. **External event transport selection**, if desired — the contract and observability layer exist, but no vendor/backend has been selected or connected.
+1. **Connected Paper qualification evidence** — verified Paper endpoint/configuration, approved secret path, fresh reference price, explicit consequential-action confirmation, controlled one-share submit/ack/status/cancel/cleanup lifecycle, and final redacted immutable evidence with its manifest row.
+
+ADR-012 coordination architecture was accepted for the current supported topology by PR #74. External event transport selection was explicitly deferred by PR #74 and is not required for v4.1 release qualification.
 
 No status in this file authorizes Live trading, broker credentials, external order submission, production `state/` access, release tags, deployments, or publication of release artifacts.
