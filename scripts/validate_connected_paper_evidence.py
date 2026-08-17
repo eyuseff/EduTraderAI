@@ -94,6 +94,8 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise EvidenceValidationError("LIVE_TRADING_MUST_BE_FALSE")
     if payload.get("credentials_embedded") is not False:
         raise EvidenceValidationError("CREDENTIALS_MUST_NOT_BE_EMBEDDED")
+    if payload.get("consequential_action_confirmed") is not True:
+        raise EvidenceValidationError("CONSEQUENTIAL_ACTION_CONFIRMATION_REQUIRED")
     observed_at = _utc_timestamp(payload.get("observed_at"), "observed_at")
 
     order = payload.get("order")
@@ -129,6 +131,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "environment": "PAPER",
+        "consequential_action_confirmed": True,
         "observed_at": observed_at,
         "symbol": symbol,
         "side": "BUY",
