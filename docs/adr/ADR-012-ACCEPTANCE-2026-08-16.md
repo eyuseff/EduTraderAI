@@ -26,6 +26,8 @@ Acceptance is based on the repository evidence accumulated through v4.1, includi
 
 PR #67 additionally closed the remaining known RECONCILE transition-record fingerprint gap before this decision was recorded.
 
+The acceptance change itself must pass the repository's current SHA-pinned Release verification, Continuous feature validation, and Performance regression gates before merge.
+
 ## Explicit non-claims
 
 This acceptance does not authorize or claim:
