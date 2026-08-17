@@ -18,7 +18,9 @@ If any precondition is uncertain, stop. The offline tooling in this repository m
 
 ## Evidence to collect
 
-Create one redacted JSON object with schema version `connected-paper-qualification-evidence-v1`. The object must state `environment: PAPER`, `live_trading: false`, and `credentials_embedded: false`; include the fresh `reference_best_ask`; include a timezone-aware UTC `observed_at`; record the one-share BUY/LIMIT/DAY order facts; and record whether submission, acknowledgment, status observation, cancellation request, cancellation confirmation, and cleanup verification each occurred.
+Create one redacted JSON object with schema version `connected-paper-qualification-evidence-v1`. The object must state `environment: PAPER`, `live_trading: false`, `credentials_embedded: false`, and `consequential_action_confirmed: true`; include the fresh `reference_best_ask`; include a timezone-aware UTC `observed_at`; record the one-share BUY/LIMIT/DAY order facts; and record whether submission, acknowledgment, status observation, cancellation request, cancellation confirmation, and cleanup verification each occurred.
+
+`consequential_action_confirmed: true` records only that the separately controlled execution-time authorization occurred. It is evidence, not an authorization mechanism, and the offline validator cannot grant broker-effect permission.
 
 Do not include API keys, secrets, tokens, authorization headers, cookies, private keys, connection strings, raw broker payloads that contain secrets, or any Live credential material.
 
@@ -30,6 +32,7 @@ Example shape only:
   "environment": "PAPER",
   "live_trading": false,
   "credentials_embedded": false,
+  "consequential_action_confirmed": true,
   "reference_best_ask": "100.50",
   "order": {
     "symbol": "AAPL",
@@ -61,7 +64,7 @@ python scripts/validate_connected_paper_evidence.py /path/to/redacted-evidence.j
 
 A passing report returns `validation: PASS`, a deterministic `evidence_sha256`, normalized safety facts, and explicit `false` flags confirming that the validator itself did not access a broker, load credentials, use network, submit an order, or change runtime state.
 
-The validator fails closed if the payload claims a non-Paper environment, Live trading, embedded credentials, a missing or non-UTC observation timestamp, a non-BUY side, quantity other than one, a non-LIMIT or non-DAY order, a marketable/crossing limit, incomplete submit/ack/status/cancel/cleanup evidence, or secret-shaped fields.
+The validator fails closed if the payload claims a non-Paper environment, Live trading, embedded credentials, lacks explicit consequential-action confirmation, has a missing or non-UTC observation timestamp, a non-BUY side, quantity other than one, a non-LIMIT or non-DAY order, a marketable/crossing limit, incomplete submit/ack/status/cancel/cleanup evidence, or secret-shaped fields.
 
 ## Review record
 

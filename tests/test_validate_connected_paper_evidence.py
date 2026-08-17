@@ -22,6 +22,7 @@ def evidence(**overrides: object) -> dict[str, object]:
         "environment": "PAPER",
         "live_trading": False,
         "credentials_embedded": False,
+        "consequential_action_confirmed": True,
         "reference_best_ask": "100.50",
         "order": {
             "symbol": "AAPL",
@@ -49,6 +50,7 @@ def test_valid_evidence_passes_with_one_non_marketable_share() -> None:
     normalized = validate_evidence(evidence())
 
     assert normalized["environment"] == "PAPER"
+    assert normalized["consequential_action_confirmed"] is True
     assert normalized["observed_at"] == "2026-08-17T00:00:00Z"
     assert normalized["side"] == "BUY"
     assert normalized["quantity"] == 1
@@ -74,6 +76,19 @@ def test_top_level_safety_failures_are_rejected(
         validate_evidence(evidence(**{field: value}))
 
     assert error_info.value.reason_code == reason
+
+
+@pytest.mark.parametrize("confirmation", (None, False, 1, "true"))
+def test_consequential_action_confirmation_requires_explicit_true(
+    confirmation: object,
+) -> None:
+    with pytest.raises(EvidenceValidationError) as error_info:
+        validate_evidence(evidence(consequential_action_confirmed=confirmation))
+
+    assert (
+        error_info.value.reason_code
+        == "CONSEQUENTIAL_ACTION_CONFIRMATION_REQUIRED"
+    )
 
 
 @pytest.mark.parametrize(
