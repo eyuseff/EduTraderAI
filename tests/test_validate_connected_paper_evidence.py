@@ -25,6 +25,7 @@ def evidence(**overrides: object) -> dict[str, object]:
         "reference_best_ask": "100.50",
         "order": {
             "symbol": "AAPL",
+            "side": "BUY",
             "quantity": 1,
             "order_type": "LIMIT",
             "time_in_force": "DAY",
@@ -48,6 +49,7 @@ def test_valid_evidence_passes_with_one_non_marketable_share() -> None:
     normalized = validate_evidence(evidence())
 
     assert normalized["environment"] == "PAPER"
+    assert normalized["side"] == "BUY"
     assert normalized["quantity"] == 1
     assert normalized["order_type"] == "LIMIT"
     assert Decimal(normalized["limit_price"]) < Decimal(
@@ -76,6 +78,7 @@ def test_top_level_safety_failures_are_rejected(
 @pytest.mark.parametrize(
     ("order_overrides", "reason"),
     (
+        ({"side": "SELL"}, "BUY_SIDE_REQUIRED"),
         ({"quantity": 2}, "ONE_SHARE_REQUIRED"),
         ({"order_type": "MARKET"}, "LIMIT_ORDER_REQUIRED"),
         ({"time_in_force": "GTC"}, "DAY_TIME_IN_FORCE_REQUIRED"),
