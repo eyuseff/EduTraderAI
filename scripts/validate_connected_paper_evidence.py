@@ -101,7 +101,10 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     order = payload.get("order")
     if not isinstance(order, Mapping):
         raise EvidenceValidationError("ORDER_EVIDENCE_REQUIRED")
-    symbol = str(order.get("symbol", "")).strip().upper()
+    raw_symbol = order.get("symbol")
+    if not isinstance(raw_symbol, str):
+        raise EvidenceValidationError("SYMBOL_REQUIRED")
+    symbol = raw_symbol.strip().upper()
     if not symbol:
         raise EvidenceValidationError("SYMBOL_REQUIRED")
     if order.get("side") != "BUY":
