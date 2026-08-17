@@ -87,6 +87,8 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     symbol = str(order.get("symbol", "")).strip().upper()
     if not symbol:
         raise EvidenceValidationError("SYMBOL_REQUIRED")
+    if order.get("side") != "BUY":
+        raise EvidenceValidationError("BUY_SIDE_REQUIRED")
     if order.get("quantity") != 1:
         raise EvidenceValidationError("ONE_SHARE_REQUIRED")
     if order.get("order_type") != "LIMIT":
@@ -112,6 +114,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "environment": "PAPER",
         "symbol": symbol,
+        "side": "BUY",
         "quantity": 1,
         "order_type": "LIMIT",
         "time_in_force": "DAY",
