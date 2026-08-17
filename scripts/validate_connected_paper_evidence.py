@@ -27,6 +27,7 @@ _SECRET_TERMS = (
     "authorization",
     "cookie",
     "private_key",
+    "account",
     "connection_string",
 )
 _SECRET_VALUE_MARKERS = (
