@@ -80,6 +80,8 @@ def test_top_level_safety_failures_are_rejected(
     (
         ({"side": "SELL"}, "BUY_SIDE_REQUIRED"),
         ({"quantity": 2}, "ONE_SHARE_REQUIRED"),
+        ({"quantity": True}, "ONE_SHARE_REQUIRED"),
+        ({"quantity": 1.0}, "ONE_SHARE_REQUIRED"),
         ({"order_type": "MARKET"}, "LIMIT_ORDER_REQUIRED"),
         ({"time_in_force": "GTC"}, "DAY_TIME_IN_FORCE_REQUIRED"),
         ({"limit_price": "100.50"}, "MARKETABLE_LIMIT_REJECTED"),
