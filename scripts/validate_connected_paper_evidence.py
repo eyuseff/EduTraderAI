@@ -83,9 +83,11 @@ class EvidenceValidationError(ValueError):
 
 
 def _decimal(value: object, field: str) -> Decimal:
+    if not isinstance(value, str) or not value.strip():
+        raise EvidenceValidationError(f"INVALID_{field.upper()}")
     try:
-        parsed = Decimal(str(value))
-    except (InvalidOperation, ValueError) as exc:
+        parsed = Decimal(value.strip())
+    except InvalidOperation as exc:
         raise EvidenceValidationError(f"INVALID_{field.upper()}") from exc
     if not parsed.is_finite() or parsed <= 0:
         raise EvidenceValidationError(f"INVALID_{field.upper()}")
