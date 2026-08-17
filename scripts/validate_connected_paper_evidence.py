@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping
@@ -56,6 +57,19 @@ def _decimal(value: object, field: str) -> Decimal:
     return parsed
 
 
+def _utc_timestamp(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EvidenceValidationError(f"INVALID_{field.upper()}")
+    rendered = value.strip()
+    try:
+        parsed = datetime.fromisoformat(rendered.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise EvidenceValidationError(f"INVALID_{field.upper()}") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise EvidenceValidationError(f"INVALID_{field.upper()}")
+    return parsed.isoformat().replace("+00:00", "Z")
+
+
 def _walk_keys(value: object) -> None:
     if isinstance(value, Mapping):
         for key, nested in value.items():
@@ -80,6 +94,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise EvidenceValidationError("LIVE_TRADING_MUST_BE_FALSE")
     if payload.get("credentials_embedded") is not False:
         raise EvidenceValidationError("CREDENTIALS_MUST_NOT_BE_EMBEDDED")
+    observed_at = _utc_timestamp(payload.get("observed_at"), "observed_at")
 
     order = payload.get("order")
     if not isinstance(order, Mapping):
@@ -114,6 +129,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "environment": "PAPER",
+        "observed_at": observed_at,
         "symbol": symbol,
         "side": "BUY",
         "quantity": 1,
