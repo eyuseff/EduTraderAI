@@ -89,7 +89,8 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise EvidenceValidationError("SYMBOL_REQUIRED")
     if order.get("side") != "BUY":
         raise EvidenceValidationError("BUY_SIDE_REQUIRED")
-    if order.get("quantity") != 1:
+    quantity = order.get("quantity")
+    if type(quantity) is not int or quantity != 1:
         raise EvidenceValidationError("ONE_SHARE_REQUIRED")
     if order.get("order_type") != "LIMIT":
         raise EvidenceValidationError("LIMIT_ORDER_REQUIRED")
