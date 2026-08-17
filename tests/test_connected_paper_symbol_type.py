@@ -44,6 +44,24 @@ def test_symbol_requires_textual_evidence(symbol: object) -> None:
     assert error_info.value.reason_code == "SYMBOL_REQUIRED"
 
 
+@pytest.mark.parametrize(
+    "symbol",
+    (
+        "AAPL/../../state",
+        r"AAPL\state",
+        "api_key",
+        "Bearer dummy-token",
+        "token=dummy",
+        "sentinel_integration_secret_do_not_expose",
+    ),
+)
+def test_symbol_rejects_unsafe_or_secret_shaped_text(symbol: str) -> None:
+    with pytest.raises(EvidenceValidationError) as error_info:
+        validate_evidence(evidence(symbol))
+
+    assert error_info.value.reason_code == "UNSAFE_SYMBOL"
+
+
 def test_textual_symbol_is_trimmed_and_normalized() -> None:
     normalized = validate_evidence(evidence(" aapl "))
 

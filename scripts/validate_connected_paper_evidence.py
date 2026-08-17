@@ -29,6 +29,17 @@ _SECRET_TERMS = (
     "private_key",
     "connection_string",
 )
+_SECRET_VALUE_MARKERS = (
+    "sentinel_integration_secret_do_not_expose",
+    "sentinel_broker_token_do_not_expose",
+    "sentinel_password_do_not_expose",
+    "api_key=",
+    "secret=",
+    "token=",
+    "password=",
+    "authorization:",
+    "bearer ",
+)
 _REQUIRED_TRUE = (
     "submitted",
     "acknowledged",
@@ -113,6 +124,15 @@ def _reject_unknown_fields(
         raise EvidenceValidationError("UNEXPECTED_FIELD_REJECTED")
 
 
+def _unsafe_symbol(value: str) -> bool:
+    lowered = value.lower()
+    if "/" in value or "\\" in value:
+        return True
+    return any(term in lowered for term in _SECRET_TERMS) or any(
+        marker in lowered for marker in _SECRET_VALUE_MARKERS
+    )
+
+
 def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Validate a redacted Paper evidence payload and return safe normalized facts."""
 
@@ -137,9 +157,12 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     raw_symbol = order.get("symbol")
     if not isinstance(raw_symbol, str):
         raise EvidenceValidationError("SYMBOL_REQUIRED")
-    symbol = raw_symbol.strip().upper()
+    symbol = raw_symbol.strip()
     if not symbol:
         raise EvidenceValidationError("SYMBOL_REQUIRED")
+    if _unsafe_symbol(symbol):
+        raise EvidenceValidationError("UNSAFE_SYMBOL")
+    symbol = symbol.upper()
     if order.get("side") != "BUY":
         raise EvidenceValidationError("BUY_SIDE_REQUIRED")
     quantity = order.get("quantity")
