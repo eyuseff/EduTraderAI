@@ -37,6 +37,30 @@ _REQUIRED_TRUE = (
     "cancel_confirmed",
     "cleanup_verified",
 )
+_TOP_LEVEL_FIELDS = frozenset(
+    {
+        "schema_version",
+        "environment",
+        "live_trading",
+        "credentials_embedded",
+        "consequential_action_confirmed",
+        "reference_best_ask",
+        "observed_at",
+        "order",
+        "lifecycle",
+    }
+)
+_ORDER_FIELDS = frozenset(
+    {
+        "symbol",
+        "side",
+        "quantity",
+        "order_type",
+        "time_in_force",
+        "limit_price",
+    }
+)
+_LIFECYCLE_FIELDS = frozenset(_REQUIRED_TRUE)
 
 
 class EvidenceValidationError(ValueError):
@@ -82,10 +106,18 @@ def _walk_keys(value: object) -> None:
             _walk_keys(nested)
 
 
+def _reject_unknown_fields(
+    value: Mapping[object, object], allowed: frozenset[str]
+) -> None:
+    if any(not isinstance(key, str) or key not in allowed for key in value):
+        raise EvidenceValidationError("UNEXPECTED_FIELD_REJECTED")
+
+
 def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Validate a redacted Paper evidence payload and return safe normalized facts."""
 
     _walk_keys(payload)
+    _reject_unknown_fields(payload, _TOP_LEVEL_FIELDS)
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise EvidenceValidationError("UNSUPPORTED_SCHEMA_VERSION")
     if payload.get("environment") != "PAPER":
@@ -101,6 +133,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     order = payload.get("order")
     if not isinstance(order, Mapping):
         raise EvidenceValidationError("ORDER_EVIDENCE_REQUIRED")
+    _reject_unknown_fields(order, _ORDER_FIELDS)
     raw_symbol = order.get("symbol")
     if not isinstance(raw_symbol, str):
         raise EvidenceValidationError("SYMBOL_REQUIRED")
@@ -127,6 +160,7 @@ def validate_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
     lifecycle = payload.get("lifecycle")
     if not isinstance(lifecycle, Mapping):
         raise EvidenceValidationError("LIFECYCLE_EVIDENCE_REQUIRED")
+    _reject_unknown_fields(lifecycle, _LIFECYCLE_FIELDS)
     for field in _REQUIRED_TRUE:
         if lifecycle.get(field) is not True:
             raise EvidenceValidationError(f"{field.upper()}_EVIDENCE_REQUIRED")
