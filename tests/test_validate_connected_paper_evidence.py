@@ -135,6 +135,18 @@ def test_order_safety_failures_are_rejected(
     assert error_info.value.reason_code == reason
 
 
+def test_account_shaped_symbol_is_rejected_for_runtime_parity() -> None:
+    payload = evidence()
+    order = dict(payload["order"])  # type: ignore[arg-type]
+    order["symbol"] = "ACCOUNT123"
+    payload["order"] = order
+
+    with pytest.raises(EvidenceValidationError) as error_info:
+        validate_evidence(payload)
+
+    assert error_info.value.reason_code == "UNSAFE_SYMBOL"
+
+
 @pytest.mark.parametrize(
     "field",
     (
