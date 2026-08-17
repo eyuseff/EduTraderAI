@@ -24,6 +24,7 @@ def test_preflight_builds_exactly_one_non_marketable_limit_share() -> None:
     assert evidence["environment"] == "PAPER"
     assert evidence["order_intent"] == {
         "symbol": "AAPL",
+        "side": "BUY",
         "quantity": 1,
         "order_type": "LIMIT",
         "time_in_force": "DAY",
@@ -86,6 +87,7 @@ def test_cli_emits_deterministic_json(capsys: pytest.CaptureFixture[str]) -> Non
     assert first == second
     payload = json.loads(first)
     assert payload["preflight_passed"] is True
+    assert payload["order_intent"]["side"] == "BUY"
     assert payload["action_executed"] is False
     assert payload["credentials_loaded"] is False
     assert payload["network_used"] is False
