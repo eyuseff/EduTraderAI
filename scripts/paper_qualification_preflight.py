@@ -54,6 +54,7 @@ def build_preflight_evidence(
         "runtime_changed": False,
         "order_intent": {
             "symbol": intent.symbol,
+            "side": "BUY",
             "quantity": intent.quantity,
             "order_type": intent.order_type.value,
             "time_in_force": intent.time_in_force.value,
