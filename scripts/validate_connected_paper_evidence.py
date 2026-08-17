@@ -82,6 +82,15 @@ class EvidenceValidationError(ValueError):
         self.reason_code = reason_code
 
 
+def _reject_duplicate_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise EvidenceValidationError("DUPLICATE_FIELD_REJECTED")
+        payload[key] = value
+    return payload
+
+
 def _decimal(value: object, field: str) -> Decimal:
     if not isinstance(value, str) or not value.strip():
         raise EvidenceValidationError(f"INVALID_{field.upper()}")
@@ -241,7 +250,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("evidence", type=Path)
     args = parser.parse_args(argv)
-    payload = json.loads(args.evidence.read_text(encoding="utf-8"))
+    payload = json.loads(
+        args.evidence.read_text(encoding="utf-8"),
+        object_pairs_hook=_reject_duplicate_object_pairs,
+    )
     if not isinstance(payload, dict):
         raise EvidenceValidationError("OBJECT_PAYLOAD_REQUIRED")
     print(json.dumps(build_validation_report(payload), sort_keys=True, separators=(",", ":")))
