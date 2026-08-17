@@ -106,7 +106,9 @@ def _walk_keys(value: object) -> None:
             _walk_keys(nested)
 
 
-def _reject_unknown_fields(value: Mapping[object, object], allowed: frozenset[str]) -> None:
+def _reject_unknown_fields(
+    value: Mapping[object, object], allowed: frozenset[str]
+) -> None:
     if any(not isinstance(key, str) or key not in allowed for key in value):
         raise EvidenceValidationError("UNEXPECTED_FIELD_REJECTED")
 
