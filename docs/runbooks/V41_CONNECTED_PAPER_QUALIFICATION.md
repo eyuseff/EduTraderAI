@@ -18,7 +18,7 @@ If any precondition is uncertain, stop. The offline tooling in this repository m
 
 ## Evidence to collect
 
-Create one redacted JSON object with schema version `connected-paper-qualification-evidence-v1`. The object must state `environment: PAPER`, `live_trading: false`, and `credentials_embedded: false`; include the fresh `reference_best_ask`; record the one-share LIMIT/DAY order facts; and record whether submission, acknowledgment, status observation, cancellation request, cancellation confirmation, and cleanup verification each occurred.
+Create one redacted JSON object with schema version `connected-paper-qualification-evidence-v1`. The object must state `environment: PAPER`, `live_trading: false`, and `credentials_embedded: false`; include the fresh `reference_best_ask`; record the one-share BUY/LIMIT/DAY order facts; and record whether submission, acknowledgment, status observation, cancellation request, cancellation confirmation, and cleanup verification each occurred.
 
 Do not include API keys, secrets, tokens, authorization headers, cookies, private keys, connection strings, raw broker payloads that contain secrets, or any Live credential material.
 
@@ -33,6 +33,7 @@ Example shape only:
   "reference_best_ask": "100.50",
   "order": {
     "symbol": "AAPL",
+    "side": "BUY",
     "quantity": 1,
     "order_type": "LIMIT",
     "time_in_force": "DAY",
@@ -60,7 +61,7 @@ python scripts/validate_connected_paper_evidence.py /path/to/redacted-evidence.j
 
 A passing report returns `validation: PASS`, a deterministic `evidence_sha256`, normalized safety facts, and explicit `false` flags confirming that the validator itself did not access a broker, load credentials, use network, submit an order, or change runtime state.
 
-The validator fails closed if the payload claims a non-Paper environment, Live trading, embedded credentials, quantity other than one, a non-LIMIT or non-DAY order, a marketable/crossing limit, incomplete submit/ack/status/cancel/cleanup evidence, or secret-shaped fields.
+The validator fails closed if the payload claims a non-Paper environment, Live trading, embedded credentials, a non-BUY side, quantity other than one, a non-LIMIT or non-DAY order, a marketable/crossing limit, incomplete submit/ack/status/cancel/cleanup evidence, or secret-shaped fields.
 
 ## Review record
 
