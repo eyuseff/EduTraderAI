@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from scripts.benchmark_release import benchmark, measure, percentile
 
-
 EXPECTED_WORKLOADS = {
     "trade_planner",
     "preview_trade_service",
@@ -41,6 +40,7 @@ def test_percentile_selects_observed_sample_without_interpolation() -> None:
 def test_benchmark_exposes_fixed_workloads_and_environment_metadata() -> None:
     report = benchmark(iterations=1, warmup=0)
 
+    assert report["release"] == "4.1.0-rc1"
     assert report["units"] == "microseconds"
     assert "100k equity" in str(report["fixture"])
     environment = report["environment"]

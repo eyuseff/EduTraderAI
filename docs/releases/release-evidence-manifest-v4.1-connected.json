@@ -1,0 +1,11 @@
+{
+  "required_files": [
+    "build/coverage.json",
+    "build/release_summary.json",
+    "build/release_summary.md",
+    "build/validation/connected-paper-qualification-20260820T164655Z.json",
+    "build/verification.json"
+  ],
+  "review_status": "HUMAN_REVIEW_REQUIRED",
+  "schema_version": 1
+}

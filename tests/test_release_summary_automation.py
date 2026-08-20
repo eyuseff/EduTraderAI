@@ -35,6 +35,7 @@ def test_summary_is_review_only_even_when_verification_passes() -> None:
     )
 
     assert summary.verification_status == "PASS"
+    assert summary.release_candidate == "v4.1.0-rc1"
     assert summary.review_status == "HUMAN_REVIEW_REQUIRED"
     assert summary.human_approval_required is True
     assert summary.source_commit_sha == "a" * 40
@@ -54,6 +55,7 @@ def test_markdown_explicitly_disclaims_release_action() -> None:
     markdown = build_release_summary(verification_payload()).to_markdown()
 
     assert "Human approval required: **yes**" in markdown
+    assert "Release candidate: **v4.1.0-rc1**" in markdown
     assert "does not approve, tag, publish, deploy, or release" in markdown
 
 
@@ -106,9 +108,7 @@ def test_status_is_strict(status: object) -> None:
 @pytest.mark.parametrize("coverage", [-0.1, 100.1, "90", True])
 def test_coverage_values_are_bounded_numeric_or_null(coverage: object) -> None:
     with pytest.raises(ValueError):
-        build_release_summary(
-            verification_payload(combined_coverage_percent=coverage)
-        )
+        build_release_summary(verification_payload(combined_coverage_percent=coverage))
 
 
 def test_coverage_can_be_absent_for_non_coverage_verify() -> None:
