@@ -57,6 +57,38 @@ def test_v41_observation_log_remains_fail_closed_about_session_credit() -> None:
     ) in source
 
 
+def test_v41_observation_log_defines_complete_redacted_session_record_shape() -> None:
+    raw = LOG_PATH.read_text(encoding="utf-8")
+    source = _normalized(LOG_PATH)
+
+    for field in (
+        "Session start UTC",
+        "Session end UTC",
+        "Observed commit",
+        "Environment",
+        "Account-active status",
+        "Blocking-flag status",
+        "AAPL eligibility",
+        "Quote freshness",
+        "Application observations",
+        "Broker observations",
+        "Incident summary",
+        "Cleanup status",
+    ):
+        assert f"| {field} |" in raw
+
+    assert (
+        "This table is a recording contract only; it is not session evidence and does "
+        "not itself create session credit."
+    ) in source
+    assert "A session is not countable if any required field is absent" in source
+    assert (
+        "Do not increment the session count until a completed, redacted numbered "
+        "session section is appended"
+    ) in source
+    assert "this template does not require or authorize an order" in source
+
+
 def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
     source = _normalized(README_PATH)
 
@@ -74,10 +106,16 @@ def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
 def test_docs_readme_is_an_index_not_a_competing_status_source() -> None:
     source = _normalized(DOCS_README_PATH)
 
-    assert "this file is a documentation index, not the authoritative release-status record" in source
+    assert (
+        "this file is a documentation index, not the authoritative release-status record"
+        in source
+    )
     assert "[root README](../README.md)" in source
     assert "`v4.1.0-rc1` **Paper-only** release-candidate observation window" in source
     assert "[v4.1 Stable promotion plan](operations/V41_STABLE_PROMOTION_PLAN.md)" in source
     assert "[v4.1 release observation log](operations/V41_RELEASE_OBSERVATION_LOG.md)" in source
     assert "historical or design context" in source
-    assert "No order may be submitted, replaced, or cancelled merely to satisfy the observation quota." in source
+    assert (
+        "No order may be submitted, replaced, or cancelled merely to satisfy the "
+        "observation quota."
+    ) in source
