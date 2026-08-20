@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 README_PATH = Path("README.md")
+DOCS_README_PATH = Path("docs/README.md")
 PLAN_PATH = Path("docs/operations/V41_STABLE_PROMOTION_PLAN.md")
 LOG_PATH = Path("docs/operations/V41_RELEASE_OBSERVATION_LOG.md")
 
@@ -68,3 +69,15 @@ def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
         "(docs/operations/RELEASE_OBSERVATION_LOG.md)"
     ) in source
     assert "does not count toward the v4.1 Stable gate" in source
+
+
+def test_docs_readme_is_an_index_not_a_competing_status_source() -> None:
+    source = _normalized(DOCS_README_PATH)
+
+    assert "this file is a documentation index, not the authoritative release-status record" in source
+    assert "[root README](../README.md)" in source
+    assert "`v4.1.0-rc1` **Paper-only** release-candidate observation window" in source
+    assert "[v4.1 Stable promotion plan](operations/V41_STABLE_PROMOTION_PLAN.md)" in source
+    assert "[v4.1 release observation log](operations/V41_RELEASE_OBSERVATION_LOG.md)" in source
+    assert "historical or design context" in source
+    assert "No order may be submitted, replaced, or cancelled merely to satisfy the observation quota." in source
