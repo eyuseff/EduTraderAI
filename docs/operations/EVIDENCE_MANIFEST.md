@@ -261,6 +261,26 @@ identifiers, broker payloads, or live-order data.
 |---|---|---:|---|---|
 | Redacted operator acceptance and Stable release authorization record | `build/validation/stable-release-authorization-20260728T205723Z.json` | 3153 | 2026-07-28T20:57:59.410701Z | `bf49882b78054b1ded966fbe0eccb338d307d33f42daef936146495aa905c21e` |
 
+## EduTraderAI v4.1 Connected Alpaca Paper qualification
+
+The connected qualification used the Alpaca Paper environment only. The
+separately authorized lifecycle submitted exactly one AAPL BUY/LIMIT/DAY order
+at `314.22`, below the fresh observed best ask of `317.40`. The broker
+acknowledged the order, its status was observed, the single targeted order was
+cancelled, and cleanup confirmed zero fill, no AAPL position, and no open
+orders. No Live endpoint, bulk cancellation, credential material, account
+identifier, or broker order identifier is present in the retained artifact.
+
+The offline validator classified the artifact as **PASS** and produced canonical
+evidence fingerprint
+`e73ee3e647482d015de0d2689d714b8341ea2d8dbaa0681bf46b71b8498f0d68`.
+As with the earlier operational evidence, the immutable JSON remains in the
+operator's ignored local evidence location and is not committed to Git.
+
+| Evidence role | Path | Bytes | Modified UTC | File SHA-256 |
+|---|---|---:|---|---|
+| Redacted one-share Connected Alpaca Paper qualification lifecycle | `build/validation/connected-paper-qualification-20260820T164655Z.json` | 510 | 2026-08-20T17:00:48Z | `13ae5c96522976700d87dfdb76d2d6dc4e02dc4a52e45f2c3bb4391862dc55be` |
+
 ## Supporting preflight and rehearsal evidence
 
 These ignored local artifacts are retained because the validation log cites the
