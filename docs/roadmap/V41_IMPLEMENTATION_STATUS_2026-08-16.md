@@ -8,6 +8,7 @@ This snapshot reconciles the original backlog with repository evidence now merge
 
 - **IMPLEMENTED** — repository implementation and offline CI evidence are present, or an architecture/governance decision required by the backlog has been explicitly accepted.
 - **IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED** — the repository-side control exists, but connected Paper evidence is still required.
+- **QUALIFIED** — the repository control and its required redacted Connected Paper evidence are present and validated.
 - **PROPOSED / DECISION REQUIRED** — design work exists, but a consequential architecture or governance choice remains open.
 
 ## Paper qualification — P0
@@ -15,12 +16,12 @@ This snapshot reconciles the original backlog with repository evidence now merge
 | Item | Status | Current evidence / remaining boundary |
 |---|---|---|
 | V41-PQ-001 State machine | IMPLEMENTED | Qualification state-machine and scenario coverage are present. |
-| V41-PQ-002 Paper-only endpoint/broker guard | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | Fail-closed Paper boundaries exist; selected real Paper endpoint/configuration has not been exercised by this audit. |
-| V41-PQ-003 Deterministic one-share quantity | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | PR #50 enforces exactly one share at qualification translation; eventual connected request still needs redacted evidence. |
-| V41-PQ-004 Safe non-marketable limit | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | PR #51 builds/validates a safe limit below an explicitly supplied best ask; connected fresh reference-price evidence remains external. |
-| V41-PQ-005 Ack/status/cancel lifecycle | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | Deterministic fake-broker lifecycle exists; real Paper lifecycle evidence remains required. |
-| V41-PQ-006 Duplicate-execution prevention | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | Offline replay/idempotency/concurrency controls exist; connected broker evidence may still be required for qualification sign-off. |
-| V41-PQ-007 Redacted immutable evidence | IMPLEMENTED / EXTERNAL EVIDENCE REQUIRED | Canonical evidence/redaction/digest infrastructure exists; final connected qualification artifact and manifest row remain external. |
+| V41-PQ-002 Paper-only endpoint/broker guard | QUALIFIED | The 2026-08-20 qualification verified Alpaca Paper configuration and never enabled Live trading. |
+| V41-PQ-003 Deterministic one-share quantity | QUALIFIED | The connected qualification submitted exactly one share. |
+| V41-PQ-004 Safe non-marketable limit | QUALIFIED | The connected limit was `314.22`, below the fresh observed best ask of `317.40`. |
+| V41-PQ-005 Ack/status/cancel lifecycle | QUALIFIED | The Paper order was acknowledged, observed, individually cancelled, and reconciled to zero fill, no position, and no open orders. |
+| V41-PQ-006 Duplicate-execution prevention | QUALIFIED | The controlled qualification made one submission attempt and used only its targeted cancellation path. |
+| V41-PQ-007 Redacted immutable evidence | QUALIFIED | The redacted local artifact passes the offline validator and is recorded with its immutable file digest in `EVIDENCE_MANIFEST.md`. |
 
 The authoritative detailed audit is `V41_PAPER_QUALIFICATION_IMPLEMENTATION_AUDIT_2026-08-16.md`.
 
@@ -65,9 +66,12 @@ The authoritative detailed audit is `V41_PAPER_QUALIFICATION_IMPLEMENTATION_AUDI
 
 ## Remaining non-automatic boundary
 
-The repository-side v4.1 backlog and governance choices are otherwise reconciled. The remaining gate tracked by issue #69 is:
+The Connected Alpaca Paper qualification gate tracked by issue #69 completed on
+2026-08-20. Its redacted immutable local artifact and digest are recorded in
+`docs/operations/EVIDENCE_MANIFEST.md`.
 
-1. **Connected Paper qualification evidence** — verified Paper endpoint/configuration, approved secret path, fresh reference price, explicit consequential-action confirmation, controlled one-share submit/ack/status/cancel/cleanup lifecycle, and final redacted immutable evidence with its manifest row.
+Any release tag, release artifact publication, or deployment remains a separate
+human authorization boundary.
 
 ADR-012 coordination architecture was accepted for the current supported topology by PR #74. External event transport selection was explicitly deferred by PR #74 and is not required for v4.1 release qualification.
 
