@@ -306,10 +306,13 @@ def test_competing_sqlite_intakes_have_one_deterministic_non_mutating_loser(
     initialized.close()
 
     def intake_once():
-        connection = open_sqlite_execution_connection(database_path)
+        connection = open_sqlite_execution_connection(
+            database_path,
+            busy_timeout_ms=5_000,
+        )
         try:
             return TransactionalExecutionIntakeService(
-                SqliteExecutionPersistence(connection)
+                SqliteExecutionPersistence(connection, busy_timeout_ms=5_000)
             ).intake(_request())
         finally:
             connection.close()
