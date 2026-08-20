@@ -36,10 +36,14 @@ def test_stable_promotion_does_not_incentivize_extra_orders() -> None:
 def test_stable_readiness_monitor_remains_repository_only() -> None:
     source = _plan()
 
-    assert "daily readiness monitor may perform only repository and GitHub read-only checks" in source
     assert (
-        "The monitor must not use broker credentials, contact a broker, access protected "
-        "runtime data, mutate repository files, create tags/releases, or deploy."
+        "daily readiness monitor may perform only repository and GitHub read-only "
+        "checks"
+    ) in source
+    assert (
+        "The monitor must not use broker credentials, contact a broker, access "
+        "protected runtime data, mutate repository files, create tags/releases, "
+        "or deploy."
     ) in source
 
 
@@ -53,8 +57,11 @@ def test_stable_promotion_requires_exact_head_and_human_acceptance() -> None:
         "proposed Stable commit"
     ) in source
     assert "a final v4.1 GO/NO-GO review is recorded" in source
-    assert "the operator explicitly accepts the final review and Paper-only restrictions" in source
     assert (
-        "Stable tag and GitHub Release creation remain separate consequential publication "
-        "actions."
+        "the operator explicitly accepts the final review and Paper-only restrictions"
+        in source
+    )
+    assert (
+        "Stable tag and GitHub Release creation remain separate consequential "
+        "publication actions."
     ) in source
