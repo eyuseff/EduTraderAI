@@ -22,8 +22,10 @@ Passing the Stable-promotion gate does **not** authorize Live trading, deploymen
 - [Stable promotion plan](docs/operations/V41_STABLE_PROMOTION_PLAN.md)
 - [Release readiness assessment](docs/operations/RELEASE_READINESS_ASSESSMENT_V4.md)
 - [Evidence manifest](docs/operations/EVIDENCE_MANIFEST.md)
-- [Release observation log](docs/operations/RELEASE_OBSERVATION_LOG.md)
+- [v4.1 release observation log](docs/operations/V41_RELEASE_OBSERVATION_LOG.md)
 - [RC runbook](docs/operations/RC_RUNBOOK.md)
+
+The historical [v4.0 observation log](docs/operations/RELEASE_OBSERVATION_LOG.md) is retained for release-history evidence and does not count toward the v4.1 Stable gate.
 
 ## Required repository gates
 
