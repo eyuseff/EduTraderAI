@@ -11,10 +11,86 @@ Before any connected Paper session, confirm all of the following outside this re
 - the broker session is explicitly Paper/sandbox, not Live;
 - the credential path is approved and secrets are not copied into repository files, logs, issues, PRs, or evidence artifacts;
 - the market reference is fresh enough for the operator's qualification procedure;
-- the intended order is exactly one share, BUY, LIMIT, DAY, with the limit strictly below the observed best ask;
-- the consequential broker action is separately authorized at execution time.
+- both best bid and best ask are positive, fresh, and form an unlocked,
+  uncrossed spread;
+- the intended order is exactly one share, BUY, LIMIT, DAY;
+- the limit is below the observed best bid and preserves the greater of 100
+  basis points or USD 1.00 below the observed best ask;
+- one explicit execution-time authorization covers exactly one submission and
+  the immediate targeted cancellation of only the acknowledged broker order;
+- position closeout is not implied by submission/cancellation authorization and
+  requires a separate explicit authorization if any fill occurs.
 
 If any precondition is uncertain, stop. The offline tooling in this repository must not compensate for missing broker or credential evidence.
+
+The price buffer reduces fill probability but cannot guarantee a non-fill.
+Quote movement, venue latency, and broker processing can fill any accepted
+limit order. The operator must be prepared to stop and request separate
+position-cleanup authority if a partial or full fill is observed.
+
+## Offline buffered preflight
+
+Use a fresh, timezone-aware quote observation and run the preflight as a module:
+
+```bash
+python -m scripts.paper_qualification_preflight \
+  --symbol AAPL \
+  --reference-best-bid 100.48 \
+  --reference-best-ask 100.50
+```
+
+The v2 preflight fails closed for invalid or locked/crossed spreads and reports:
+
+- exactly one share, BUY, LIMIT, DAY;
+- a tick-aligned limit below the reference best bid;
+- the configured absolute and proportional ask buffers;
+- the effective buffer and explicit buffer-satisfaction flags; and
+- false effect flags for broker, credential, network, persistence, and runtime
+  access.
+
+The default effective buffer is
+`max(USD 1.00, reference_best_ask * 100 / 10000)`. An operator may configure a
+larger reviewed buffer but must not weaken either default for Connected Paper
+qualification.
+
+## Controlled execution sequence
+
+After the buffered preflight passes, use one effect-capable operator process
+with one durable client-order identity. Do not route effects through the
+qualification or certification packages; those packages remain brokerless.
+
+1. Revalidate Paper endpoint, active account, all account blocks, market-open
+   status, AAPL eligibility, quote freshness, spread, tick size, and the v2
+   buffered plan immediately before dispatch.
+2. Obtain explicit authority for exactly one submission plus immediate targeted
+   cancellation of the acknowledged order. The authority does not include
+   retry, replacement, bulk cancellation, or position closeout.
+3. Durably claim the client-order identity before dispatch. If a claim already
+   exists, stop without dispatch.
+4. Submit exactly one AAPL BUY/LIMIT/DAY order for one share. Never retry a send
+   whose outcome is uncertain; reconcile only by the durable client-order
+   identity.
+5. On acknowledgment, immediately observe the targeted broker order and request
+   cancellation by its broker identifier. Never call a bulk cancellation API.
+6. If status is `NEW`, `ACCEPTED`, or another zero-fill open state, continue
+   targeted cancellation and require terminal cancellation evidence.
+7. If status is partially filled, target-cancel the remaining quantity under
+   the existing cancellation authority, record the fill, and stop for separate
+   position-cleanup authorization.
+8. If status is filled, do not issue a meaningless cancellation. Record the
+   fill and stop for separate position-cleanup authorization.
+9. If submission or cancellation outcome is ambiguous, do not retry. Reconcile
+   only by the durable client/broker identity and retain `OUTCOME_UNKNOWN` until
+   broker truth is established.
+10. Verify the targeted order is terminal, no targeted open order remains, and
+    whether any AAPL position exists. A nonzero position is not cleanup success.
+11. Only after a zero-position, terminal-order result may the redacted v1
+    connected evidence be assembled and validated offline.
+
+Passing offline tests or preflight is not Connected Paper qualification. A
+connected attempt that fills before cancellation does not satisfy the v1
+cancel-confirmation evidence contract, even if a separately authorized
+position closeout later restores a zero position.
 
 ## Evidence to collect
 
@@ -42,7 +118,7 @@ Example shape only:
     "quantity": 1,
     "order_type": "LIMIT",
     "time_in_force": "DAY",
-    "limit_price": "100.49"
+    "limit_price": "99.49"
   },
   "lifecycle": {
     "submitted": true,

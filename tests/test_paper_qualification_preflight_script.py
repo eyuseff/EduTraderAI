@@ -16,10 +16,11 @@ from scripts.paper_qualification_preflight import build_preflight_evidence, main
 def test_preflight_builds_exactly_one_non_marketable_limit_share() -> None:
     evidence = build_preflight_evidence(
         symbol=" aapl ",
+        reference_best_bid=Decimal("100.48"),
         reference_best_ask=Decimal("100.50"),
     )
 
-    assert evidence["schema_version"] == "paper-qualification-preflight-v1"
+    assert evidence["schema_version"] == "paper-qualification-preflight-v2"
     assert evidence["preflight_passed"] is True
     assert evidence["environment"] == "PAPER"
     assert evidence["order_intent"] == {
@@ -28,11 +29,15 @@ def test_preflight_builds_exactly_one_non_marketable_limit_share() -> None:
         "quantity": 1,
         "order_type": "LIMIT",
         "time_in_force": "DAY",
-        "limit_price": "100.49",
+        "limit_price": "99.49",
     }
+    assert evidence["reference_best_bid"] == "100.48"
     assert evidence["reference_best_ask"] == "100.50"
     assert evidence["tick_size"] == "0.01"
     assert evidence["non_marketable"] is True
+    assert evidence["below_best_bid"] is True
+    assert evidence["ask_buffer_satisfied"] is True
+    assert evidence["effective_ask_buffer"] == "1.005"
 
 
 @pytest.mark.parametrize(
@@ -49,6 +54,7 @@ def test_preflight_builds_exactly_one_non_marketable_limit_share() -> None:
 def test_preflight_effect_flags_are_false(flag: str) -> None:
     evidence = build_preflight_evidence(
         symbol="AAPL",
+        reference_best_bid=Decimal("100.48"),
         reference_best_ask=Decimal("100.50"),
     )
 
@@ -69,6 +75,7 @@ def test_preflight_has_no_external_effects(monkeypatch: pytest.MonkeyPatch) -> N
 
     evidence = build_preflight_evidence(
         symbol="AAPL",
+        reference_best_bid=Decimal("100.48"),
         reference_best_ask=Decimal("100.50"),
     )
 
@@ -77,7 +84,14 @@ def test_preflight_has_no_external_effects(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_cli_emits_deterministic_json(capsys: pytest.CaptureFixture[str]) -> None:
-    args = ["--symbol", "AAPL", "--reference-best-ask", "100.50"]
+    args = [
+        "--symbol",
+        "AAPL",
+        "--reference-best-bid",
+        "100.48",
+        "--reference-best-ask",
+        "100.50",
+    ]
 
     assert main(args) == 0
     first = capsys.readouterr().out
@@ -93,8 +107,22 @@ def test_cli_emits_deterministic_json(capsys: pytest.CaptureFixture[str]) -> Non
     assert payload["network_used"] is False
 
 
-def test_cli_never_emits_secret_shaped_fields(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["--symbol", "AAPL", "--reference-best-ask", "100.50"]) == 0
+def test_cli_never_emits_secret_shaped_fields(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert (
+        main(
+            [
+                "--symbol",
+                "AAPL",
+                "--reference-best-bid",
+                "100.48",
+                "--reference-best-ask",
+                "100.50",
+            ]
+        )
+        == 0
+    )
 
     rendered = capsys.readouterr().out.lower()
     assert "api_key" not in rendered

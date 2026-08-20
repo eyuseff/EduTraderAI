@@ -31,19 +31,25 @@ def _decimal(value: str) -> Decimal:
 def build_preflight_evidence(
     *,
     symbol: str,
+    reference_best_bid: Decimal,
     reference_best_ask: Decimal,
     tick_size: Decimal = Decimal("0.01"),
+    minimum_ask_buffer_bps: Decimal = Decimal("100"),
+    minimum_ask_buffer_amount: Decimal = Decimal("1.00"),
 ) -> dict[str, Any]:
     """Return deterministic, non-sensitive evidence without external effects."""
 
     plan = build_non_marketable_buy_limit_plan(
         symbol=symbol,
+        reference_best_bid=reference_best_bid,
         reference_best_ask=reference_best_ask,
         tick_size=tick_size,
+        minimum_ask_buffer_bps=minimum_ask_buffer_bps,
+        minimum_ask_buffer_amount=minimum_ask_buffer_amount,
     )
     intent = plan.order_intent
     return {
-        "schema_version": "paper-qualification-preflight-v1",
+        "schema_version": "paper-qualification-preflight-v2",
         "preflight_passed": True,
         "environment": "PAPER",
         "action_executed": False,
@@ -60,9 +66,17 @@ def build_preflight_evidence(
             "time_in_force": intent.time_in_force.value,
             "limit_price": str(intent.limit_price),
         },
+        "reference_best_bid": str(plan.reference_best_bid),
         "reference_best_ask": str(plan.reference_best_ask),
         "tick_size": str(plan.tick_size),
+        "minimum_ask_buffer_bps": str(plan.minimum_ask_buffer_bps),
+        "minimum_ask_buffer_amount": str(plan.minimum_ask_buffer_amount),
+        "effective_ask_buffer": str(plan.effective_ask_buffer),
+        "below_best_bid": intent.limit_price < plan.reference_best_bid,
         "non_marketable": intent.limit_price < plan.reference_best_ask,
+        "ask_buffer_satisfied": (
+            plan.reference_best_ask - intent.limit_price >= plan.effective_ask_buffer
+        ),
         "rationale": plan.rationale,
     }
 
@@ -72,14 +86,24 @@ def main(argv: list[str] | None = None) -> int:
         description="Build offline evidence for the v4.1 Paper qualification preflight."
     )
     parser.add_argument("--symbol", required=True)
+    parser.add_argument("--reference-best-bid", required=True, type=_decimal)
     parser.add_argument("--reference-best-ask", required=True, type=_decimal)
     parser.add_argument("--tick-size", default=Decimal("0.01"), type=_decimal)
+    parser.add_argument(
+        "--minimum-ask-buffer-bps", default=Decimal("100"), type=_decimal
+    )
+    parser.add_argument(
+        "--minimum-ask-buffer-amount", default=Decimal("1.00"), type=_decimal
+    )
     args = parser.parse_args(argv)
 
     evidence = build_preflight_evidence(
         symbol=args.symbol,
+        reference_best_bid=args.reference_best_bid,
         reference_best_ask=args.reference_best_ask,
         tick_size=args.tick_size,
+        minimum_ask_buffer_bps=args.minimum_ask_buffer_bps,
+        minimum_ask_buffer_amount=args.minimum_ask_buffer_amount,
     )
     print(json.dumps(evidence, sort_keys=True, separators=(",", ":")))
     return 0
