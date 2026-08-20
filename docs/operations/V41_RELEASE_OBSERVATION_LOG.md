@@ -34,6 +34,27 @@ A session may be counted only when its evidence records all fields required by `
 
 Credentials, account identifiers, broker order identifiers, raw broker payloads, and unredacted logs must never be committed or published. A session does not require an order, and no order may be submitted, replaced, or cancelled merely to satisfy the observation quota.
 
+## Required session record shape
+
+Every numbered session section appended to this log must contain the following redacted fields. This table is a recording contract only; it is not session evidence and does not itself create session credit.
+
+| Required field | Recording rule |
+|---|---|
+| Session start UTC | Record a timezone-aware UTC start timestamp. |
+| Session end UTC | Record a timezone-aware UTC end timestamp. |
+| Observed commit | Record the exact RC/main commit actually observed. |
+| Environment | Confirm Paper-only operation; do not record Live credentials or identifiers. |
+| Account-active status | Record only the fully redacted active/inactive result; never an account identifier. |
+| Blocking-flag status | Record only fully redacted blocking-flag results. |
+| AAPL eligibility | Record the eligibility result observed for AAPL. |
+| Quote freshness | Record the freshness result without raw broker payloads. |
+| Application observations | Summarize the application observations actually performed. |
+| Broker observations | Summarize broker observations actually performed; this template does not require or authorize an order. |
+| Incident summary | Record `None` or a sanitized incident summary/reference. |
+| Cleanup status | Record final cleanup status, including whether any order or position remains unresolved, without broker identifiers. |
+
+A session is not countable if any required field is absent or if the proposed public record contains credentials, account identifiers, broker order identifiers, raw broker payloads, or unredacted logs. Do not increment the session count until a completed, redacted numbered session section is appended and reviewed against this contract.
+
 ## Recorded sessions
 
 No qualifying post-RC Paper-market sessions are recorded yet.
