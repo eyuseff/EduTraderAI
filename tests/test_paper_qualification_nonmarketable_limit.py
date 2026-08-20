@@ -16,9 +16,12 @@ from volcanoes.application.qualification.integration.order_safety import (
 )
 
 
-def test_builder_creates_one_share_day_limit_below_reference_best_ask() -> None:
+def test_builder_creates_one_share_day_limit_below_bid_with_material_ask_buffer() -> (
+    None
+):
     plan = build_non_marketable_buy_limit_plan(
         symbol=" aapl ",
+        reference_best_bid=Decimal("100.48"),
         reference_best_ask=Decimal("100.50"),
     )
 
@@ -26,25 +29,29 @@ def test_builder_creates_one_share_day_limit_below_reference_best_ask() -> None:
     assert plan.order_intent.quantity == 1
     assert plan.order_intent.order_type is IntegrationOrderType.LIMIT
     assert plan.order_intent.time_in_force is IntegrationTimeInForce.DAY
-    assert plan.order_intent.limit_price == Decimal("100.49")
+    assert plan.order_intent.limit_price == Decimal("99.49")
+    assert plan.order_intent.limit_price < plan.reference_best_bid
     assert plan.order_intent.limit_price < plan.reference_best_ask
-    assert "one tick below" in plan.rationale.lower()
+    assert plan.reference_best_ask - plan.order_intent.limit_price >= Decimal("1.005")
+    assert "reduces but cannot eliminate fill risk" in plan.rationale.lower()
 
 
 def test_builder_is_deterministic_for_off_tick_reference() -> None:
     first = build_non_marketable_buy_limit_plan(
         symbol="AAPL",
+        reference_best_bid=Decimal("100.495"),
         reference_best_ask=Decimal("100.505"),
         tick_size=Decimal("0.01"),
     )
     second = build_non_marketable_buy_limit_plan(
         symbol="AAPL",
+        reference_best_bid=Decimal("100.495"),
         reference_best_ask=Decimal("100.505"),
         tick_size=Decimal("0.01"),
     )
 
     assert first == second
-    assert first.order_intent.limit_price == Decimal("100.49")
+    assert first.order_intent.limit_price == Decimal("99.49")
 
 
 @pytest.mark.parametrize(
@@ -55,6 +62,7 @@ def test_invalid_reference_price_fails_closed(reference_best_ask: Decimal) -> No
     with pytest.raises(RuntimeRequestValidationError) as error_info:
         build_non_marketable_buy_limit_plan(
             symbol="AAPL",
+            reference_best_bid=Decimal("0.01"),
             reference_best_ask=reference_best_ask,
         )
 
@@ -65,6 +73,7 @@ def test_binary_float_reference_is_rejected() -> None:
     with pytest.raises(RuntimeRequestValidationError):
         build_non_marketable_buy_limit_plan(
             symbol="AAPL",
+            reference_best_bid=Decimal("100.49"),
             reference_best_ask=100.50,  # type: ignore[arg-type]
         )
 
@@ -73,11 +82,74 @@ def test_price_too_small_for_one_tick_fails_closed() -> None:
     with pytest.raises(RuntimeRequestValidationError) as error_info:
         build_non_marketable_buy_limit_plan(
             symbol="AAPL",
+            reference_best_bid=Decimal("0.005"),
             reference_best_ask=Decimal("0.01"),
             tick_size=Decimal("0.01"),
         )
 
-    assert error_info.value.reason_code == "NO_SAFE_NON_MARKETABLE_LIMIT"
+    assert error_info.value.reason_code == "NO_SAFE_BUFFERED_LIMIT"
+
+
+@pytest.mark.parametrize(
+    ("bid", "ask"),
+    (
+        (Decimal("100.50"), Decimal("100.50")),
+        (Decimal("100.51"), Decimal("100.50")),
+    ),
+)
+def test_locked_or_crossed_market_fails_closed(bid: Decimal, ask: Decimal) -> None:
+    with pytest.raises(RuntimeRequestValidationError) as error_info:
+        build_non_marketable_buy_limit_plan(
+            symbol="AAPL", reference_best_bid=bid, reference_best_ask=ask
+        )
+
+    assert error_info.value.reason_code == "INVALID_QUALIFICATION_SPREAD"
+
+
+def test_absolute_buffer_controls_lower_priced_instrument() -> None:
+    plan = build_non_marketable_buy_limit_plan(
+        symbol="AAPL",
+        reference_best_bid=Decimal("20.00"),
+        reference_best_ask=Decimal("20.01"),
+    )
+
+    assert plan.effective_ask_buffer == Decimal("1.00")
+    assert plan.order_intent.limit_price == Decimal("19.01")
+
+
+def test_proportional_buffer_controls_higher_priced_instrument() -> None:
+    plan = build_non_marketable_buy_limit_plan(
+        symbol="AAPL",
+        reference_best_bid=Decimal("316.74"),
+        reference_best_ask=Decimal("316.75"),
+    )
+
+    assert plan.effective_ask_buffer == Decimal("3.1675")
+    assert plan.order_intent.limit_price == Decimal("313.58")
+    assert plan.order_intent.limit_price < plan.reference_best_bid
+
+
+@pytest.mark.parametrize(
+    ("buffer_bps", "buffer_amount"),
+    (
+        (Decimal("99.99"), Decimal("1.00")),
+        (Decimal("100"), Decimal("0.99")),
+        (Decimal("0.01"), Decimal("0.01")),
+    ),
+)
+def test_connected_buffer_defaults_cannot_be_weakened(
+    buffer_bps: Decimal, buffer_amount: Decimal
+) -> None:
+    with pytest.raises(RuntimeRequestValidationError) as error_info:
+        build_non_marketable_buy_limit_plan(
+            symbol="AAPL",
+            reference_best_bid=Decimal("316.74"),
+            reference_best_ask=Decimal("316.75"),
+            minimum_ask_buffer_bps=buffer_bps,
+            minimum_ask_buffer_amount=buffer_amount,
+        )
+
+    assert error_info.value.reason_code == "QUALIFICATION_BUFFER_WEAKENING_BLOCKED"
 
 
 @pytest.mark.parametrize("limit_price", (Decimal("100.50"), Decimal("100.51")))

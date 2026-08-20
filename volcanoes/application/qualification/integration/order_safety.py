@@ -14,14 +14,21 @@ from volcanoes.application.qualification.integration.errors import (
     RuntimeRequestValidationError,
 )
 
+MINIMUM_CONNECTED_ASK_BUFFER_BPS = Decimal("100")
+MINIMUM_CONNECTED_ASK_BUFFER_AMOUNT = Decimal("1.00")
+
 
 @dataclass(frozen=True, slots=True)
 class NonMarketableBuyLimitPlan:
-    """Offline evidence for a one-share BUY limit below a supplied best ask."""
+    """Offline evidence for a buffered BUY limit below the supplied NBBO."""
 
     order_intent: SafeOrderIntent
+    reference_best_bid: Decimal
     reference_best_ask: Decimal
     tick_size: Decimal
+    minimum_ask_buffer_bps: Decimal
+    minimum_ask_buffer_amount: Decimal
+    effective_ask_buffer: Decimal
     rationale: str
 
     def __post_init__(self) -> None:
@@ -40,6 +47,19 @@ class NonMarketableBuyLimitPlan:
             raise RuntimeRequestValidationError(
                 reason_code="QUALIFICATION_MARKETABLE_LIMIT_BLOCKED",
                 safe_message="Qualification BUY limit must remain below the reference best ask.",
+            )
+        if self.order_intent.limit_price >= self.reference_best_bid:
+            raise RuntimeRequestValidationError(
+                reason_code="QUALIFICATION_BID_CROSSING_LIMIT_BLOCKED",
+                safe_message="Qualification BUY limit must remain below the reference best bid.",
+            )
+        if (
+            self.reference_best_ask - self.order_intent.limit_price
+            < self.effective_ask_buffer
+        ):
+            raise RuntimeRequestValidationError(
+                reason_code="QUALIFICATION_ASK_BUFFER_REQUIRED",
+                safe_message="Qualification BUY limit must preserve the configured ask buffer.",
             )
 
 
@@ -66,19 +86,51 @@ def require_one_share_order_intent(
 def build_non_marketable_buy_limit_plan(
     *,
     symbol: str,
+    reference_best_bid: Decimal,
     reference_best_ask: Decimal,
     tick_size: Decimal = Decimal("0.01"),
+    minimum_ask_buffer_bps: Decimal = MINIMUM_CONNECTED_ASK_BUFFER_BPS,
+    minimum_ask_buffer_amount: Decimal = MINIMUM_CONNECTED_ASK_BUFFER_AMOUNT,
 ) -> NonMarketableBuyLimitPlan:
-    """Build a deterministic one-share BUY limit strictly below a supplied best ask."""
+    """Build a deterministic BUY limit below bid with a material ask buffer."""
 
+    bid = _require_positive_decimal(reference_best_bid, "reference_best_bid")
     ask = _require_positive_decimal(reference_best_ask, "reference_best_ask")
     tick = _require_positive_decimal(tick_size, "tick_size")
-    aligned_at_or_below_ask = (ask / tick).to_integral_value(rounding=ROUND_FLOOR) * tick
-    limit_price = aligned_at_or_below_ask - tick
-    if limit_price <= 0 or limit_price >= ask:
+    buffer_bps = _require_positive_decimal(
+        minimum_ask_buffer_bps, "minimum_ask_buffer_bps"
+    )
+    buffer_amount = _require_positive_decimal(
+        minimum_ask_buffer_amount, "minimum_ask_buffer_amount"
+    )
+    if (
+        buffer_bps < MINIMUM_CONNECTED_ASK_BUFFER_BPS
+        or buffer_amount < MINIMUM_CONNECTED_ASK_BUFFER_AMOUNT
+    ):
         raise RuntimeRequestValidationError(
-            reason_code="NO_SAFE_NON_MARKETABLE_LIMIT",
-            safe_message="No positive non-marketable qualification limit can be constructed.",
+            reason_code="QUALIFICATION_BUFFER_WEAKENING_BLOCKED",
+            safe_message="Connected Paper qualification buffers cannot be weakened.",
+        )
+    if bid >= ask:
+        raise RuntimeRequestValidationError(
+            reason_code="INVALID_QUALIFICATION_SPREAD",
+            safe_message="Qualification requires a positive, unlocked bid-ask spread.",
+        )
+    proportional_buffer = ask * buffer_bps / Decimal("10000")
+    effective_buffer = max(buffer_amount, proportional_buffer)
+    raw_limit_ceiling = min(bid - tick, ask - effective_buffer)
+    limit_price = (raw_limit_ceiling / tick).to_integral_value(
+        rounding=ROUND_FLOOR
+    ) * tick
+    if (
+        limit_price <= 0
+        or limit_price >= bid
+        or limit_price >= ask
+        or ask - limit_price < effective_buffer
+    ):
+        raise RuntimeRequestValidationError(
+            reason_code="NO_SAFE_BUFFERED_LIMIT",
+            safe_message="No positive buffered qualification limit can be constructed.",
         )
     intent = SafeOrderIntent(
         symbol=symbol,
@@ -89,11 +141,17 @@ def build_non_marketable_buy_limit_plan(
     )
     return NonMarketableBuyLimitPlan(
         order_intent=intent,
+        reference_best_bid=bid,
         reference_best_ask=ask,
         tick_size=tick,
+        minimum_ask_buffer_bps=buffer_bps,
+        minimum_ask_buffer_amount=buffer_amount,
+        effective_ask_buffer=effective_buffer,
         rationale=(
-            "One-share Paper qualification BUY limit is one tick below the "
-            "best tick-aligned price at or below the supplied best ask."
+            "One-share Paper qualification BUY limit is below the reference best bid "
+            "and preserves the greater of the configured absolute or proportional "
+            "distance below the reference best ask. This reduces but cannot eliminate "
+            "fill risk."
         ),
     )
 
