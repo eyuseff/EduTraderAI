@@ -8,6 +8,11 @@ import json
 from pathlib import Path
 from typing import Mapping
 
+try:
+    from scripts.release_identity import RELEASE_CANDIDATE
+except ModuleNotFoundError:  # Direct `python scripts/...` execution.
+    from release_identity import RELEASE_CANDIDATE
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 _REQUIRED_VERIFICATION_FIELDS = {
@@ -27,6 +32,7 @@ class ReleaseVerificationSummary:
     """Secret-free verification readout that never makes a release decision."""
 
     verification_status: str
+    release_candidate: str
     review_status: str
     command: str
     test_count: int
@@ -39,6 +45,7 @@ class ReleaseVerificationSummary:
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "release_candidate": self.release_candidate,
             "verification_status": self.verification_status,
             "review_status": self.review_status,
             "command": self.command,
@@ -60,6 +67,7 @@ class ReleaseVerificationSummary:
         source = self.source_commit_sha or "not supplied"
         return (
             "# EduTraderAI Release Verification Summary\n\n"
+            f"- Release candidate: **{self.release_candidate}**\n"
             f"- Verification status: **{self.verification_status}**\n"
             f"- Review status: **{self.review_status}**\n"
             f"- Verification command: `{self.command}`\n"
@@ -122,6 +130,7 @@ def build_release_summary(
     normalized_sha = _normalize_optional_sha(source_commit_sha)
     return ReleaseVerificationSummary(
         verification_status=status,
+        release_candidate=RELEASE_CANDIDATE,
         review_status="HUMAN_REVIEW_REQUIRED",
         command=command,
         test_count=test_count,

@@ -1,4 +1,4 @@
-"""Measure reproducible v4.0 deterministic runtime latency baselines."""
+"""Measure reproducible v4.1 deterministic runtime latency baselines."""
 
 # ruff: noqa: E402
 
@@ -46,6 +46,7 @@ from volcanoes.application.supervisor import (
 from volcanoes.domain import TradeIntent, TradeSide
 from volcanoes.events import NullEventPublisher
 from volcanoes.execution import ExecutionPipeline
+from scripts.release_identity import BENCHMARK_RELEASE
 
 
 class NoOpAuditLog(AuditLog):
@@ -295,7 +296,7 @@ def benchmark(iterations: int, warmup: int) -> dict[str, object]:
         supervised_brain.scan_market = original_scan_market
 
     return {
-        "release": "4.0.0-rc1",
+        "release": BENCHMARK_RELEASE,
         "units": "microseconds",
         "fixture": "100k equity, AAPL 100/97.5/105, zero-delay paper broker",
         "environment": {

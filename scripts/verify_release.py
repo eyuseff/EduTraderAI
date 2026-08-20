@@ -1,4 +1,4 @@
-"""Run the complete EduTraderAI v4.0 release-candidate verification gate."""
+"""Run the complete EduTraderAI v4.1 release-candidate verification gate."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 
 from generate_release_summary import write_release_summary
 from package_release_evidence import build_evidence_pack
+from release_identity import RELEASE_CANDIDATE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,6 +37,7 @@ SUPPORTED_PYTHON_TARGETS = (
     "scripts/benchmark_release.py",
     "scripts/generate_release_summary.py",
     "scripts/package_release_evidence.py",
+    "scripts/release_identity.py",
     "scripts/verify_release.py",
 )
 
@@ -108,6 +110,24 @@ def collect_test_count() -> int:
         text=True,
     )
     return sum("::" in line for line in result.stdout.splitlines())
+
+
+def source_commit_sha() -> str:
+    """Resolve the exact commit being verified without mutating repository state."""
+
+    result = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    value = result.stdout.strip().lower()
+    if len(value) != 40 or any(
+        character not in "0123456789abcdef" for character in value
+    ):
+        raise ValueError("unable to resolve a full source commit SHA")
+    return value
 
 
 def write_verification_metadata(*, test_count: int, coverage: bool) -> None:
@@ -226,6 +246,7 @@ def verify(*, coverage: bool) -> None:
         PROJECT_ROOT / "build/verification.json",
         json_path=PROJECT_ROOT / "build/release_summary.json",
         markdown_path=PROJECT_ROOT / "build/release_summary.md",
+        source_commit_sha=source_commit_sha(),
     )
     print(
         "Generated build/release_summary.json and build/release_summary.md",
@@ -244,7 +265,7 @@ def verify(*, coverage: bool) -> None:
             flush=True,
         )
 
-    print("\nEduTraderAI v4.0.0-rc1 verification passed.", flush=True)
+    print(f"\nEduTraderAI {RELEASE_CANDIDATE} verification passed.", flush=True)
 
 
 def main() -> int:
