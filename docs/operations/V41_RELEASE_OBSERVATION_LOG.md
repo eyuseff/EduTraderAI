@@ -79,6 +79,8 @@ The `Incident summary` field is fail-closed and reference-only: every counted se
 
 The `Cleanup status` field is fail-closed and redacted: every counted session must record exactly `CLEAN` when no unresolved order or position remains at end-of-session cleanup, or `UNRESOLVED` when any order or position remains unresolved or cleanup cannot be completed. Any other value is non-qualifying; never record order identifiers, position identifiers, account identifiers, broker identifiers, or raw broker payloads in this field.
 
+Cross-field incident tracking is fail-closed: if a counted session records any adverse or reportable finding — `INACTIVE`, `BLOCKED`, `INELIGIBLE`, `STALE`, `UNRESOLVED`, or `ISSUE #N` in either application or broker observations — its `Incident summary` must be an `ISSUE #N` repository reference. `NONE` is non-qualifying when any such adverse or reportable finding is present.
+
 ## Recorded sessions
 
 No qualifying post-RC Paper-market sessions are recorded yet.
