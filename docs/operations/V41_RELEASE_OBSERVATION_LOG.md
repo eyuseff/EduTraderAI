@@ -43,7 +43,7 @@ Every numbered session section appended to this log must contain the following r
 | Session start UTC | Record a timezone-aware UTC start timestamp. |
 | Session end UTC | Record a timezone-aware UTC end timestamp. |
 | Observed commit | Record the exact RC/main commit actually observed. |
-| Environment | Confirm Paper-only operation; do not record Live credentials or identifiers. |
+| Environment | Record `PAPER` exactly after confirming Paper-only operation; any other value is non-qualifying. Do not record Live credentials or identifiers. |
 | Account-active status | Record only the fully redacted active/inactive result; never an account identifier. |
 | Blocking-flag status | Record only fully redacted blocking-flag results. |
 | AAPL eligibility | Record the eligibility result observed for AAPL. |
@@ -58,6 +58,8 @@ A session is not countable if any required field is absent or if the proposed pu
 Counted evidence sections must use the exact heading form `### Session N`, beginning with `### Session 1` and increasing consecutively by one. The `Post-RC Paper-market sessions` status above must equal the number of those completed numbered sections; a template, prose note, CI run, or unnumbered section cannot advance the count.
 
 Within each numbered section, every required field must be recorded as exactly one two-cell Markdown table row in the form `| Required field | Redacted value |`. The value must be non-empty and substantive. Blank values and placeholders such as `TBD`, `TODO`, `N/A`, `NA`, `UNKNOWN`, or `-` do not qualify as session evidence and must not advance the count.
+
+The `Environment` field is fail-closed: every counted session must record exactly `PAPER`. Any other value, including `LIVE`, does not qualify for session credit.
 
 ## Recorded sessions
 
