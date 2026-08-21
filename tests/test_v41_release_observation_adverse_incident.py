@@ -14,6 +14,7 @@ _TRACKED_FIELDS = (
     "Incident summary",
     "Cleanup status",
 )
+_OBSERVATION_FIELDS = ("Application observations", "Broker observations")
 _HEALTHY_VALUES = {
     "Account-active status": "ACTIVE",
     "Blocking-flag status": "CLEAR",
@@ -38,8 +39,18 @@ def _requires_incident_reference(values: dict[str, str]) -> bool:
         return True
     return any(
         _ISSUE_REFERENCE_RE.fullmatch(values[field]) is not None
-        for field in ("Application observations", "Broker observations")
+        for field in _OBSERVATION_FIELDS
     )
+
+
+def _observation_issue_references_match(values: dict[str, str]) -> bool:
+    incident_reference = values["Incident summary"]
+    observation_references = [
+        values[field]
+        for field in _OBSERVATION_FIELDS
+        if _ISSUE_REFERENCE_RE.fullmatch(values[field]) is not None
+    ]
+    return all(reference == incident_reference for reference in observation_references)
 
 
 def _section_values(section: str) -> dict[str, str]:
@@ -61,10 +72,30 @@ def test_adverse_observation_detection_is_fail_closed() -> None:
         values[field] = adverse
         assert _requires_incident_reference(values), field
 
-    for field in ("Application observations", "Broker observations"):
+    for field in _OBSERVATION_FIELDS:
         values = dict(_HEALTHY_VALUES)
         values[field] = "ISSUE #123"
         assert _requires_incident_reference(values), field
+
+
+def test_observation_issue_references_match_incident_reference() -> None:
+    values = dict(_HEALTHY_VALUES)
+    assert _observation_issue_references_match(values)
+
+    for field in _OBSERVATION_FIELDS:
+        values = dict(_HEALTHY_VALUES)
+        values[field] = "ISSUE #123"
+        values["Incident summary"] = "ISSUE #123"
+        assert _observation_issue_references_match(values), field
+
+        values["Incident summary"] = "ISSUE #456"
+        assert not _observation_issue_references_match(values), field
+
+    values = dict(_HEALTHY_VALUES)
+    values["Application observations"] = "ISSUE #123"
+    values["Broker observations"] = "ISSUE #456"
+    values["Incident summary"] = "ISSUE #123"
+    assert not _observation_issue_references_match(values)
 
 
 def test_numbered_v41_sessions_reference_incidents_for_adverse_findings() -> None:
@@ -84,3 +115,7 @@ def test_numbered_v41_sessions_reference_incidents_for_adverse_findings() -> Non
                 f"Session {match.group(1)} adverse/reportable finding must reference "
                 "a repository issue in Incident summary"
             )
+        assert _observation_issue_references_match(values), (
+            f"Session {match.group(1)} application/broker ISSUE references must match "
+            "Incident summary"
+        )
