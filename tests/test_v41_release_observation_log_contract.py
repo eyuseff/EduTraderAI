@@ -39,6 +39,18 @@ def test_v41_observation_log_release_identity_matches_promotion_plan() -> None:
         assert log_rows[key] == plan_rows[key]
 
 
+def test_v41_observation_status_matches_promotion_plan() -> None:
+    plan_rows = _table_rows(PLAN_PATH)
+    log_rows = _table_rows(LOG_PATH)
+
+    for key in (
+        "Post-RC Paper-market sessions",
+        "Incidents",
+        "Recommendation",
+    ):
+        assert log_rows[key] == plan_rows[key]
+
+
 def test_v41_observation_log_remains_fail_closed_about_session_credit() -> None:
     source = _normalized(LOG_PATH)
 
