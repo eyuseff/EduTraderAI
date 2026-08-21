@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -39,6 +40,14 @@ def _table_rows(path: Path) -> dict[str, str]:
 
 def _normalized(path: Path) -> str:
     return " ".join(path.read_text(encoding="utf-8").split())
+
+
+def _parse_utc_timestamp(value: str) -> datetime:
+    text = value.strip().strip("`")
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    assert parsed.tzinfo is not None, f"timestamp must be timezone-aware: {value!r}"
+    assert parsed.utcoffset() == timedelta(0), f"timestamp must be UTC: {value!r}"
+    return parsed
 
 
 def test_v41_observation_log_release_identity_matches_promotion_plan() -> None:
@@ -180,6 +189,32 @@ def test_each_numbered_v41_session_has_substantive_table_values() -> None:
             assert value.strip("`").upper() not in PLACEHOLDER_SESSION_VALUES, (
                 f"Session {match.group(1)} field {field!r} must not use a placeholder"
             )
+
+
+def test_each_numbered_v41_session_is_post_rc_and_time_ordered() -> None:
+    raw = LOG_PATH.read_text(encoding="utf-8")
+    rc_published = _parse_utc_timestamp(_table_rows(PLAN_PATH)["RC published UTC"])
+    matches = list(re.finditer(r"^### Session (\d+)\s*$", raw, flags=re.MULTILINE))
+
+    for index, match in enumerate(matches):
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(raw)
+        section = raw[match.end() : section_end]
+        values: dict[str, str] = {}
+
+        for line in section.splitlines():
+            if not line.startswith("|"):
+                continue
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if len(cells) != 2 or cells[0] not in {"Session start UTC", "Session end UTC"}:
+                continue
+            values[cells[0]] = cells[1]
+
+        start = _parse_utc_timestamp(values["Session start UTC"])
+        end = _parse_utc_timestamp(values["Session end UTC"])
+        assert start >= rc_published, (
+            f"Session {match.group(1)} must start at or after RC publication"
+        )
+        assert end > start, f"Session {match.group(1)} end must be later than start"
 
 
 def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
