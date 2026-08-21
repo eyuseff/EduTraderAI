@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -16,7 +16,7 @@ def _parse_utc_timestamp(value: str) -> datetime:
     return parsed
 
 
-def _market_date(value: str) -> object:
+def _market_date(value: str) -> date:
     return _parse_utc_timestamp(value).astimezone(_MARKET_TZ).date()
 
 
@@ -50,7 +50,7 @@ def test_numbered_v41_observation_sessions_do_not_overlap() -> None:
 def test_numbered_v41_observation_sessions_use_distinct_market_dates() -> None:
     raw = LOG_PATH.read_text(encoding="utf-8")
     matches = list(re.finditer(r"^### Session (\d+)\s*$", raw, flags=re.MULTILINE))
-    credited_market_dates: set[object] = set()
+    credited_market_dates: set[date] = set()
 
     for index, match in enumerate(matches):
         section_end = matches[index + 1].start() if index + 1 < len(matches) else len(raw)
@@ -74,5 +74,9 @@ def test_numbered_v41_observation_sessions_use_distinct_market_dates() -> None:
 
 
 def test_market_date_identity_uses_new_york_calendar_day() -> None:
-    assert _market_date("2026-08-21T13:30:00Z") == _market_date("2026-08-21T19:59:00Z")
-    assert _market_date("2026-08-21T13:30:00Z") != _market_date("2026-08-22T13:30:00Z")
+    assert _market_date("2026-08-21T13:30:00Z") == _market_date(
+        "2026-08-21T19:59:00Z"
+    )
+    assert _market_date("2026-08-21T13:30:00Z") != _market_date(
+        "2026-08-22T13:30:00Z"
+    )
