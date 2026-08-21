@@ -36,9 +36,11 @@ def test_performance_gate_primes_candidate_and_base_symmetrically() -> None:
     assert source.index("Prime candidate runner before recorded samples") < source.index(
         "Run candidate benchmark noise study"
     )
-    assert source.index("Check out exact pull-request base") < source.index(
-        "Prime base runner before recorded samples"
-    ) < source.index("Run base benchmark noise study")
+    assert (
+        source.index("Check out exact pull-request base")
+        < source.index("Prime base runner before recorded samples")
+        < source.index("Run base benchmark noise study")
+    )
 
 
 def test_performance_gate_keeps_prime_evidence_separate_from_recorded_samples() -> None:
