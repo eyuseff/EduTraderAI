@@ -55,6 +55,8 @@ Every numbered session section appended to this log must contain the following r
 
 A session is not countable if any required field is absent or if the proposed public record contains credentials, account identifiers, broker order identifiers, raw broker payloads, or unredacted logs. Do not increment the session count until a completed, redacted numbered session section is appended and reviewed against this contract.
 
+Counted evidence sections must use the exact heading form `### Session N`, beginning with `### Session 1` and increasing consecutively by one. The `Post-RC Paper-market sessions` status above must equal the number of those completed numbered sections; a template, prose note, CI run, or unnumbered section cannot advance the count.
+
 ## Recorded sessions
 
 No qualifying post-RC Paper-market sessions are recorded yet.

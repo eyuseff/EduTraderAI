@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -87,6 +88,30 @@ def test_v41_observation_log_defines_complete_redacted_session_record_shape() ->
         "session section is appended"
     ) in source
     assert "this template does not require or authorize an order" in source
+
+
+def test_v41_observation_count_matches_numbered_evidence_sections() -> None:
+    raw = LOG_PATH.read_text(encoding="utf-8")
+    status = _table_rows(LOG_PATH)["Post-RC Paper-market sessions"]
+    match = re.fullmatch(r"(\d+) of 5 recorded", status)
+
+    assert match is not None
+    recorded_count = int(match.group(1))
+    session_numbers = [
+        int(value)
+        for value in re.findall(r"^### Session (\d+)\s*$", raw, flags=re.MULTILINE)
+    ]
+
+    assert session_numbers == list(range(1, len(session_numbers) + 1))
+    assert recorded_count == len(session_numbers)
+    assert recorded_count <= 5
+
+    source = _normalized(LOG_PATH)
+    assert "Counted evidence sections must use the exact heading form `### Session N`" in source
+    assert (
+        "The `Post-RC Paper-market sessions` status above must equal the number of "
+        "those completed numbered sections"
+    ) in source
 
 
 def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
