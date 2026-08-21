@@ -22,6 +22,7 @@ REQUIRED_SESSION_FIELDS = (
     "Incident summary",
     "Cleanup status",
 )
+PLACEHOLDER_SESSION_VALUES = {"-", "TBD", "TODO", "N/A", "NA", "UNKNOWN"}
 
 
 def _table_rows(path: Path) -> dict[str, str]:
@@ -103,6 +104,13 @@ def test_v41_observation_log_defines_complete_redacted_session_record_shape() ->
         "session section is appended"
     ) in source
     assert "this template does not require or authorize an order" in source
+    assert (
+        "every required field must be recorded as exactly one two-cell Markdown table row"
+        in source
+    )
+    assert "Blank values and placeholders" in source
+    for placeholder in PLACEHOLDER_SESSION_VALUES:
+        assert f"`{placeholder}`" in raw
 
 
 def test_v41_observation_count_matches_numbered_evidence_sections() -> None:
@@ -140,6 +148,37 @@ def test_each_numbered_v41_session_contains_every_required_evidence_field() -> N
         for field in REQUIRED_SESSION_FIELDS:
             assert section.count(field) == 1, (
                 f"Session {match.group(1)} must contain required field {field!r} exactly once"
+            )
+
+
+def test_each_numbered_v41_session_has_substantive_table_values() -> None:
+    raw = LOG_PATH.read_text(encoding="utf-8")
+    matches = list(re.finditer(r"^### Session (\d+)\s*$", raw, flags=re.MULTILINE))
+
+    for index, match in enumerate(matches):
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(raw)
+        section = raw[match.end() : section_end]
+        values: dict[str, str] = {}
+
+        for line in section.splitlines():
+            if not line.startswith("|"):
+                continue
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if len(cells) != 2 or cells[0] not in REQUIRED_SESSION_FIELDS:
+                continue
+            assert cells[0] not in values, (
+                f"Session {match.group(1)} repeats required field {cells[0]!r}"
+            )
+            values[cells[0]] = cells[1]
+
+        assert set(values) == set(REQUIRED_SESSION_FIELDS), (
+            f"Session {match.group(1)} must record every required field as a two-cell table row"
+        )
+        for field in REQUIRED_SESSION_FIELDS:
+            value = values[field].strip()
+            assert value, f"Session {match.group(1)} field {field!r} must not be blank"
+            assert value.strip("`").upper() not in PLACEHOLDER_SESSION_VALUES, (
+                f"Session {match.group(1)} field {field!r} must not use a placeholder"
             )
 
 

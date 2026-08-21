@@ -57,6 +57,8 @@ A session is not countable if any required field is absent or if the proposed pu
 
 Counted evidence sections must use the exact heading form `### Session N`, beginning with `### Session 1` and increasing consecutively by one. The `Post-RC Paper-market sessions` status above must equal the number of those completed numbered sections; a template, prose note, CI run, or unnumbered section cannot advance the count.
 
+Within each numbered section, every required field must be recorded as exactly one two-cell Markdown table row in the form `| Required field | Redacted value |`. The value must be non-empty and substantive. Blank values and placeholders such as `TBD`, `TODO`, `N/A`, `NA`, `UNKNOWN`, or `-` do not qualify as session evidence and must not advance the count.
+
 ## Recorded sessions
 
 No qualifying post-RC Paper-market sessions are recorded yet.
