@@ -50,7 +50,7 @@ Every numbered session section appended to this log must contain the following r
 | Quote freshness | Record exactly `FRESH` or `STALE`; never record raw broker quote payloads or identifiers. |
 | Application observations | Summarize the application observations actually performed. |
 | Broker observations | Summarize broker observations actually performed; this template does not require or authorize an order. |
-| Incident summary | Record `None` or a sanitized incident summary/reference. |
+| Incident summary | Record exactly `NONE` when no incident occurred or `ISSUE #N` using a positive repository issue number; never record free-form incident details, identifiers, or raw broker payloads in this log. |
 | Cleanup status | Record exactly `CLEAN` or `UNRESOLVED`; never record raw order/position identifiers, account identifiers, broker identifiers, or broker payloads. |
 
 A session is not countable if any required field is absent or if the proposed public record contains credentials, account identifiers, broker order identifiers, raw broker payloads, or unredacted logs. Do not increment the session count until a completed, redacted numbered session section is appended and reviewed against this contract.
@@ -68,6 +68,8 @@ The `Blocking-flag status` field is fail-closed and redacted: every counted sess
 The `AAPL eligibility` field is fail-closed and redacted: every counted session must record exactly `ELIGIBLE` when AAPL is eligible for the observed Paper workflow or `INELIGIBLE` when it is not. Any other value is non-qualifying; never record raw broker eligibility responses, asset identifiers, account identifiers, or broker identifiers in this field.
 
 The `Quote freshness` field is fail-closed and redacted: every counted session must record exactly `FRESH` when the session's reviewed quote-freshness check passes or `STALE` when it does not. Any other value is non-qualifying; never record raw broker quote payloads, broker quote identifiers, account identifiers, or broker identifiers in this field.
+
+The `Incident summary` field is fail-closed and reference-only: every counted session must record exactly `NONE` when no incident occurred, or `ISSUE #N` where `N` is a positive repository issue number containing the sanitized incident record. Any other value is non-qualifying; never record free-form incident details, identifiers, or raw broker payloads in this log.
 
 The `Cleanup status` field is fail-closed and redacted: every counted session must record exactly `CLEAN` when no unresolved order or position remains at end-of-session cleanup, or `UNRESOLVED` when any order or position remains unresolved or cleanup cannot be completed. Any other value is non-qualifying; never record order identifiers, position identifiers, account identifiers, broker identifiers, or raw broker payloads in this field.
 
