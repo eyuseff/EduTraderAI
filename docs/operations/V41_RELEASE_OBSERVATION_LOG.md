@@ -45,7 +45,7 @@ Every numbered session section appended to this log must contain the following r
 | Observed commit | Record the exact RC/main commit actually observed. |
 | Environment | Record `PAPER` exactly after confirming Paper-only operation; any other value is non-qualifying. Do not record Live credentials or identifiers. |
 | Account-active status | Record exactly `ACTIVE` or `INACTIVE`; never record an account identifier. |
-| Blocking-flag status | Record only fully redacted blocking-flag results. |
+| Blocking-flag status | Record exactly `CLEAR` or `BLOCKED`; never record raw broker/account flags or identifiers. |
 | AAPL eligibility | Record the eligibility result observed for AAPL. |
 | Quote freshness | Record the freshness result without raw broker payloads. |
 | Application observations | Summarize the application observations actually performed. |
@@ -62,6 +62,8 @@ Within each numbered section, every required field must be recorded as exactly o
 The `Environment` field is fail-closed: every counted session must record exactly `PAPER`. Any other value, including `LIVE`, does not qualify for session credit.
 
 The `Account-active status` field is fail-closed and identifier-free: every counted session must record exactly `ACTIVE` or `INACTIVE`. Any other value is non-qualifying so an account number, account name, or other account identifier cannot be embedded in this field.
+
+The `Blocking-flag status` field is fail-closed and redacted: every counted session must record exactly `CLEAR` when no blocking broker/account flag is observed or `BLOCKED` when any blocking flag is observed. Any other value is non-qualifying; never record raw flag names, raw flag values, account identifiers, or broker identifiers in this field.
 
 ## Recorded sessions
 
