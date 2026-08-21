@@ -14,7 +14,7 @@ Historical v4.0 operational notes also recorded ordinary median movement up to a
 
 ## Gate method
 
-The CI gate compares the pull-request head with its exact base commit on the same GitHub runner. Both sides execute the same deterministic benchmark seven times. Each workload/metric is represented by the median center across those seven runs.
+The CI gate compares the pull-request head with its exact base commit on the same GitHub runner. Candidate and exact base execute in separate benchmark processes. Each process performs one full unmeasured priming execution before collecting seven recorded deterministic benchmark runs; this symmetric priming prevents fixed candidate-first process or CPU warm-up from being interpreted as a code regression without changing the recorded sample count or threshold policy. Each workload/metric is represented by the median center across those seven recorded runs.
 
 Blocking metrics:
 
@@ -39,8 +39,9 @@ A negative delta is an improvement and passes. A positive delta above the derive
 
 - Base and head must run on the same runner/environment in the same job.
 - Fixture, units, and workload set must match exactly.
-- Each side uses seven repeated benchmark runs.
-- The gate compares centers across repeated runs rather than a single benchmark sample.
+- Candidate and exact-base benchmark processes each perform one identical unmeasured full-fixture priming execution before recorded sampling.
+- Each side still contributes exactly seven recorded benchmark runs; the priming execution is discarded and cannot influence the reported center directly.
+- The gate compares centers across recorded repeated runs rather than a single benchmark sample.
 - The retained noise baseline is used only to derive tolerances, not as an absolute latency target.
 - Environment or schema mismatch fails closed.
 
