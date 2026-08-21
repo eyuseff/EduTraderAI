@@ -8,6 +8,22 @@ PLAN_PATH = Path("docs/operations/V41_STABLE_PROMOTION_PLAN.md")
 LOG_PATH = Path("docs/operations/V41_RELEASE_OBSERVATION_LOG.md")
 
 
+REQUIRED_SESSION_FIELDS = (
+    "Session start UTC",
+    "Session end UTC",
+    "Observed commit",
+    "Environment",
+    "Account-active status",
+    "Blocking-flag status",
+    "AAPL eligibility",
+    "Quote freshness",
+    "Application observations",
+    "Broker observations",
+    "Incident summary",
+    "Cleanup status",
+)
+
+
 def _table_rows(path: Path) -> dict[str, str]:
     rows: dict[str, str] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -74,20 +90,7 @@ def test_v41_observation_log_defines_complete_redacted_session_record_shape() ->
     raw = LOG_PATH.read_text(encoding="utf-8")
     source = _normalized(LOG_PATH)
 
-    for field in (
-        "Session start UTC",
-        "Session end UTC",
-        "Observed commit",
-        "Environment",
-        "Account-active status",
-        "Blocking-flag status",
-        "AAPL eligibility",
-        "Quote freshness",
-        "Application observations",
-        "Broker observations",
-        "Incident summary",
-        "Cleanup status",
-    ):
+    for field in REQUIRED_SESSION_FIELDS:
         assert f"| {field} |" in raw
 
     assert (
@@ -124,6 +127,20 @@ def test_v41_observation_count_matches_numbered_evidence_sections() -> None:
         "The `Post-RC Paper-market sessions` status above must equal the number of "
         "those completed numbered sections"
     ) in source
+
+
+def test_each_numbered_v41_session_contains_every_required_evidence_field() -> None:
+    raw = LOG_PATH.read_text(encoding="utf-8")
+    matches = list(re.finditer(r"^### Session (\d+)\s*$", raw, flags=re.MULTILINE))
+
+    for index, match in enumerate(matches):
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(raw)
+        section = raw[match.end() : section_end]
+
+        for field in REQUIRED_SESSION_FIELDS:
+            assert section.count(field) == 1, (
+                f"Session {match.group(1)} must contain required field {field!r} exactly once"
+            )
 
 
 def test_repository_entrypoint_distinguishes_v41_log_from_v40_history() -> None:
