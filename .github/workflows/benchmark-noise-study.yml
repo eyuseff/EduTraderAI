@@ -35,7 +35,7 @@ jobs:
 
       - name: Validate performance tooling
         run: |
-          black --check \
+          black --diff --check \
             scripts/benchmark_noise_study.py \
             scripts/evaluate_benchmark_regression.py \
             tests/test_benchmark_noise_study.py \
