@@ -49,7 +49,7 @@ Every numbered session section appended to this log must contain the following r
 | AAPL eligibility | Record exactly `ELIGIBLE` or `INELIGIBLE`; never record raw broker eligibility payloads or identifiers. |
 | Quote freshness | Record exactly `FRESH` or `STALE`; never record raw broker quote payloads or identifiers. |
 | Application observations | Record exactly `OBSERVED` when the required application observations completed without a reportable issue, or `ISSUE #N` using a positive repository issue number when a finding exists; never record free-form logs, identifiers, or payloads. |
-| Broker observations | Record exactly `OBSERVED` when the required broker observations completed without a reportable issue, or `ISSUE #N` using a positive repository issue number when a finding exists; never record free-form broker data, identifiers, or payloads. This template does not require or authorize an order. |
+| Broker observations | Record exactly `OBSERVED` when the required broker observations completed without a reportable issue, or `ISSUE #N` using a positive repository issue number when a finding exists; never record free-form broker data, identifiers, or payloads; this template does not require or authorize an order. |
 | Incident summary | Record exactly `NONE` when no incident occurred or `ISSUE #N` using a positive repository issue number; never record free-form incident details, identifiers, or raw broker payloads in this log. |
 | Cleanup status | Record exactly `CLEAN` or `UNRESOLVED`; never record raw order/position identifiers, account identifiers, broker identifiers, or broker payloads. |
 
