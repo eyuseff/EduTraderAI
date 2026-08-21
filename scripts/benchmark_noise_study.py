@@ -91,6 +91,13 @@ def run_noise_study(
 ) -> dict[str, object]:
     if repeats < 3:
         raise ValueError("repeats must be at least three")
+
+    # Prime each benchmark process once before recording samples. The performance
+    # gate runs candidate and exact base in separate processes, so symmetric
+    # priming prevents fixed candidate-first process/CPU warm-up from being
+    # mistaken for a code regression while leaving the seven recorded samples
+    # and evidence-derived thresholds unchanged.
+    runner(iterations, warmup)
     return summarize_runs([runner(iterations, warmup) for _ in range(repeats)])
 
 
