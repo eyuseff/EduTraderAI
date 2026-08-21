@@ -48,8 +48,8 @@ Every numbered session section appended to this log must contain the following r
 | Blocking-flag status | Record exactly `CLEAR` or `BLOCKED`; never record raw broker/account flags or identifiers. |
 | AAPL eligibility | Record exactly `ELIGIBLE` or `INELIGIBLE`; never record raw broker eligibility payloads or identifiers. |
 | Quote freshness | Record exactly `FRESH` or `STALE`; never record raw broker quote payloads or identifiers. |
-| Application observations | Summarize the application observations actually performed. |
-| Broker observations | Summarize broker observations actually performed; this template does not require or authorize an order. |
+| Application observations | Record exactly `OBSERVED` when the required application observations completed without a reportable issue, or `ISSUE #N` using a positive repository issue number when a finding exists; never record free-form logs, identifiers, or payloads. |
+| Broker observations | Record exactly `OBSERVED` when the required broker observations completed without a reportable issue, or `ISSUE #N` using a positive repository issue number when a finding exists; never record free-form broker data, identifiers, or payloads. This template does not require or authorize an order. |
 | Incident summary | Record exactly `NONE` when no incident occurred or `ISSUE #N` using a positive repository issue number; never record free-form incident details, identifiers, or raw broker payloads in this log. |
 | Cleanup status | Record exactly `CLEAN` or `UNRESOLVED`; never record raw order/position identifiers, account identifiers, broker identifiers, or broker payloads. |
 
@@ -68,6 +68,10 @@ The `Blocking-flag status` field is fail-closed and redacted: every counted sess
 The `AAPL eligibility` field is fail-closed and redacted: every counted session must record exactly `ELIGIBLE` when AAPL is eligible for the observed Paper workflow or `INELIGIBLE` when it is not. Any other value is non-qualifying; never record raw broker eligibility responses, asset identifiers, account identifiers, or broker identifiers in this field.
 
 The `Quote freshness` field is fail-closed and redacted: every counted session must record exactly `FRESH` when the session's reviewed quote-freshness check passes or `STALE` when it does not. Any other value is non-qualifying; never record raw broker quote payloads, broker quote identifiers, account identifiers, or broker identifiers in this field.
+
+The `Application observations` field is fail-closed and reference-only: every counted session must record exactly `OBSERVED` when the required application observations completed without a reportable issue, or `ISSUE #N` where `N` is a positive repository issue number containing the sanitized finding. Any other value is non-qualifying; never record free-form application logs, identifiers, or payloads in this log.
+
+The `Broker observations` field is fail-closed and reference-only: every counted session must record exactly `OBSERVED` when the required broker observations completed without a reportable issue, or `ISSUE #N` where `N` is a positive repository issue number containing the sanitized finding. Any other value is non-qualifying; never record free-form broker data, account identifiers, broker order identifiers, broker identifiers, or raw broker payloads in this log. Recording this field does not require or authorize an order.
 
 The `Incident summary` field is fail-closed and reference-only: every counted session must record exactly `NONE` when no incident occurred, or `ISSUE #N` where `N` is a positive repository issue number containing the sanitized incident record. Any other value is non-qualifying; never record free-form incident details, identifiers, or raw broker payloads in this log.
 
