@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 WORKFLOW_PATH = Path(".github/workflows/benchmark-noise-study.yml")
 
 
@@ -33,10 +32,9 @@ def test_performance_gate_primes_candidate_and_base_symmetrically() -> None:
         assert "|| true" not in step
         assert "continue-on-error" not in step
 
-    assert (
-        source.index("Prime candidate runner before recorded samples")
-        < source.index("Run candidate benchmark noise study")
-    )
+    assert source.index(
+        "Prime candidate runner before recorded samples"
+    ) < source.index("Run candidate benchmark noise study")
     assert (
         source.index("Check out exact pull-request base")
         < source.index("Prime base runner before recorded samples")
