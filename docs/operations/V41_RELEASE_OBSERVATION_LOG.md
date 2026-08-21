@@ -47,7 +47,7 @@ Every numbered session section appended to this log must contain the following r
 | Account-active status | Record exactly `ACTIVE` or `INACTIVE`; never record an account identifier. |
 | Blocking-flag status | Record exactly `CLEAR` or `BLOCKED`; never record raw broker/account flags or identifiers. |
 | AAPL eligibility | Record exactly `ELIGIBLE` or `INELIGIBLE`; never record raw broker eligibility payloads or identifiers. |
-| Quote freshness | Record the freshness result without raw broker payloads. |
+| Quote freshness | Record exactly `FRESH` or `STALE`; never record raw broker quote payloads or identifiers. |
 | Application observations | Summarize the application observations actually performed. |
 | Broker observations | Summarize broker observations actually performed; this template does not require or authorize an order. |
 | Incident summary | Record `None` or a sanitized incident summary/reference. |
@@ -66,6 +66,8 @@ The `Account-active status` field is fail-closed and identifier-free: every coun
 The `Blocking-flag status` field is fail-closed and redacted: every counted session must record exactly `CLEAR` when no blocking broker/account flag is observed or `BLOCKED` when any blocking flag is observed. Any other value is non-qualifying; never record raw flag names, raw flag values, account identifiers, or broker identifiers in this field.
 
 The `AAPL eligibility` field is fail-closed and redacted: every counted session must record exactly `ELIGIBLE` when AAPL is eligible for the observed Paper workflow or `INELIGIBLE` when it is not. Any other value is non-qualifying; never record raw broker eligibility responses, asset identifiers, account identifiers, or broker identifiers in this field.
+
+The `Quote freshness` field is fail-closed and redacted: every counted session must record exactly `FRESH` when the session's reviewed quote-freshness check passes or `STALE` when it does not. Any other value is non-qualifying; never record raw broker quote payloads, broker quote identifiers, account identifiers, or broker identifiers in this field.
 
 ## Recorded sessions
 
