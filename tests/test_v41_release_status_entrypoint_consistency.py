@@ -22,12 +22,13 @@ def test_root_readme_release_status_matches_authoritative_v41_records() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
     plan = _table_rows(PLAN_PATH)
     log = _table_rows(LOG_PATH)
+    tracking_issue = log["Tracking issue"].strip("`")
 
     assert f"- Release candidate: {plan['Release candidate']}" in readme
     assert f"- RC commit: {plan['RC commit']}" in readme
     assert f"- RC published: {plan['RC published UTC']}" in readme
     assert f"- Earliest Stable review: {plan['Earliest Stable review']}" in readme
-    assert f"- Stable observation gate: tracked in issue {log['Tracking issue']}" in readme
+    assert f"- Stable observation gate: tracked in issue {tracking_issue}" in readme
     assert f"- Current recommendation: {log['Recommendation']}" in readme
 
     assert log["Recommendation"] == plan["Recommendation"]
