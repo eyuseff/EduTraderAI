@@ -44,7 +44,7 @@ Every numbered session section appended to this log must contain the following r
 | Session end UTC | Record a timezone-aware UTC end timestamp. |
 | Observed commit | Record the exact RC/main commit actually observed. |
 | Environment | Record `PAPER` exactly after confirming Paper-only operation; any other value is non-qualifying. Do not record Live credentials or identifiers. |
-| Account-active status | Record only the fully redacted active/inactive result; never an account identifier. |
+| Account-active status | Record exactly `ACTIVE` or `INACTIVE`; never record an account identifier. |
 | Blocking-flag status | Record only fully redacted blocking-flag results. |
 | AAPL eligibility | Record the eligibility result observed for AAPL. |
 | Quote freshness | Record the freshness result without raw broker payloads. |
@@ -60,6 +60,8 @@ Counted evidence sections must use the exact heading form `### Session N`, begin
 Within each numbered section, every required field must be recorded as exactly one two-cell Markdown table row in the form `| Required field | Redacted value |`. The value must be non-empty and substantive. Blank values and placeholders such as `TBD`, `TODO`, `N/A`, `NA`, `UNKNOWN`, or `-` do not qualify as session evidence and must not advance the count.
 
 The `Environment` field is fail-closed: every counted session must record exactly `PAPER`. Any other value, including `LIVE`, does not qualify for session credit.
+
+The `Account-active status` field is fail-closed and identifier-free: every counted session must record exactly `ACTIVE` or `INACTIVE`. Any other value is non-qualifying so an account number, account name, or other account identifier cannot be embedded in this field.
 
 ## Recorded sessions
 
