@@ -31,7 +31,9 @@ def _head_commit_time() -> datetime:
         capture_output=True,
         text=True,
     )
-    return _parse_utc_timestamp(result.stdout.strip())
+    parsed = datetime.fromisoformat(result.stdout.strip().replace("Z", "+00:00"))
+    assert parsed.tzinfo is not None, "HEAD commit timestamp must be timezone-aware"
+    return parsed.astimezone(timezone.utc)
 
 
 def test_completed_observation_evidence_rejects_future_end_time() -> None:
