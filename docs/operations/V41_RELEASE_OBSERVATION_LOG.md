@@ -22,7 +22,7 @@ The historical `docs/operations/RELEASE_OBSERVATION_LOG.md` records the v4.0 obs
 
 | Item | Status |
 |---|---|
-| Post-RC Paper-market sessions | 4 of 5 recorded |
+| Post-RC Paper-market sessions | 5 of 5 recorded |
 | Incidents | None recorded |
 | Recommendation | **EXTEND VALIDATION** |
 
@@ -143,6 +143,23 @@ Do not infer broker-side observations from repository or CI state.
 | Session start UTC | 2026-08-24T16:23:39.551559Z |
 | Session end UTC | 2026-08-24T16:23:42.784073Z |
 | Observed commit | 5527fd5eb5dc6e6a47a9eee3606134ce1aa4a7c7 |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
+
+### Session 5
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:24:56.014957Z |
+| Session end UTC | 2026-08-24T16:24:59.016786Z |
+| Observed commit | 1da66186cb1d44bbb8573f0552dc3f0e1d06683c |
 | Environment | PAPER |
 | Account-active status | ACTIVE |
 | Blocking-flag status | CLEAR |
