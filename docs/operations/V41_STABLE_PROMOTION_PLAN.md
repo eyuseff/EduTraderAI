@@ -76,7 +76,7 @@ GitHub Release creation remain separate consequential publication actions.
 | Item | Status |
 |---|---|
 | Elapsed observation | In progress from `2026-08-20T17:20:13Z` |
-| Post-RC Paper-market sessions | 0 of 5 recorded |
+| Post-RC Paper-market sessions | 1 of 5 recorded |
 | Repository verification | PASS at RC publication |
 | Performance gate | PASS at RC publication |
 | Connected qualification | PASS; pre-RC and not session credit |

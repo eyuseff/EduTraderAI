@@ -22,7 +22,7 @@ The historical `docs/operations/RELEASE_OBSERVATION_LOG.md` records the v4.0 obs
 
 | Item | Status |
 |---|---|
-| Post-RC Paper-market sessions | 0 of 5 recorded |
+| Post-RC Paper-market sessions | 1 of 5 recorded |
 | Incidents | None recorded |
 | Recommendation | **EXTEND VALIDATION** |
 
@@ -83,6 +83,21 @@ Cross-field incident tracking is fail-closed: if a counted session records any a
 
 ## Recorded sessions
 
-No qualifying post-RC Paper-market sessions are recorded yet.
+Do not infer broker-side observations from repository or CI state.
 
-When a qualifying session is available, append a numbered section containing only redacted, reviewable evidence and update the session count above. Do not infer broker-side observations from repository or CI state.
+### Session 1
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:16:10.818390Z |
+| Session end UTC | 2026-08-24T16:16:13.661071Z |
+| Observed commit | c18dd4dafeda4cad04084dfcc4f56465bbe68391 |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
