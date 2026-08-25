@@ -22,7 +22,7 @@ The historical `docs/operations/RELEASE_OBSERVATION_LOG.md` records the v4.0 obs
 
 | Item | Status |
 |---|---|
-| Post-RC Paper-market sessions | 0 of 5 recorded |
+| Post-RC Paper-market sessions | 5 of 5 recorded |
 | Incidents | None recorded |
 | Recommendation | **EXTEND VALIDATION** |
 
@@ -83,6 +83,89 @@ Cross-field incident tracking is fail-closed: if a counted session records any a
 
 ## Recorded sessions
 
-No qualifying post-RC Paper-market sessions are recorded yet.
+Do not infer broker-side observations from repository or CI state.
 
-When a qualifying session is available, append a numbered section containing only redacted, reviewable evidence and update the session count above. Do not infer broker-side observations from repository or CI state.
+### Session 1
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:16:10.818390Z |
+| Session end UTC | 2026-08-24T16:16:13.661071Z |
+| Observed commit | c18dd4dafeda4cad04084dfcc4f56465bbe68391 |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
+
+### Session 2
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:20:03.010771Z |
+| Session end UTC | 2026-08-24T16:20:07.372598Z |
+| Observed commit | 1c2f64e6c4cf8b0f6df644b032f19124685bf7d0 |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
+
+### Session 3
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:21:36.265812Z |
+| Session end UTC | 2026-08-24T16:21:39.354602Z |
+| Observed commit | 763252c0c0b39da70607539ac7d731102f20184b |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
+
+### Session 4
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:23:39.551559Z |
+| Session end UTC | 2026-08-24T16:23:42.784073Z |
+| Observed commit | 5527fd5eb5dc6e6a47a9eee3606134ce1aa4a7c7 |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
+
+### Session 5
+
+| Required field | Redacted value |
+|---|---|
+| Session start UTC | 2026-08-24T16:24:56.014957Z |
+| Session end UTC | 2026-08-24T16:24:59.016786Z |
+| Observed commit | 1da66186cb1d44bbb8573f0552dc3f0e1d06683c |
+| Environment | PAPER |
+| Account-active status | ACTIVE |
+| Blocking-flag status | CLEAR |
+| AAPL eligibility | ELIGIBLE |
+| Quote freshness | FRESH |
+| Application observations | OBSERVED |
+| Broker observations | OBSERVED |
+| Incident summary | NONE |
+| Cleanup status | CLEAN |
