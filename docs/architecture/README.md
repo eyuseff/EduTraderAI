@@ -138,6 +138,7 @@ paper-only.
 | [ADR-0005](ADR-0005-execution-supervisor.md) | Idempotency, cooldown, duplicate execution, and symbol serialization | Accepted; process-local implementation |
 | [ADR-0006](ADR-0006-scanner-integration.md) | Scanner as signal producer and supervisor as execution gatekeeper | Accepted; implemented with legacy rollback |
 | [ADR-0007](ADR-0007-operational-validation.md) | Process-local observational metrics, dashboard, export, and stable validation | Accepted; RC validation boundary |
+| [ADR-0008](ADR-0008-global-rotation-paper-core.md) | Provider-neutral global EduTrader + Volcanes research and Paper-preview gates | Proposed; isolated first slice |
 
 Earlier ADR text records migration-time deferred work. This inventory is the
 authoritative statement of the current `v4.0.0-rc1` migration status.
