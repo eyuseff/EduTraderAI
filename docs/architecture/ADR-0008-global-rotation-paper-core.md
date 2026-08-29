@@ -102,3 +102,22 @@ The repository gains a deterministic and testable strategy core without
 widening the broker execution surface. A future data adapter can feed thousands
 of instruments into the same engine, but no quantity is produced until both the
 research thesis and account-specific eligibility are verified.
+
+## First read-only operator slice
+
+The initial operator composition adds:
+
+- a versioned 64-stock starter spanning the United States, Canada, euro-area
+  exchanges, Japan, Australia, and Hong Kong;
+- a batched Yahoo Finance research adapter capped at 500 symbols, explicitly
+  unsuitable for the final 8,000-name production universe;
+- OHLCV completeness and consistency quarantine, regional benchmark-session
+  alignment, and daily FX conversion;
+- a deterministic run id and JSON/CSV audit representation;
+- a `Global Rotation Paper` Streamlit button that has no order-submission path;
+- a CLI that refuses to run without an explicit portfolio snapshot.
+
+The starter universe deliberately records eToro eligibility and BUY x1 status
+as unverified. Therefore it can rank candidates but cannot create a non-zero
+Paper quantity until an authenticated read-only capability source updates those
+fields.
