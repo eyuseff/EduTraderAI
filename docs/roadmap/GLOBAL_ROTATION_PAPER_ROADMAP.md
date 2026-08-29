@@ -16,11 +16,11 @@ currency, or multiple-testing risk.
 | Slice | Deliverable | Status | Exit gate |
 |---|---|---|---|
 | 1. Deterministic core | Regional regimes, EduTrader + Volcanes scoring, resistance checks, adaptive targets, Paper sizing | Implemented in isolated module | Unit tests and architecture review |
-| 2. Universe and data | Stable ~8,000-name security master, exchange calendars, daily OHLCV, FX, corporate actions, delisting history | Pending | Completeness, freshness, and survivorship QA |
+| 2. Universe and data | Stable ~8,000-name security master, exchange calendars, daily OHLCV, FX, corporate actions, delisting history | In progress: versioned 64-stock starter and research reader implemented; authoritative master pending | Completeness, freshness, and survivorship QA |
 | 3. eToro Read adapter | Demo + Read authentication, public availability, account eligibility, fractional support, BUY x1 underlying verification | Blocked by authenticated read access | Zero writes; capability evidence per symbol |
 | 4. Event/fundamental overlay | Earnings windows, recent results, valuation, balance-sheet and sector checks | Pending | Source-backed blocker and freshness rules |
 | 5. Backtest and calibration | Walk-forward tests by region/regime with costs, FX, slippage and gaps | Pending | Pre-declared acceptance thresholds; no look-ahead |
-| 6. Daily operator surface | Run button, ranked funnel, changes since prior run, audit export and manual confirmation | Pending | Reproducible run and zero broker writes |
+| 6. Daily operator surface | Run button, ranked funnel, changes since prior run, audit export and manual confirmation | In progress: read-only button and JSON/CSV audit output implemented | Reproducible run and zero broker writes |
 | 7. Paper qualification | Supervisor-composed previews and tightly controlled Paper submissions | Pending | Existing Paper qualification and rollback gates |
 
 ## Daily funnel target
