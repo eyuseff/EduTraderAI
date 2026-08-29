@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
+import json
 import logging
 import os
 from pathlib import Path
@@ -22,6 +23,13 @@ from broker.app_runtime import build_local_simulated_broker
 from broker.base import PaperBroker
 from engine.brain import EduTraderBrain
 from engine.supervised_brain import SupervisedEduTraderBrain
+from global_rotation import (
+    DailyGlobalRotationService,
+    PaperPortfolioContext,
+    YFinanceDailyHistoryProvider,
+    load_universe,
+)
+from global_rotation.reporting import candidate_rows, run_payload
 from trading.execution import PaperExecutionEngine
 from trading.risk_manager import RiskLimits, RiskManager, TradeProposal
 from scanner_engine.universe import CORE_UNIVERSE, normalize_universe
@@ -123,6 +131,7 @@ with st.sidebar:
     navigation = [
         "Safety Dashboard",
         "Automated Scanner",
+        "Global Rotation Paper",
         "Paper Order",
         "Orders & Positions",
         "Legacy Dashboard",
@@ -437,6 +446,111 @@ elif page == "Automated Scanner":
                     st.write("No rejected candidates.")
         except Exception as exc:
             st.error(f"Automated scan failed safely: {exc}")
+
+elif page == "Global Rotation Paper":
+    st.title("Global Rotation Paper")
+    st.caption(
+        "Read-only international EduTrader + Volcanes Explorer + Guardian screen. "
+        "This page cannot submit an order."
+    )
+    universe_path = (
+        Path(__file__).resolve().parent
+        / "data/global_rotation_universe_starter_v1.json"
+    )
+    universe = load_universe(universe_path)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Starter universe", f"{len(universe.active_securities)} stocks")
+    c2.metric("Regions", len(universe.regions))
+    c3.metric("eToro account verification", "Pending")
+    st.info(
+        "The bundled universe is a versioned 64-stock international starter, not the "
+        "final 8,000-name security master. Its eToro eligibility is intentionally "
+        "unverified, so it cannot generate non-zero quantities."
+    )
+    qualification_phase = st.checkbox(
+        "Qualification phase: maximum two positions and USD 200 per new position",
+        value=True,
+    )
+    if st.button("Run Global Rotation Paper", type="primary"):
+        try:
+            exposure = sum(max(position.market_value, 0.0) for position in positions)
+            portfolio = PaperPortfolioContext(
+                equity_usd=Decimal(str(account.equity)),
+                buying_power_usd=Decimal(str(account.buying_power)),
+                current_exposure_usd=Decimal(str(exposure)),
+                realized_loss_today_usd=Decimal(str(max(-account.daily_pnl, 0.0))),
+                open_symbols=tuple(position.symbol for position in positions),
+                qualification_phase=qualification_phase,
+            )
+            with st.spinner(
+                f"Loading and validating {len(universe.history_symbols)} daily series..."
+            ):
+                run = DailyGlobalRotationService(YFinanceDailyHistoryProvider()).run(
+                    universe=universe, portfolio=portfolio
+                )
+            rows = candidate_rows(run)
+            prepare_count = sum(row["category"] == "preparar" for row in rows)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Histories", f"{run.histories_loaded}/{run.histories_requested}")
+            m2.metric("Scanned", run.result.scanned)
+            m3.metric("Candidates", len(rows))
+            m4.metric("Prepare", prepare_count)
+            if rows:
+                display_rows = [
+                    {
+                        "Symbol": row["symbol"],
+                        "Region": row["region"],
+                        "Edu": row["edu_score"],
+                        "Volcanes": row["volcano_score"],
+                        "Guardian": row["guardian_approved"],
+                        "Entry USD": row["entry_usd"],
+                        "RSI": row["rsi14"],
+                        "Gap %": row["gap_pct"],
+                        "Day %": row["daily_change_pct"],
+                        "Vol. rel.": row["relative_volume"],
+                        "Stop": row["stop_local"],
+                        "Target": row["target_local"],
+                        "Target %": row["target_pct"],
+                        "Quantity": row["quantity"],
+                        "Risk USD": row["planned_loss_usd"],
+                        "Category": row["category"],
+                        "First invalidation": row["first_invalidation"],
+                    }
+                    for row in rows
+                ]
+                st.dataframe(
+                    pd.DataFrame(display_rows), width="stretch", hide_index=True
+                )
+            else:
+                st.info("No security reached either scanner threshold after data QA.")
+            if run.data_issues:
+                with st.expander(f"Data-quality issues ({len(run.data_issues)})"):
+                    st.dataframe(
+                        pd.DataFrame(
+                            [
+                                {
+                                    "Symbol": item.symbol,
+                                    "Code": item.code,
+                                    "Message": item.message,
+                                }
+                                for item in run.data_issues
+                            ]
+                        ),
+                        width="stretch",
+                        hide_index=True,
+                    )
+            st.download_button(
+                "Download audit JSON",
+                data=json.dumps(run_payload(run), indent=2, ensure_ascii=False),
+                file_name=f"global-rotation-{run.run_id}.json",
+                mime="application/json",
+            )
+            st.warning(
+                "Research candidates are not recommendations. Manual confirmation and "
+                "verified eToro Demo + Read eligibility remain mandatory."
+            )
+        except Exception as exc:
+            st.error(f"Global Rotation failed safely: {exc}")
 
 elif page == "Paper Order":
     st.title("Create a Paper Trade")
