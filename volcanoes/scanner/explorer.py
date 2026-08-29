@@ -5,6 +5,7 @@ from __future__ import annotations
 from volcanoes.domain import Candidate
 from volcanoes.indicators.engine import IndicatorEngine
 from volcanoes.market.sentinel import Sentinel
+from volcanoes.scanner.momentum import score_momentum
 
 
 class Explorer:
@@ -30,23 +31,12 @@ class Explorer:
         ema20 = latest["EMA20"]
         rsi14 = latest["RSI14"]
 
-        score = 0
-        reasons: list[str] = []
-
-        if price > sma20:
-            score += 35
-            reasons.append("Price is above SMA20.")
-
-        if price > ema20:
-            score += 35
-            reasons.append("Price is above EMA20.")
-
-        if 50 <= rsi14 <= 70:
-            score += 30
-            reasons.append("RSI14 confirms positive momentum.")
-
-        if not reasons:
-            reasons.append("Momentum conditions were not confirmed.")
+        score, reasons = score_momentum(
+            price=price,
+            sma20=sma20,
+            ema20=ema20,
+            rsi14=rsi14,
+        )
 
         return Candidate(
             symbol=symbol,
