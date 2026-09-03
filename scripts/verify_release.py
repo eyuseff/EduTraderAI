@@ -19,6 +19,8 @@ SUPPORTED_PYTHON_TARGETS = (
     "app.py",
     "adapters",
     "engine/supervised_brain.py",
+    "global_rotation",
+    "market/regime.py",
     "volcanoes/application/services",
     "volcanoes/application/supervisor",
     "volcanoes/application/platform",
@@ -34,16 +36,27 @@ SUPPORTED_PYTHON_TARGETS = (
     "tests/test_platform_configuration.py",
     "tests/test_operational_metrics.py",
     "tests/test_v4_release_acceptance.py",
+    "tests/test_global_rotation_architecture.py",
+    "tests/test_global_rotation_cli.py",
+    "tests/test_global_rotation_daily.py",
+    "tests/test_global_rotation_data.py",
+    "tests/test_global_rotation_engine.py",
+    "tests/test_global_rotation_reporting.py",
+    "tests/test_global_rotation_risk.py",
+    "tests/test_global_rotation_universe.py",
     "scripts/benchmark_release.py",
     "scripts/generate_release_summary.py",
     "scripts/package_release_evidence.py",
     "scripts/release_identity.py",
+    "scripts/run_global_rotation_daily.py",
     "scripts/verify_release.py",
 )
 
 MYPY_TARGETS = (
     "adapters",
     "engine/supervised_brain.py",
+    "global_rotation",
+    "market/regime.py",
     "volcanoes/application/services",
     "volcanoes/application/supervisor",
     "volcanoes/application/platform",
@@ -53,6 +66,7 @@ MYPY_TARGETS = (
     "volcanoes/execution/trade_planner.py",
     "volcanoes/risk",
     "volcanoes/sizing",
+    "scripts/run_global_rotation_daily.py",
 )
 
 
@@ -199,6 +213,7 @@ def verify(*, coverage: bool) -> None:
                 "import adapters.paper_order_submission; "
                 "import adapters.scanner_execution; "
                 "import engine.supervised_brain; "
+                "import global_rotation; "
                 "import volcanoes.application.platform; "
                 "import volcanoes.application.operations; "
                 "import volcanoes.application.services; "

@@ -4,6 +4,7 @@ source =
     volcanoes
     adapters
     engine
+    global_rotation
 omit =
     engine/__init__.py
     engine/brain.py

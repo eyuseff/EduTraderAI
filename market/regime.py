@@ -8,17 +8,26 @@ class MarketRegime:
     label: str
     score: int
     tradeable: bool
-    reasons: list[str]
+    reasons: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "reasons", tuple(self.reasons))
 
 
-def classify_market(spy_close: float, spy_sma50: float, spy_sma200: float, volatility_pct: float) -> MarketRegime:
+def classify_market(
+    spy_close: float,
+    spy_sma50: float,
+    spy_sma200: float,
+    volatility_pct: float,
+    benchmark_symbol: str = "SPY",
+) -> MarketRegime:
     score = 0
     reasons: list[str] = []
     if spy_close > spy_sma200:
         score += 45
-        reasons.append("SPY is above its 200-day moving average.")
+        reasons.append(f"{benchmark_symbol} is above its 200-day moving average.")
     else:
-        reasons.append("SPY is below its 200-day moving average.")
+        reasons.append(f"{benchmark_symbol} is below its 200-day moving average.")
     if spy_sma50 > spy_sma200:
         score += 30
         reasons.append("The 50-day average is above the 200-day average.")
@@ -31,7 +40,7 @@ def classify_market(spy_close: float, spy_sma50: float, spy_sma200: float, volat
         reasons.append("Recent volatility is elevated.")
 
     if score >= 75:
-        return MarketRegime("Bullish", score, True, reasons)
+        return MarketRegime("Bullish", score, True, tuple(reasons))
     if score >= 45:
-        return MarketRegime("Cautious", score, False, reasons)
-    return MarketRegime("Risk-Off", score, False, reasons)
+        return MarketRegime("Cautious", score, False, tuple(reasons))
+    return MarketRegime("Risk-Off", score, False, tuple(reasons))
