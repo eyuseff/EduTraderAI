@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from typing import Mapping, Sequence
 
@@ -17,6 +18,7 @@ from global_rotation.models import (
     ScanRejection,
 )
 from global_rotation.risk import (
+    ZERO,
     PaperPortfolioContext,
     PaperRiskPolicy,
     blocked_paper_preview,
@@ -133,6 +135,21 @@ class GlobalRotationEngine:
                 item.symbol,
             )
         )
+        candidates = self._allocate_ranked_previews(
+            candidates=candidates,
+            instruments=instruments,
+            histories=histories,
+            regimes=regimes,
+            portfolio=portfolio,
+        )
+        candidates.sort(
+            key=lambda item: (
+                category_order[item.category],
+                -(item.edu_score + item.volcano_score),
+                -float(item.reward_risk_to_resistance),
+                item.symbol,
+            )
+        )
         return GlobalRotationResult(
             candidates=tuple(candidates[: self.rotation_policy.max_candidates]),
             rejected=tuple(rejected),
@@ -140,6 +157,65 @@ class GlobalRotationEngine:
             scanned=len(instruments),
             valid=valid,
         )
+
+    def _allocate_ranked_previews(
+        self,
+        *,
+        candidates: Sequence[GlobalRotationCandidate],
+        instruments: Sequence[GlobalInstrument],
+        histories: Mapping[str, pd.DataFrame],
+        regimes: Mapping[str, MarketRegime],
+        portfolio: PaperPortfolioContext,
+    ) -> list[GlobalRotationCandidate]:
+        """Reserve portfolio capacity cumulatively in deterministic rank order."""
+
+        instrument_by_symbol: dict[str, GlobalInstrument] = {}
+        for instrument in instruments:
+            instrument_by_symbol.setdefault(
+                instrument.symbol.strip().upper(), instrument
+            )
+
+        projected = portfolio
+        allocated: list[GlobalRotationCandidate] = []
+        for candidate in candidates:
+            if candidate.category != "preparar":
+                allocated.append(candidate)
+                continue
+
+            instrument = instrument_by_symbol[candidate.symbol]
+            frame = histories[instrument.symbol]
+            clean = _clean_history(frame)
+            resized = self._evaluate(
+                instrument=instrument,
+                frame=clean,
+                regime=regimes[instrument.region],
+                portfolio=projected,
+            )
+            if resized is None:
+                raise RuntimeError("Ranked candidate could not be reproduced.")
+            allocated.append(resized)
+            if resized.category != "preparar":
+                continue
+            if (
+                projected.current_exposure_usd is None
+                or projected.open_symbols is None
+                or projected.qualification_phase is None
+            ):
+                raise RuntimeError(
+                    "A Paper quantity was produced without complete portfolio truth."
+                )
+            exact_reserved_notional = resized.reserved_position_value_usd
+            projected = replace(
+                projected,
+                buying_power_usd=max(
+                    ZERO, projected.buying_power_usd - exact_reserved_notional
+                ),
+                current_exposure_usd=(
+                    projected.current_exposure_usd + exact_reserved_notional
+                ),
+                open_symbols=(*projected.open_symbols, resized.symbol),
+            )
+        return allocated
 
     def _classify_regions(
         self,
@@ -333,6 +409,7 @@ class GlobalRotationEngine:
                 Decimal("0.01")
             ),
             quantity=size.quantity,
+            reserved_position_value_usd=size.reserved_position_value_usd,
             position_value_usd=size.position_value_usd,
             planned_loss_usd=size.planned_loss_usd,
             target_profit_usd=size.target_profit_usd,

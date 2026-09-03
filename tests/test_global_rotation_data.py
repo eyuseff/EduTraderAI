@@ -54,6 +54,16 @@ def test_invalid_ohlc_is_quarantined():
     assert [item.code for item in issues] == ["INVALID_OHLC"]
 
 
+def test_non_finite_ohlcv_is_quarantined():
+    frame = _history().astype(float)
+    frame.loc[frame.index[-1], :] = float("inf")
+
+    clean, issues = validate_daily_history("INFINITE", frame)
+
+    assert clean is None
+    assert "NON_FINITE_OHLCV" in [item.code for item in issues]
+
+
 def test_yahoo_research_adapter_refuses_unreviewed_large_scale():
     provider = YFinanceDailyHistoryProvider(
         maximum_symbols=2, downloader=lambda **_: _history()
@@ -72,3 +82,17 @@ def test_yahoo_research_adapter_refuses_unreviewed_large_scale():
         assert "cannot be configured above 500" in str(exc)
     else:
         raise AssertionError("Yahoo hard safety cap should not be configurable away.")
+
+
+def test_download_errors_do_not_echo_provider_details():
+    def downloader(**_):
+        raise RuntimeError("secret-bearing-provider-detail")
+
+    batch = YFinanceDailyHistoryProvider(maximum_symbols=1, downloader=downloader).load(
+        ["AAA"]
+    )
+
+    assert batch.loaded == 0
+    assert batch.issues[0].code == "DOWNLOAD_ERROR"
+    assert batch.issues[0].message == "Download failed (RuntimeError)."
+    assert "secret-bearing-provider-detail" not in batch.issues[0].message

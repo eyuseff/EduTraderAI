@@ -63,16 +63,29 @@ def test_reporting_payload_is_auditable_and_explicitly_non_executing():
         portfolio=PaperPortfolioContext(
             equity_usd=Decimal("10000"),
             buying_power_usd=Decimal("10000"),
+            current_exposure_usd=Decimal("0"),
+            realized_loss_today_usd=Decimal("0"),
+            open_symbols=(),
+            qualification_phase=True,
         ),
     )
     run = DailyGlobalRotationRun(
         run_id="abc123",
+        operator_schema="global-rotation-daily-output-v2",
+        universe_sha256="a" * 64,
+        portfolio_sha256="b" * 64,
+        market_data_sha256="c" * 64,
+        data_quality_sha256="d" * 64,
+        result_sha256="e" * 64,
+        risk_policy_sha256="f" * 64,
+        rotation_policy_sha256="0" * 64,
         universe_id=universe.universe_id,
         universe_version=universe.version,
         universe_size=1,
         histories_requested=2,
         histories_loaded=2,
         as_of_by_region={"US": date(2026, 8, 28)},
+        fx_as_of_by_region={"US": date(2026, 8, 28)},
         result=result,
         data_issues=(DataQualityIssue("ZZZ", "NO_DATA", "Missing."),),
     )
@@ -87,3 +100,14 @@ def test_reporting_payload_is_auditable_and_explicitly_non_executing():
         "manual_confirmation_required": True,
     }
     assert payload["market_data"]["as_of_by_region"]["US"] == "2026-08-28"
+    assert payload["market_data"]["fx_as_of_by_region"]["US"] == "2026-08-28"
+    assert payload["evidence_fingerprints"] == {
+        "operator_schema": "global-rotation-daily-output-v2",
+        "universe_sha256": "a" * 64,
+        "portfolio_sha256": "b" * 64,
+        "market_data_sha256": "c" * 64,
+        "data_quality_sha256": "d" * 64,
+        "result_sha256": "e" * 64,
+        "risk_policy_sha256": "f" * 64,
+        "rotation_policy_sha256": "0" * 64,
+    }

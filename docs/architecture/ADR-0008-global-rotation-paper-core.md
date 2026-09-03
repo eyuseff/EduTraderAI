@@ -113,7 +113,8 @@ The initial operator composition adds:
   unsuitable for the final 8,000-name production universe;
 - OHLCV completeness and consistency quarantine, regional benchmark-session
   alignment, and daily FX conversion;
-- a deterministic run id and JSON/CSV audit representation;
+- a content-addressed run id bound to canonical universe, portfolio, OHLCV,
+  data-quality, and policy fingerprints, plus JSON/CSV audit representation;
 - a `Global Rotation Paper` Streamlit button that has no order-submission path;
 - a CLI that refuses to run without an explicit portfolio snapshot.
 
@@ -121,3 +122,8 @@ The starter universe deliberately records eToro eligibility and BUY x1 status
 as unverified. Therefore it can rank candidates but cannot create a non-zero
 Paper quantity until an authenticated read-only capability source updates those
 fields.
+
+The operator refuses to overwrite an existing content-addressed run directory.
+Missing exposure, realized-loss, open-position, or qualification-phase truth is
+represented explicitly and blocks every quantity. Combined daily equity P&L is
+not accepted as realized-loss truth.

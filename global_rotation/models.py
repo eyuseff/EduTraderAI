@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from types import MappingProxyType
+from typing import Mapping
 
 from market.regime import MarketRegime
 
@@ -35,7 +37,7 @@ class GlobalInstrument:
     fx_to_usd: Decimal = Decimal("1")
     etoro_eligible: bool | None = None
     fractional_enabled: bool = False
-    underlying_buy_x1: bool = True
+    underlying_buy_x1: bool = False
     is_cfd: bool = False
     is_247: bool = False
 
@@ -46,8 +48,20 @@ class GlobalInstrument:
             raise ValueError("Instrument region is required.")
         if len(self.currency.strip()) != 3:
             raise ValueError("Currency must be a three-letter code.")
+        if not isinstance(self.fx_to_usd, Decimal) or not self.fx_to_usd.is_finite():
+            raise ValueError("FX conversion rate must be a finite Decimal.")
         if self.fx_to_usd <= Decimal("0"):
             raise ValueError("FX conversion rate must be greater than zero.")
+        if self.etoro_eligible is not None and type(self.etoro_eligible) is not bool:
+            raise ValueError("eToro eligibility must be true, false, or null.")
+        for name, boolean_value in (
+            ("Fractional capability", self.fractional_enabled),
+            ("BUY x1 capability", self.underlying_buy_x1),
+            ("CFD status", self.is_cfd),
+            ("24/7 status", self.is_247),
+        ):
+            if type(boolean_value) is not bool:
+                raise ValueError(f"{name} must be true or false.")
 
 
 @dataclass(frozen=True)
@@ -67,6 +81,25 @@ class RotationPolicy:
     max_candidates: int = 10
 
     def __post_init__(self) -> None:
+        for name, integer_value in (
+            ("EduTrader minimum score", self.edu_min_score),
+            ("Volcanes minimum score", self.volcano_min_score),
+            ("Resistance lookback", self.resistance_lookback),
+            ("Candidate limit", self.max_candidates),
+        ):
+            if type(integer_value) is not int:
+                raise ValueError(f"{name} must be an integer.")
+        for name, decimal_value in (
+            ("Minimum price", self.minimum_price_usd),
+            ("Minimum average volume", self.minimum_average_volume),
+            ("Maximum daily move", self.maximum_daily_move_pct),
+            ("Maximum gap", self.maximum_gap_pct),
+            ("Minimum target", self.minimum_target_pct),
+            ("Stretch target", self.stretch_target_pct),
+            ("Maximum stop", self.maximum_stop_pct),
+        ):
+            if not isinstance(decimal_value, Decimal) or not decimal_value.is_finite():
+                raise ValueError(f"{name} must be a finite Decimal.")
         if not 0 <= self.edu_min_score <= 100:
             raise ValueError("EduTrader score must be between 0 and 100.")
         if not 0 <= self.volcano_min_score <= 100:
@@ -125,6 +158,7 @@ class GlobalRotationCandidate:
     resistance_local: Decimal
     reward_risk_to_resistance: Decimal
     quantity: Decimal
+    reserved_position_value_usd: Decimal
     position_value_usd: Decimal
     planned_loss_usd: Decimal
     target_profit_usd: Decimal
@@ -137,6 +171,13 @@ class GlobalRotationCandidate:
 class GlobalRotationResult:
     candidates: tuple[GlobalRotationCandidate, ...]
     rejected: tuple[ScanRejection, ...]
-    regimes: dict[str, MarketRegime]
+    regimes: Mapping[str, MarketRegime]
     scanned: int
     valid: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "regimes",
+            MappingProxyType(dict(sorted(self.regimes.items()))),
+        )

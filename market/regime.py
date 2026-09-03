@@ -8,7 +8,10 @@ class MarketRegime:
     label: str
     score: int
     tradeable: bool
-    reasons: list[str]
+    reasons: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "reasons", tuple(self.reasons))
 
 
 def classify_market(
@@ -37,7 +40,7 @@ def classify_market(
         reasons.append("Recent volatility is elevated.")
 
     if score >= 75:
-        return MarketRegime("Bullish", score, True, reasons)
+        return MarketRegime("Bullish", score, True, tuple(reasons))
     if score >= 45:
-        return MarketRegime("Cautious", score, False, reasons)
-    return MarketRegime("Risk-Off", score, False, reasons)
+        return MarketRegime("Cautious", score, False, tuple(reasons))
+    return MarketRegime("Risk-Off", score, False, tuple(reasons))

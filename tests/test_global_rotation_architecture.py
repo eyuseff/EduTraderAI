@@ -35,3 +35,13 @@ def test_daily_runner_contains_no_order_submission_call():
     assert "submit_bracket_order" not in source
     assert "submit_paper_order" not in source
     assert "orders_submitted" not in source
+
+
+def test_release_gate_covers_global_rotation_source_and_runner():
+    verification = (ROOT / "scripts/verify_release.py").read_text(encoding="utf-8")
+    coverage = (ROOT / ".coveragerc").read_text(encoding="utf-8")
+
+    assert '"global_rotation"' in verification
+    assert '"market/regime.py"' in verification
+    assert '"scripts/run_global_rotation_daily.py"' in verification
+    assert "    global_rotation\n" in coverage

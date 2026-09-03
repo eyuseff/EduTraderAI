@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+import numpy as np
 import pandas as pd
 
 REQUIRED_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
@@ -60,6 +61,14 @@ def validate_daily_history(
                 symbol,
                 "INSUFFICIENT_BARS",
                 f"Only {len(clean)} complete bars; {minimum_bars} required.",
+            )
+        )
+    if not np.isfinite(clean.to_numpy(dtype=float)).all():
+        issues.append(
+            DataQualityIssue(
+                symbol,
+                "NON_FINITE_OHLCV",
+                "OHLCV values must all be finite.",
             )
         )
     prices = clean.loc[:, ["Open", "High", "Low", "Close"]]
@@ -145,7 +154,9 @@ class YFinanceDailyHistoryProvider:
                 for symbol in chunk:
                     issues.append(
                         DataQualityIssue(
-                            symbol, "DOWNLOAD_ERROR", f"Download failed: {exc}"
+                            symbol,
+                            "DOWNLOAD_ERROR",
+                            f"Download failed ({type(exc).__name__}).",
                         )
                     )
                 continue

@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
+from contextlib import contextmanager
 import csv
 from decimal import Decimal
 import json
+import os
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -42,12 +47,17 @@ def _portfolio(path: Path) -> PaperPortfolioContext:
         raise ValueError("qualification_phase must be true or false.")
     if not isinstance(payload["open_symbols"], list):
         raise ValueError("open_symbols must be a JSON array.")
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in payload["open_symbols"]
+    ):
+        raise ValueError("open_symbols must contain only non-empty strings.")
     return PaperPortfolioContext(
         equity_usd=Decimal(str(payload["equity_usd"])),
         buying_power_usd=Decimal(str(payload["buying_power_usd"])),
         current_exposure_usd=Decimal(str(payload["current_exposure_usd"])),
         realized_loss_today_usd=Decimal(str(payload["realized_loss_today_usd"])),
-        open_symbols=tuple(str(item) for item in payload["open_symbols"]),
+        open_symbols=tuple(item.strip() for item in payload["open_symbols"]),
         qualification_phase=payload["qualification_phase"],
     )
 
@@ -60,6 +70,39 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+@contextmanager
+def _staged_output_directory(root: Path, run_id: str) -> Iterator[Path]:
+    """Publish a complete run directory atomically without replacing evidence."""
+
+    root.mkdir(parents=True, exist_ok=True)
+    output = root / run_id
+    lock = root / f".{run_id}.lock"
+    try:
+        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise FileExistsError(
+            f"A Global Rotation publication is already reserved: {output}"
+        ) from exc
+    os.close(descriptor)
+    staging: Path | None = None
+    try:
+        staging = Path(tempfile.mkdtemp(prefix=f".{run_id}.staging-", dir=root))
+        if output.exists():
+            raise FileExistsError(
+                f"Refusing to overwrite existing Global Rotation run: {output}"
+            )
+        yield staging
+        if output.exists():
+            raise FileExistsError(
+                f"Refusing to overwrite existing Global Rotation run: {output}"
+            )
+        staging.rename(output)
+    finally:
+        if staging is not None and staging.exists():
+            shutil.rmtree(staging)
+        lock.unlink(missing_ok=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,7 +118,10 @@ def parse_args() -> argparse.Namespace:
         "--portfolio-json",
         type=Path,
         required=True,
-        help="Required broker-truth Paper portfolio snapshot; no defaults are invented.",
+        help=(
+            "Required operator-supplied Paper portfolio snapshot. Values are "
+            "validated, but their source and freshness are not authenticated."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -95,13 +141,13 @@ def main() -> int:
     )
     run = service.run(universe=universe, portfolio=portfolio)
     output = args.output_dir / run.run_id
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "summary.json").write_text(
-        json.dumps(run_payload(run), indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    _write_csv(output / "candidates.csv", candidate_rows(run))
-    _write_csv(output / "data_quality.csv", data_issue_rows(run))
+    with _staged_output_directory(args.output_dir, run.run_id) as staging:
+        (staging / "summary.json").write_text(
+            json.dumps(run_payload(run), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        _write_csv(staging / "candidates.csv", candidate_rows(run))
+        _write_csv(staging / "data_quality.csv", data_issue_rows(run))
     print(output)
     return 0
 

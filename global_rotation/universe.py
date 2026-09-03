@@ -22,6 +22,8 @@ class UniverseRegion:
 
     def __post_init__(self) -> None:
         RegionConfig(self.code, self.benchmark_symbol, self.currency)
+        if type(self.fx_invert) is not bool:
+            raise ValueError("FX inversion must be true or false.")
         if self.currency != "USD" and not self.fx_symbol:
             raise ValueError(f"Region {self.code} requires an FX symbol.")
 
@@ -59,6 +61,17 @@ class UniverseSecurity:
             raise ValueError(f"Currency must have three letters for {self.symbol}.")
         if self.asset_type != "stock":
             raise ValueError(f"Only listed stocks are allowed: {self.symbol}.")
+        if self.etoro_eligible is not None and type(self.etoro_eligible) is not bool:
+            raise ValueError("eToro eligibility must be true, false, or null.")
+        for name, value in (
+            ("Active status", self.active),
+            ("Fractional capability", self.fractional_enabled),
+            ("BUY x1 capability", self.underlying_buy_x1),
+            ("CFD status", self.is_cfd),
+            ("24/7 status", self.is_247),
+        ):
+            if type(value) is not bool:
+                raise ValueError(f"{name} must be true or false.")
 
     def to_instrument(self, *, fx_to_usd: Decimal) -> GlobalInstrument:
         return GlobalInstrument(

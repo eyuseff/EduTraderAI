@@ -7,6 +7,11 @@ does not connect to eToro Real. Every bundled security has unverified eToro
 eligibility, so the starter universe returns zero quantities even when its
 technical filters pass.
 
+The shared account view does not prove exact gross fractional exposure,
+working-order commitments, or broker-truth realized loss. The Streamlit
+composition therefore leaves those gates explicitly unverified and returns
+zero quantities rather than treating incomplete values as safe.
+
 ## Streamlit button
 
 Start the existing application:
@@ -25,8 +30,10 @@ as an 8,000-stock production universe.
 
 ## Headless CLI
 
-The CLI requires an explicit Paper portfolio snapshot so equity, exposure, and
-loss values are never invented. Create a local JSON file with all fields:
+The CLI requires an explicit operator-supplied Paper portfolio snapshot so
+equity, exposure, and loss values are never invented. The CLI validates the
+shape and values but does not authenticate their source or freshness. Create a
+local JSON file with all fields:
 
 ```json
 {
@@ -39,6 +46,9 @@ loss values are never invented. Create a local JSON file with all fields:
 }
 ```
 
+`realized_loss_today_usd` is a nonnegative loss magnitude: use `0` for no
+realized loss and a positive value for realized loss. It is not signed P&L.
+
 Run:
 
 ```bash
@@ -50,10 +60,15 @@ The command writes a run-specific directory under `build/global_rotation/`
 containing:
 
 - `summary.json` — run identity, market dates, funnel, candidates, and an
-  explicit zero-order execution record;
+  explicit zero-order execution record. It also records SHA-256 fingerprints
+  for the universe, portfolio, OHLCV, data-quality issues, and policies;
 - `candidates.csv` — scores, risk/target fields, category, blockers, and first
   invalidation;
 - `data_quality.csv` — missing, invalid, or stale market series.
+
+The run id is the full SHA-256 content identity of those inputs. If its output
+directory already exists, the command stops instead of overwriting prior audit
+evidence.
 
 ## Scale boundary
 

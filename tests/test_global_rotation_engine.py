@@ -1,12 +1,15 @@
 from decimal import Decimal
 
 import pandas as pd
+import pytest
 
 from global_rotation import (
     GlobalInstrument,
     GlobalRotationEngine,
     PaperPortfolioContext,
     RegionConfig,
+    RotationPolicy,
+    size_paper_position,
 )
 
 
@@ -40,6 +43,10 @@ def _portfolio() -> PaperPortfolioContext:
     return PaperPortfolioContext(
         equity_usd=Decimal("10000"),
         buying_power_usd=Decimal("10000"),
+        current_exposure_usd=Decimal("0"),
+        realized_loss_today_usd=Decimal("0"),
+        open_symbols=(),
+        qualification_phase=True,
     )
 
 
@@ -54,6 +61,7 @@ def test_global_engine_requires_both_scanners_and_produces_paper_preview():
                 currency="USD",
                 etoro_eligible=True,
                 fractional_enabled=True,
+                underlying_buy_x1=True,
             )
         ],
         histories={"SPY": _constructive_history(), "TEST": _constructive_history()},
@@ -106,6 +114,7 @@ def test_missing_resistance_space_prevents_prepare():
                 currency="USD",
                 etoro_eligible=True,
                 fractional_enabled=True,
+                underlying_buy_x1=True,
             )
         ],
         histories={
@@ -137,6 +146,7 @@ def test_region_specific_benchmark_is_named_in_regime_explanation():
                 fx_to_usd=Decimal("0.0068"),
                 etoro_eligible=True,
                 fractional_enabled=True,
+                underlying_buy_x1=True,
             )
         ],
         histories={
@@ -163,6 +173,7 @@ def test_opening_gap_above_four_percent_is_not_pursued_or_sized():
                 currency="USD",
                 etoro_eligible=True,
                 fractional_enabled=True,
+                underlying_buy_x1=True,
             )
         ],
         histories={"SPY": _constructive_history(), "TEST": _history_with_opening_gap()},
@@ -174,3 +185,163 @@ def test_opening_gap_above_four_percent_is_not_pursued_or_sized():
     assert candidate.category == "no perseguir"
     assert candidate.quantity == Decimal("0")
     assert "Opening gap exceeds the 4% review limit." in candidate.blockers
+
+
+def test_buy_x1_must_be_explicitly_verified_before_sizing():
+    engine = GlobalRotationEngine(
+        regions=[RegionConfig(code="US", benchmark_symbol="SPY", currency="USD")]
+    )
+    result = engine.scan(
+        instruments=[
+            GlobalInstrument(
+                symbol="TEST",
+                region="US",
+                currency="USD",
+                etoro_eligible=True,
+                fractional_enabled=True,
+            )
+        ],
+        histories={"SPY": _constructive_history(), "TEST": _constructive_history()},
+        portfolio=_portfolio(),
+    )
+
+    candidate = result.candidates[0]
+    assert candidate.category == "esperar"
+    assert candidate.quantity == Decimal("0")
+    assert (
+        "Instrument is not an eligible BUY x1 underlying stock." in candidate.blockers
+    )
+
+
+def test_instrument_rejects_false_like_capability_values():
+    with pytest.raises(ValueError, match="eToro eligibility"):
+        GlobalInstrument(
+            symbol="TEST",
+            region="US",
+            currency="USD",
+            etoro_eligible="false",
+            underlying_buy_x1="false",
+        )
+
+    with pytest.raises(ValueError, match="finite Decimal"):
+        GlobalInstrument(
+            symbol="TEST",
+            region="US",
+            currency="USD",
+            fx_to_usd=Decimal("Infinity"),
+        )
+
+    with pytest.raises(ValueError, match="must be an integer"):
+        RotationPolicy(edu_min_score=True)
+
+
+def test_ranked_batch_reserves_qualification_position_capacity():
+    engine = GlobalRotationEngine(
+        regions=[RegionConfig(code="US", benchmark_symbol="SPY", currency="USD")]
+    )
+    instruments = [
+        GlobalInstrument(
+            symbol=symbol,
+            region="US",
+            currency="USD",
+            etoro_eligible=True,
+            fractional_enabled=True,
+            underlying_buy_x1=True,
+        )
+        for symbol in ("AAA", "BBB", "CCC")
+    ]
+    history = _constructive_history()
+    result = engine.scan(
+        instruments=instruments,
+        histories={"SPY": history, **{item.symbol: history for item in instruments}},
+        portfolio=_portfolio(),
+    )
+
+    prepared = [item for item in result.candidates if item.category == "preparar"]
+    blocked = [item for item in result.candidates if item.category == "esperar"]
+    assert [item.symbol for item in prepared] == ["AAA", "BBB"]
+    assert sum(item.position_value_usd for item in prepared) == Decimal("400.00")
+    assert [item.symbol for item in blocked] == ["CCC"]
+    assert blocked[0].quantity == Decimal("0")
+    assert "Maximum open positions reached." in blocked[0].blockers
+
+
+def test_ranked_batch_reserves_remaining_exposure_capacity():
+    engine = GlobalRotationEngine(
+        regions=[RegionConfig(code="US", benchmark_symbol="SPY", currency="USD")]
+    )
+    instruments = [
+        GlobalInstrument(
+            symbol=symbol,
+            region="US",
+            currency="USD",
+            etoro_eligible=True,
+            fractional_enabled=True,
+            underlying_buy_x1=True,
+        )
+        for symbol in ("AAA", "BBB", "CCC")
+    ]
+    history = _constructive_history()
+    result = engine.scan(
+        instruments=instruments,
+        histories={"SPY": history, **{item.symbol: history for item in instruments}},
+        portfolio=PaperPortfolioContext(
+            equity_usd=Decimal("10000"),
+            buying_power_usd=Decimal("10000"),
+            current_exposure_usd=Decimal("4900"),
+            realized_loss_today_usd=Decimal("0"),
+            open_symbols=(),
+            qualification_phase=True,
+        ),
+    )
+
+    total_new_exposure = sum(item.position_value_usd for item in result.candidates)
+    assert total_new_exposure <= Decimal("100.00")
+    assert sum(item.quantity > 0 for item in result.candidates) == 1
+
+
+def test_ranked_batch_reserves_exact_fractional_notional_before_rounding():
+    engine = GlobalRotationEngine(
+        regions=[RegionConfig(code="US", benchmark_symbol="SPY", currency="USD")]
+    )
+    instruments = [
+        GlobalInstrument(
+            symbol=symbol,
+            region="US",
+            currency="USD",
+            etoro_eligible=True,
+            fractional_enabled=True,
+            underlying_buy_x1=True,
+        )
+        for symbol in ("AAA", "BBB", "CCC")
+    ]
+    history = _constructive_history()
+    result = engine.scan(
+        instruments=instruments,
+        histories={"SPY": history, **{item.symbol: history for item in instruments}},
+        portfolio=PaperPortfolioContext(
+            equity_usd=Decimal("10000"),
+            buying_power_usd=Decimal("10000"),
+            current_exposure_usd=Decimal("4600.015"),
+            realized_loss_today_usd=Decimal("0"),
+            open_symbols=(),
+            qualification_phase=False,
+        ),
+    )
+
+    exact_new_notional = sum(
+        item.reserved_position_value_usd for item in result.candidates
+    )
+    assert exact_new_notional <= Decimal("399.985")
+
+
+def test_sizing_rejects_false_like_fractional_capability():
+    with pytest.raises(ValueError, match="Fractional capability"):
+        size_paper_position(
+            symbol="TEST",
+            entry_usd=Decimal("99"),
+            stop_usd=Decimal("95"),
+            target_usd=Decimal("110"),
+            fractional_enabled="false",
+            portfolio=_portfolio(),
+        )

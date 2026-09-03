@@ -36,6 +36,9 @@ def candidate_rows(run: DailyGlobalRotationRun) -> list[dict[str, Any]]:
                 "resistance_local": str(candidate.resistance_local),
                 "reward_risk_to_resistance": str(candidate.reward_risk_to_resistance),
                 "quantity": str(candidate.quantity),
+                "reserved_position_value_usd": str(
+                    candidate.reserved_position_value_usd
+                ),
                 "position_value_usd": str(candidate.position_value_usd),
                 "planned_loss_usd": str(candidate.planned_loss_usd),
                 "target_profit_usd": str(candidate.target_profit_usd),
@@ -60,6 +63,16 @@ def run_payload(run: DailyGlobalRotationRun) -> dict[str, Any]:
         categories[candidate.category] = categories.get(candidate.category, 0) + 1
     return {
         "run_id": run.run_id,
+        "evidence_fingerprints": {
+            "operator_schema": run.operator_schema,
+            "universe_sha256": run.universe_sha256,
+            "portfolio_sha256": run.portfolio_sha256,
+            "market_data_sha256": run.market_data_sha256,
+            "data_quality_sha256": run.data_quality_sha256,
+            "result_sha256": run.result_sha256,
+            "risk_policy_sha256": run.risk_policy_sha256,
+            "rotation_policy_sha256": run.rotation_policy_sha256,
+        },
         "universe": {
             "id": run.universe_id,
             "version": run.universe_version,
@@ -70,6 +83,9 @@ def run_payload(run: DailyGlobalRotationRun) -> dict[str, Any]:
             "histories_loaded": run.histories_loaded,
             "as_of_by_region": {
                 key: value.isoformat() for key, value in run.as_of_by_region.items()
+            },
+            "fx_as_of_by_region": {
+                key: value.isoformat() for key, value in run.fx_as_of_by_region.items()
             },
             "quality_issue_count": len(run.data_issues),
         },

@@ -467,19 +467,26 @@ elif page == "Global Rotation Paper":
         "final 8,000-name security master. Its eToro eligibility is intentionally "
         "unverified, so it cannot generate non-zero quantities."
     )
+    st.info(
+        "The shared account snapshot does not prove exact gross exposure, working-order "
+        "commitments, or realized daily loss. Those sizing gates remain unverified "
+        "here, so this screen fails closed to zero quantities."
+    )
     qualification_phase = st.checkbox(
         "Qualification phase: maximum two positions and USD 200 per new position",
         value=True,
     )
     if st.button("Run Global Rotation Paper", type="primary"):
         try:
-            exposure = sum(max(position.market_value, 0.0) for position in positions)
             portfolio = PaperPortfolioContext(
                 equity_usd=Decimal(str(account.equity)),
                 buying_power_usd=Decimal(str(account.buying_power)),
-                current_exposure_usd=Decimal(str(exposure)),
-                realized_loss_today_usd=Decimal(str(max(-account.daily_pnl, 0.0))),
-                open_symbols=tuple(position.symbol for position in positions),
+                # The generic view omits exact gross fractional exposure and
+                # working-order commitments, while daily P&L mixes realized and
+                # unrealized movement. Keep every unproven gate explicitly unknown.
+                current_exposure_usd=None,
+                realized_loss_today_usd=None,
+                open_symbols=None,
                 qualification_phase=qualification_phase,
             )
             with st.spinner(
