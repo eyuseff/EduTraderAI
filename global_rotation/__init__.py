@@ -1,5 +1,15 @@
 """Deterministic, paper-only global rotation research core."""
 
+from global_rotation.congressional import (
+    CongressionalSignal,
+    CongressionalSignalPolicy,
+    CongressionalSnapshot,
+    CongressionalTrade,
+    load_congressional_snapshot,
+    parse_congressional_snapshot,
+    score_congressional_activity,
+    score_congressional_universe,
+)
 from global_rotation.daily import DailyGlobalRotationRun, DailyGlobalRotationService
 from global_rotation.data import (
     DailyHistoryBatch,
@@ -31,6 +41,10 @@ from global_rotation.universe import (
 )
 
 __all__ = [
+    "CongressionalSignal",
+    "CongressionalSignalPolicy",
+    "CongressionalSnapshot",
+    "CongressionalTrade",
     "DailyGlobalRotationRun",
     "DailyGlobalRotationService",
     "DailyHistoryBatch",
@@ -50,7 +64,11 @@ __all__ = [
     "UniverseSnapshot",
     "YFinanceDailyHistoryProvider",
     "blocked_paper_preview",
+    "load_congressional_snapshot",
     "load_universe",
+    "parse_congressional_snapshot",
     "parse_universe",
+    "score_congressional_activity",
+    "score_congressional_universe",
     "size_paper_position",
 ]
