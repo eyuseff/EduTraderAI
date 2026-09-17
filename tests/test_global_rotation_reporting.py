@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pandas as pd
 
+from global_rotation.congressional import CongressionalTrade, score_congressional_activity
 from global_rotation.daily import DailyGlobalRotationRun
 from global_rotation.data import DataQualityIssue
 from global_rotation.engine import GlobalRotationEngine
@@ -94,6 +95,8 @@ def test_reporting_payload_is_auditable_and_explicitly_non_executing():
     payload = run_payload(run)
 
     assert rows[0]["first_invalidation"].startswith("Close below stop")
+    assert "f7_score" not in rows[0]
+    assert "congressional_intelligence" not in payload
     assert payload["execution"] == {
         "mode": "RESEARCH_PAPER_PREVIEW_ONLY",
         "orders_submitted": 0,
@@ -111,3 +114,40 @@ def test_reporting_payload_is_auditable_and_explicitly_non_executing():
         "risk_policy_sha256": "f" * 64,
         "rotation_policy_sha256": "0" * 64,
     }
+
+    signal = score_congressional_activity(
+        "AAA",
+        [
+            CongressionalTrade(
+                symbol="AAA",
+                politician="Example Discloser",
+                transaction_type="purchase",
+                traded_on=date(2026, 8, 27),
+                published_on=date(2026, 8, 28),
+                amount_low_usd=Decimal("50000"),
+                amount_high_usd=Decimal("100000"),
+                source="capitoltrades",
+            )
+        ],
+        as_of=date(2026, 8, 28),
+    )
+    enriched_rows = candidate_rows(run, {"AAA": signal})
+    enriched_payload = run_payload(
+        run,
+        {"AAA": signal},
+        {"source": "capitoltrades", "input_sha256": "1" * 64},
+    )
+
+    assert enriched_rows[0]["f7_available"] is True
+    assert enriched_rows[0]["f7_direction"] == "bullish"
+    assert enriched_rows[0]["f7_priority_adjustment"] > 0
+    assert enriched_rows[0]["research_priority_score"] >= round(
+        (result.candidates[0].edu_score + result.candidates[0].volcano_score) / 2
+    )
+    assert enriched_payload["congressional_intelligence"]["source"] == "capitoltrades"
+    assert (
+        enriched_payload["congressional_intelligence"]["changes_execution_eligibility"]
+        is False
+    )
+    assert enriched_payload["congressional_intelligence"]["can_bypass_guardian"] is False
+    assert enriched_payload["execution"] == payload["execution"]
