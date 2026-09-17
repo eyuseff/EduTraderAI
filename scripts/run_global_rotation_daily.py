@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 import csv
 from decimal import Decimal
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,7 +20,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from global_rotation.daily import DailyGlobalRotationService  # noqa: E402
+from global_rotation.congressional import (  # noqa: E402
+    CongressionalSignal,
+    load_congressional_snapshot,
+    score_congressional_activity,
+)
+from global_rotation.daily import (  # noqa: E402
+    DailyGlobalRotationRun,
+    DailyGlobalRotationService,
+)
 from global_rotation.data import YFinanceDailyHistoryProvider  # noqa: E402
 from global_rotation.reporting import (  # noqa: E402
     candidate_rows,
@@ -60,6 +69,32 @@ def _portfolio(path: Path) -> PaperPortfolioContext:
         open_symbols=tuple(item.strip() for item in payload["open_symbols"]),
         qualification_phase=payload["qualification_phase"],
     )
+
+
+def _congressional_enrichment(
+    run: DailyGlobalRotationRun,
+    path: Path | None,
+) -> tuple[dict[str, CongressionalSignal] | None, dict[str, object] | None]:
+    if path is None:
+        return None, None
+
+    raw = path.read_bytes()
+    snapshot = load_congressional_snapshot(path)
+    signals: dict[str, CongressionalSignal] = {}
+    for candidate in run.result.candidates:
+        signals[candidate.symbol.upper()] = score_congressional_activity(
+            candidate.symbol,
+            snapshot.trades,
+            as_of=run.as_of_by_region[candidate.region],
+        )
+    context: dict[str, object] = {
+        "source_loaded": True,
+        "source": snapshot.source,
+        "snapshot_as_of": snapshot.as_of.isoformat(),
+        "input_sha256": hashlib.sha256(raw).hexdigest(),
+        "lookahead_prevention": "published_on <= regional market as_of",
+    }
+    return signals, context
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
@@ -124,6 +159,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--congressional-json",
+        type=Path,
+        help=(
+            "Optional normalized F7 disclosure snapshot. Capitol Trades can be "
+            "recorded as provenance; the scanner performs no website scraping."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / "build/global_rotation",
@@ -140,13 +183,28 @@ def main() -> int:
         YFinanceDailyHistoryProvider(maximum_symbols=args.provider_cap)
     )
     run = service.run(universe=universe, portfolio=portfolio)
+    congressional_signals, congressional_context = _congressional_enrichment(
+        run, args.congressional_json
+    )
     output = args.output_dir / run.run_id
     with _staged_output_directory(args.output_dir, run.run_id) as staging:
         (staging / "summary.json").write_text(
-            json.dumps(run_payload(run), indent=2, ensure_ascii=False) + "\n",
+            json.dumps(
+                run_payload(
+                    run,
+                    congressional_signals=congressional_signals,
+                    congressional_context=congressional_context,
+                ),
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
             encoding="utf-8",
         )
-        _write_csv(staging / "candidates.csv", candidate_rows(run))
+        _write_csv(
+            staging / "candidates.csv",
+            candidate_rows(run, congressional_signals),
+        )
         _write_csv(staging / "data_quality.csv", data_issue_rows(run))
     print(output)
     return 0
