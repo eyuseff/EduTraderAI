@@ -70,9 +70,7 @@ def candidate_rows(
             "resistance_local": str(candidate.resistance_local),
             "reward_risk_to_resistance": str(candidate.reward_risk_to_resistance),
             "quantity": str(candidate.quantity),
-            "reserved_position_value_usd": str(
-                candidate.reserved_position_value_usd
-            ),
+            "reserved_position_value_usd": str(candidate.reserved_position_value_usd),
             "position_value_usd": str(candidate.position_value_usd),
             "planned_loss_usd": str(candidate.planned_loss_usd),
             "target_profit_usd": str(candidate.target_profit_usd),

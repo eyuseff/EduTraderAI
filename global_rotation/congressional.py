@@ -452,9 +452,7 @@ def parse_congressional_snapshot(payload: Mapping[str, Any]) -> CongressionalSna
                     raw.get("amount_high_usd"), field="amount_high_usd"
                 ),
                 owner=(
-                    str(raw["owner"]).strip()
-                    if raw.get("owner") is not None
-                    else None
+                    str(raw["owner"]).strip() if raw.get("owner") is not None else None
                 ),
                 chamber=(
                     str(raw["chamber"]).strip()

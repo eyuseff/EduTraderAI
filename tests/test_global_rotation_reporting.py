@@ -3,7 +3,10 @@ from decimal import Decimal
 
 import pandas as pd
 
-from global_rotation.congressional import CongressionalTrade, score_congressional_activity
+from global_rotation.congressional import (
+    CongressionalTrade,
+    score_congressional_activity,
+)
 from global_rotation.daily import DailyGlobalRotationRun
 from global_rotation.data import DataQualityIssue
 from global_rotation.engine import GlobalRotationEngine
@@ -149,5 +152,7 @@ def test_reporting_payload_is_auditable_and_explicitly_non_executing():
         enriched_payload["congressional_intelligence"]["changes_execution_eligibility"]
         is False
     )
-    assert enriched_payload["congressional_intelligence"]["can_bypass_guardian"] is False
+    assert (
+        enriched_payload["congressional_intelligence"]["can_bypass_guardian"] is False
+    )
     assert enriched_payload["execution"] == payload["execution"]
